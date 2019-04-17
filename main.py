@@ -15,7 +15,7 @@ def random_key(mode=""):
 def create_song(parts="4"):
 	song_notes = []
 	if parts >= 1:
-		song_notes.append(Bass(*random_key()).create_part())
+		song_notes.append(Bass(*random_key("aeolian")).create_part())
 	if parts >= 2:
 		song_notes.append(Soprano().create_part())
 	if parts >= 3:
@@ -41,17 +41,17 @@ def make_lily_file():
 	new_file = new_file.replace("PART_SLOT", "")
 	new_file = new_file.replace("Symphony", title)
 	with open("new_layout.txt", 'w') as f:
-		f.write(new_file)
+		f.write(new_file)	
 
 song_degrees = create_song(2)
 
 if __name__ ==  "__main__":
-	program = 40
+	program = 42
 	track    = 0
 	channel  = 0
 	time     = 0   # In beats
 	# duration = 1   # In beats
-	tempo    = 100  # In BPM
+	tempo    = 110  # In BPM
 	volume   = 100 # 0-127, as per the MIDI standard
 
 	MyMIDI = MIDIFile(2) # One track, defaults to format 1 (tempo track
