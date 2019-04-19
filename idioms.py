@@ -20,6 +20,9 @@ minor_scales = {"A":"#", "E":"#", "B":"#", "F#":"#", "C#":"#", "G#":"#",
 if so use all_notes instead of tonics variable, 
 the latter of which has dependencies"""
 
+
+
+
 all_notes = (
 	"A", ("A#","Bb"), "B", "C", ("C#", "Db"), "D",
 	"E", ("F"), ("F#", "Gb"), "G", ("G#", "Ab")
@@ -30,6 +33,11 @@ tonics = {
 }
 """tuple with one item needs comma. Negative chords denote descent
 You can create fake passing chords by combining accents"""
+
+# Converting pitch to scale degree
+major_scale_degrees = { 0:0, 2:1, 4:2, 5:3, 7:4, 9:5, 11:6 }
+minor_scale_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 10:6, 11:6 }
+
 expand_tonic = {
 	I: ((-V6, I), (VII6, I6), (VII6, -I), (-V65, I6), (V43, I6), 
 		(V42, I6), (-V65, I), (V43, -I)), 
@@ -52,11 +60,14 @@ subdom_to_dom = {
 	II: (V, V7, -V65), II6: (V, V7, V42), IV: (V, V7, V42)
 }
 accent_dom = {
-	V: (V6, V65,), V6: (-V,)
+	V: (V6, V65), V6: (-V,)
 }
 bass_notes = {
 	I:0, II: 1, V43: 1, VII6: 1, I6: 2, IV: 3, II6: 3, V42: 3, V: 4, V7: 4, 
 	I64: 4, V6: 6, V65: 6
+}
+dom_to_tonic = {
+	V: (-I,), V7: (-I,), V6: (I,), V65: (I,),  V43:(-I,), V42: (-I,)
 }
 # Flat is better than nested
 chord_tones = {
@@ -70,8 +81,9 @@ Passing chord: I VII6 I. Addendum of 2. First chord from prior sequence.
 A to P is an accent chord that become a passing chord: I6 I VII6 I Addendum of 3
 First chord from prior sequence. I is the accent here. """
 antecedent = {
-	("P","A"):(2,2,2), ("A","P","A"): (1,1,2,2), ("A","A","P"):(2,1,1,2),
-	("A","P","P"):(1,1,1,1,2)
+	("P","A"):(2,2,2,2), ("A","P","A"): (2,1,1,2,2), ("A","A","P"):(2,2,1,1,2),
+	("A","P","P"):(2,1,1,1,1,2), ("P","P","A"): (1,1,1,1,2,2), 
+	("P","A","P"): (1,1,2,1,1,2), ("A","A","P","A"): (1,1,1,1,2,2)
 }
 """F denotes the final chord, dominant or tonic depending on half/authentic cadence. 
 Final dominant can be V7 or V. Some chord combos may have multiple possible note combos
@@ -88,6 +100,14 @@ consequent2 = {
 }
 names = {
 	"1":"I", "2":"II", "3":"III", "4":"IV", "5":"V", "6":"VI", "7":"VII",
-	"530":"", "753":"7", "630":"6", "653": "65", "640":"64", "643": "43", "642":"42"   
+	"530":"", "753":"7", "630":"6", "653": "65", "640":"64", 
+	"643": "43", "642":"42"   
 }
 
+interval_names = {
+	(0,0): "P8", (0,1): "d2", (1,0): "A1", (1,1): "m2", (2,1): "M2", (2,2): "d3",
+	(3,1): "A2", (3,2): "m3", (4,2): "M3", (4,3): "d4", (5,2): "A3", (5,3): "P4",
+	(6,3): "A4", (6,4): "d5", (7,4): "P5", (7,5): "d6", (8,4): "A5", (8,5): "m6",
+	(9,5): "M6", (9,6): "d7", (10,5): "A6", (10,6): "m7", (11,6): "M7", 
+	(11,7): "d8", (0,6): "A7"
+}

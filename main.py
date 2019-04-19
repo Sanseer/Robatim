@@ -1,7 +1,9 @@
 from midiutil import MIDIFile
 import random
 
-from parts import *
+from voice import *
+from bass import *
+from soprano import *
 from idioms import *
 
 def random_key(mode=""):
@@ -15,7 +17,7 @@ def random_key(mode=""):
 def create_song(parts="4"):
 	song_notes = []
 	if parts >= 1:
-		song_notes.append(Bass(*random_key("aeolian")).create_part())
+		song_notes.append(Bass(*random_key()).create_part())
 	if parts >= 2:
 		song_notes.append(Soprano().create_part())
 	if parts >= 3:
@@ -30,7 +32,8 @@ def make_lily_file():
 		mode = "major "
 	elif Voice.mode == "aeolian":
 		mode = "minor "
-	title = "Cantus in " + Voice.tonic + " " +  mode.replace(" ","")
+	# title = "Cantus in " + Voice.tonic + " " +  mode.replace(" ","")
+	title = "".join(["Cantus in ", Voice.tonic, " ", mode.replace(" ","")])
 	with open("old_layout.txt", 'r') as f:
 		new_file = f.read()
 	for part in Voice.lily_parts:
