@@ -28,6 +28,7 @@ class Bass(Voice):
 		self.add_notes()
 		self.convert_notes()
 		self.make_letters()
+		print(Voice.note_values, len(Voice.note_values))
 		self.lily_convert()
 		return self.real_notes
 
@@ -53,7 +54,7 @@ class Bass(Voice):
 			Voice.note_values.extend(tonic_note_values)
 			# print(Voice.note_values)
 			self.old_chord = Voice.chord_path[-1]
-			chord_options = expand_tonic[abs(self.old_chord)]
+			chord_options = expand_tonic1[abs(self.old_chord)]
 			self.create_passing_chords(chord_options)
 		# self.old_chord = Voice.chord_path[-1]
 		self.make_authentic_cadence()
@@ -76,8 +77,11 @@ class Bass(Voice):
 		Voice.note_values.extend(antecedent[rhythm_sequence])
 
 		for rhythm in rhythm_sequence:
-			if rhythm == "P":
-				chord_options = expand_tonic[abs(self.old_chord)]
+			if rhythm == "DP":
+				chord_options = expand_tonic2[abs(self.old_chord)]
+				self.create_passing_chords(chord_options)
+			elif rhythm == "P":
+				chord_options = expand_tonic1[abs(self.old_chord)]
 				self.create_passing_chords(chord_options)
 			elif rhythm == "A":
 				chord_options = accent_tonic[abs(self.old_chord)]
@@ -99,9 +103,9 @@ class Bass(Voice):
 		rhythm_sequence = random.choice(tuple(consequent1.keys()))
 		Voice.note_values.extend(consequent1[rhythm_sequence])
 		Voice.idea3_length = len(Voice.note_values) - Voice.idea1_length - Voice.idea2_length
-		self.choose_chord(rhythm_sequence)
+		self.choose_chord(rhythm_sequence, False)
 
-	def choose_chord(self, rhythm_sequence):
+	def choose_chord(self, rhythm_sequence, cadence):
 		counter = 0
 		for rhythm in rhythm_sequence:
 			counter += 1
@@ -111,14 +115,22 @@ class Bass(Voice):
 			elif "AS" in rhythm:
 				chord_options = accent_subdom[abs(self.old_chord)]
 				self.create_accent_chord(chord_options)
-			elif rhythm == "AD":
-				chord_options = subdom_to_dom[abs(self.old_chord)]
-				self.create_accent_chord(chord_options)
 			elif rhythm == "PS":
 				chord_options = expand_subdom[abs(self.old_chord)]
 				self.create_passing_chords(chord_options)
-			elif rhythm == "FD":
+			elif rhythm == "CD":
+				chord_options = (I64,)
+				self.create_accent_chord(chord_options)
+			elif rhythm == "FD" and "CD" in rhythm_sequence:
+				# print("Optional cadence")
+				chord_options = accent_dom[abs(self.old_chord)]
+				self.create_accent_chord(chord_options)
+			elif rhythm == "FD" and "CD" not in rhythm_sequence:
 				chord_options = subdom_to_dom[abs(self.old_chord)]
+				self.create_accent_chord(chord_options)
+			elif rhythm == "AD":
+				# print("Mandatory cadence")
+				chord_options = (V, V7)
 				self.create_accent_chord(chord_options)
 			elif rhythm == "FT":
 				# chord_options = (I,)
@@ -132,7 +144,7 @@ class Bass(Voice):
 			(Voice.idea2_length) * 2 - Voice.idea3_length)
 		# print(Voice.note_values)
 		# print(rhythm_sequence)
-		self.choose_chord(rhythm_sequence)
+		self.choose_chord(rhythm_sequence, True)
 
 	def add_notes(self):
 		"""Add notes to bass based on chords. First chord must be tonic"""

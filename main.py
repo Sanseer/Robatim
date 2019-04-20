@@ -49,7 +49,7 @@ def make_lily_file():
 song_degrees = create_song(2)
 
 if __name__ ==  "__main__":
-	program = 42
+	program = 22
 	track    = 0
 	channel  = 0
 	time     = 0   # In beats

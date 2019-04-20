@@ -11,7 +11,6 @@ class Voice:
 	idea4_length = 0
 	chord_path = []
 	note_values = [] 
-	chord_types = []
 	main_pitches = []
 	bass_pitches = []
 	bass_motion = []
@@ -33,32 +32,51 @@ class Voice:
 		while main_pitch < 0:
 			main_pitch += 12
 		new_pitch = pitch_choice % 12
-		while new_pitch < 0:
-			new_pitch += 12
-		while new_pitch > 12:
-			new_pitch -= 12
 		# print(f"{Voice.mode} mode: {main_pitch} and {new_pitch}")
+
+		intervals.append(self.make_specific_interval(main_pitch, new_pitch))
+
+	def validate_leap(self, pitch_choice):
+		# print(f"Pitch choice {pitch_choice}", end=" | ")
+		old_pitch = self.pitch_amounts[self.note_index - 1]
+		# print(f"Old pitch {old_pitch}", end=" | ")
+		pitch_change = pitch_choice - old_pitch
+
+		old_pitch %= 12
+		pitch_choice %= 12 
+
+		if pitch_change >= 0:
+			specific_interval = self.make_specific_interval(old_pitch, pitch_choice)
+		elif pitch_change < 0:
+			specific_interval = self.make_specific_interval(pitch_choice, old_pitch)
+
+		if (pitch_change > 0) and ("6" in specific_interval or "7" in specific_interval):
+			# print("Leap too far up")
+			return False
+		elif (pitch_change < 0) and ("3" in specific_interval or "2" in specific_interval):
+			# print("Leap too far down")
+			return False
+		return specific_interval
+
+
+	def make_specific_interval(self, old_pitch, new_pitch):
+
 		if Voice.mode == "ionian":
-			main_pitch_degree = major_scale_degrees[main_pitch]
+			old_pitch_degree = major_scale_degrees[old_pitch]
 			new_pitch_degree = major_scale_degrees[new_pitch]
 		elif Voice.mode == "aeolian":
-			main_pitch_degree = minor_scale_degrees[main_pitch]
+			old_pitch_degree = minor_scale_degrees[old_pitch]
 			new_pitch_degree = minor_scale_degrees[new_pitch]
-		# print(f"Scale degrees: {main_pitch_degree} and {new_pitch_degree}")
-		leap = new_pitch - main_pitch
-		generic_interval = new_pitch_degree - main_pitch_degree
+
+		leap = new_pitch - old_pitch
+		generic_interval = new_pitch_degree - old_pitch_degree
+
 		if leap < 0:
 			leap += 12
 			generic_interval += 7
-		# print(f"{leap} semitones. Generic interval: {generic_interval}")
-		# intervals.append((leap, generic_interval))
-		# intervals[-1] = interval_names[(leap, generic_interval)]
-		intervals.append(interval_names[(leap, generic_interval)])
-		# print(self.pitch_amounts, len(self.pitch_amounts))
-		# print(self.intervals, len(self.intervals), end="\n\n")
 
-	def next_interval(self, old_pitch, pitch_choice):
-		pass
+		return interval_names[(leap, generic_interval)]
+
 
 	def calculate_motion(self, old_motion, new_motion, movements):
 		old_move = old_motion[self.note_index - 1]

@@ -84,22 +84,27 @@ class Soprano(Voice):
 		attempts = 0
 		while "Blank" in self.pitch_amounts:
 			attempts += 1
+			assert(attempts < 40), "You ran out of tries!"
 			if self.possible_pitches[self.note_index]:
 				pitch_choice = self.choose_pitch()
 				voice_lead = self.validate_note(pitch_choice)
 				if (self.note_index == Voice.idea1_length + 
 					Voice.idea2_length + Voice. idea3_length - 1):
-					print("Ending antecedent")
+					print("")
 				if voice_lead:
 					self.pitch_amounts[self.note_index] = pitch_choice
 					last_pitch = pitch_choice
+					# print(f"Good choice")
+					print(self.validate_leap(pitch_choice), end=" ")
+					attempts = 0
 					self.note_index += 1
 					# print(f"\nGood choice! Move on. New index: {self.note_index}")
 					if self.note_index == len(self.pitch_amounts):
 						# print(f"You win: {self.pitch_amounts}")
 						break
 				else:
-					# print(f"Bad choice. Try another {self.note_index}", end="\n")
+					# print(f"Bad choice. Try another {self.note_index}")
+					print(self.note_index, end=" ")
 					self.possible_pitches[self.note_index].remove(pitch_choice)
 					self.intervals.pop()
 					Voice.soprano_motion.pop()
@@ -163,13 +168,9 @@ class Soprano(Voice):
 				pitches.append(self.calculate_pitch(chord_root, note, -1) - 11)
 			else:
 				pitches.append(self.calculate_pitch(chord_root, note, 1))
-				# print(f"Add {note} above: {pitches}")
 				pitches.append(self.calculate_pitch(chord_root, note, 1) + 12)
-				# print(f"Add {note} above (+ octave): {pitches}")
 				pitches.append(self.calculate_pitch(chord_root, note, -1))
-				# print(f"Add {note} below {pitches}")
 				pitches.append(self.calculate_pitch(chord_root, note, -1) - 12)
-				# print(f"Add {note} below (-octave) {pitches}")
 		return pitches
 
 	def choose_pitch(self):
@@ -209,7 +210,7 @@ class Soprano(Voice):
 		self.calculate_interval(Voice.main_pitches, pitch_choice, self.intervals)
 		self.calculate_motion(Voice.bass_motion, Voice.soprano_motion, self.motion_with_bass)
 
-		print(f"Considering note #{self.note_index + 1}")
+		# print(f"Considering note #{self.note_index + 1}")
 
 		return self.is_counterpoint(pitch_choice)
 
@@ -217,61 +218,68 @@ class Soprano(Voice):
 	def is_counterpoint(self, pitch_choice):
 
 		if "P" in self.intervals[-1] and "P" in self.intervals[-2]:
-			print("Double perfects. Delete!")
-			print(self.intervals)
+			# print("Double perfects. Delete!")
+			# print(self.intervals)
 			return False  
 		elif (self.note_index > 3 and self.intervals[-1] == self.intervals[-2] 
 		and self.intervals[-2] == self.intervals[-3] and 
 		self.intervals[-3] == self.intervals[-4]):
-			print("Quadruple identical imperfects. Delete")
-			print(self.intervals)
+			# print("Quadruple identical imperfects. Delete")
+			# print(self.intervals)
 			return False
 		elif (self.note_index > 2 and 
 		self.motion_with_bass[-1] == "Parallel" and 
 		self.motion_with_bass[-2] == "Parallel" and 
 		self.motion_with_bass[-3] == "Parallel"):
-			print("Three consecutive parallels. Delete!")  
-			print(self.intervals)
-			print(self.motion_with_bass)
+			# print("Three consecutive parallels. Delete!")  
+			# print(self.intervals)
+			# print(self.motion_with_bass)
 			return False
 		elif (((self.pitch_amounts[self.note_index - 1] + 1) % 12 == 0) and 
 		pitch_choice % 12 != 0):
-			print("Leading tone must progress to tonic")
+			# print("Leading tone must progress to tonic")
 			return False
 		elif self.intervals[-2] == "d5" and "3" not in self.intervals[-1]:
-			print("Diminished 5th must resolve to a third. Delete!")
-			print(self.intervals)
+			# print("Diminished 5th must resolve to a third. Delete!")
+			# print(self.intervals)
 			return False
 		elif (self.intervals[-2] == "A4") and ("6" not in self.intervals[-1]):
-			print("Augmented 4th must resolve to a sixth. Delete!")
-			print(self.intervals)
+			# print("Augmented 4th must resolve to a sixth. Delete!")
+			# print(self.intervals)
 			return False
 		elif ((self.note_index != len(self.possible_pitches) - 1) and 
 		self.intervals[-1] == "P8"):
-			print("Avoiding premature unison")
+			# print("Avoiding premature unison")
 			return False
-		elif (self.note_index > 3 and self.motion_with_bass[-1] != "Contrary"
+		elif (self.note_index > 2 and self.motion_with_bass[-1] != "Contrary" 
+		and self.motion_with_bass[-1] != "Oblique" 
 		and self.motion_with_bass[-1] == self.motion_with_bass[-2] and 
 		self.motion_with_bass[-2] == self.motion_with_bass[-3]):
-			print(f"Triple {self.motion_with_bass[-1]}. Delete!")
-			print(self.motion_with_bass)
+			# print(f"Triple {self.motion_with_bass[-1]}. Delete!")
+			# print(self.motion_with_bass)
 			return False
 		elif self.motion_with_bass[-1] == "No motion":
-			print("No movement. Delete!")
+			# print("No movement. Delete!")
 			return False
 		elif ((self.motion_with_bass[-1] == "Parallel" or
 		self.motion_with_bass[-1] == "Similar") and self.intervals[-1] == "P5"):
-			print(f"{self.motion_with_bass[-1]} 5th or hidden 5th")
+			# print(f"{self.motion_with_bass[-1]} 5th or hidden 5th")
 			return False 
 		elif (self.note_index > 1 and Voice.soprano_motion[-1] == 0 and 
 		Voice.soprano_motion[-2] == 0):
-			print("Triple repeat. Delete!")
-			print(Voice.soprano_motion)
+			# print("Triple repeat. Delete!")
+			# print(Voice.soprano_motion)
+			return False
+		elif "7" in self.intervals[-1] or "2" in self.intervals[-1]:
+			# print(f"{self.intervals[-1]} is a dissonant interval.")
 			return False
 		elif ((self.note_index == len(self.possible_pitches) - 1) and 
 			self.motion_with_bass[-1] != "Contrary"):
-			print("Must end strong with contrary motion!")
+			# print("Must end strong with contrary motion!")
 			return False
+		# elif not self.validate_leap(pitch_choice):
+		# 	print("Leap too wide!")
+		# 	return False
 
 		# Leaps higher than a 4th
 		# Protect transition to consequent
