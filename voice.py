@@ -11,7 +11,6 @@ class Voice:
 	idea4_length = 0
 	chord_path = []
 	note_values = [] 
-	main_pitches = []
 	bass_pitches = []
 	bass_motion = []
 	soprano_pitches = []
@@ -24,40 +23,31 @@ class Voice:
 	chord_symbols = []
 
 	def calculate_interval(self, old_pitches, pitch_choice, intervals):
-		# print(old_pitches)
-		# main_pitches = [(pitch - tonics[Voice.tonic]) % 12 for pitch in old_pitches]
-		# new_pitches = [pitch % 12 for pitch in self.pitch_amounts if type(pitch) == int]
 		main_pitch = old_pitches[self.note_index]
-		# print(f"{main_pitch} and {pitch_choice}")
-		while main_pitch < 0:
-			main_pitch += 12
+		main_pitch = (main_pitch - tonics[Voice.tonic]) % 12
 		new_pitch = pitch_choice % 12
-		# print(f"{Voice.mode} mode: {main_pitch} and {new_pitch}")
 
 		intervals.append(self.make_specific_interval(main_pitch, new_pitch))
 
 	def validate_leap(self, pitch_choice):
-		# print(f"Pitch choice {pitch_choice}", end=" | ")
 		old_pitch = self.pitch_amounts[self.note_index - 1]
-		# print(f"Old pitch {old_pitch}", end=" | ")
 		pitch_change = pitch_choice - old_pitch
 
-		old_pitch %= 12
-		pitch_choice %= 12 
-
-		if pitch_change >= 0:
-			specific_interval = self.make_specific_interval(old_pitch, pitch_choice)
-		elif pitch_change < 0:
-			specific_interval = self.make_specific_interval(pitch_choice, old_pitch)
-
-		if (pitch_change > 0) and ("6" in specific_interval or "7" in specific_interval):
-			# print("Leap too far up")
+		if abs(pitch_change) > 7: 
 			return False
-		elif (pitch_change < 0) and ("3" in specific_interval or "2" in specific_interval):
-			# print("Leap too far down")
-			return False
-		return specific_interval
+		return True
 
+	def is_voice_range(self):
+		selected_pitches = [ pitch for pitch in self.pitch_amounts 
+		if type(pitch) == int ]
+		highest_pitch = max(selected_pitches)
+		lowest_pitch = min(selected_pitches)
+		vocal_range = highest_pitch - lowest_pitch
+
+		if vocal_range > 16:
+			return False
+		else:
+			return True
 
 	def make_specific_interval(self, old_pitch, new_pitch):
 
@@ -76,7 +66,6 @@ class Voice:
 			generic_interval += 7
 
 		return interval_names[(leap, generic_interval)]
-
 
 	def calculate_motion(self, old_motion, new_motion, movements):
 		old_move = old_motion[self.note_index - 1]
@@ -119,6 +108,7 @@ class Voice:
 	def make_letters(self):
 		for real_note in self.real_notes:
 			self.sheet_notes.append(self.make_letter(real_note))
+		print(self.sheet_notes)
 
 	def convert_chords(self):
 		new_chords_names = []
@@ -160,16 +150,26 @@ class Voice:
 		lily_string = ""
 		for note in self.lily_notes:
 			lily_string += note
-		# print(lily_string)
 		Voice.lily_parts.append(lily_string)
 
 	def invert_note_values(self):
-		correct_durations = {1:4, 4:1, 2:2}
+		correct_durations = {1:4, 4:1, 2:2, 3:"2."}
 		fixed_durations = []
 		for index in range(len(Voice.note_values)):
 			time = Voice.note_values[index]
 			fixed_durations.append(correct_durations[time])
 		return fixed_durations
+
+	def create_part(self):
+		self.make_letters()
+		self.lily_convert()
+		return self.real_notes
+
+	def make_scale_degree(self, pitch):
+		natural_pitch = pitch - tonics[Voice.tonic]
+		corrected_pitch = natural_pitch % 12
+		return corrected_pitch
+
 
 
 

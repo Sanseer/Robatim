@@ -4,9 +4,11 @@ import random
 from voice import *
 from bass import *
 from soprano import *
+from alto_tenor import *
 from idioms import *
 
 def random_key(mode=""):
+	"""Selects a random but practical key unless one is provided"""
 	if not mode:
 		mode = random.choice(["ionian", "aeolian"])
 	if mode == "ionian":
@@ -14,30 +16,32 @@ def random_key(mode=""):
 	elif mode == "aeolian":
 		return random.choice(tuple(minor_scales.keys())), mode
 
-def create_song(parts="4"):
+def create_song(parts=4):
+	"""Creates a basic antecedent/consequent phrase"""
 	song_notes = []
 	if parts >= 1:
 		song_notes.append(Bass(*random_key()).create_part())
 	if parts >= 2:
 		song_notes.append(Soprano().create_part())
 	if parts >= 3:
-		pass
+		MiddleVoices().create_parts()
+		song_notes.append(Alto().create_part())
 	if parts >= 4:
-		pass
+		song_notes.append(Tenor().create_part())
 	make_lily_file()
 	return song_notes
 
 def make_lily_file():
+	"""Creates a lilyPond file"""
 	if Voice.mode == "ionian":
 		mode = "major "
 	elif Voice.mode == "aeolian":
 		mode = "minor "
-	# title = "Cantus in " + Voice.tonic + " " +  mode.replace(" ","")
-	title = "".join(["Cantus in ", Voice.tonic, " ", mode.replace(" ","")])
+	title = " ".join(["Cantus in", Voice.tonic, mode.replace(" ","")])
 	with open("old_layout.txt", 'r') as f:
 		new_file = f.read()
+
 	for part in Voice.lily_parts:
-	# for index in range(len(Voice.lily_parts)):
 		new_file = new_file.replace("PART_SLOT", "\\key " + 
 			Voice.tonic.replace("#","is").replace("b","es").lower() 
 			+ " \\" + mode + part, 1)
@@ -46,7 +50,7 @@ def make_lily_file():
 	with open("new_layout.txt", 'w') as f:
 		f.write(new_file)	
 
-song_degrees = create_song(2)
+song_degrees = create_song(4)
 
 if __name__ ==  "__main__":
 	program = 22
@@ -69,8 +73,6 @@ if __name__ ==  "__main__":
 	MyMIDI.addProgramChange(track, 1, time, program)
 
 	index = 0
-	# print("Song degrees")
-	# print(song_degrees)
 	for part in song_degrees:
 		time = 0
 		index = 0

@@ -1,8 +1,11 @@
 I, I6, I64 = 1_530, 1_630, 1_640
 II, II6 = 2_530, 2_630
-IV = 4_530
+II7, II65, II43, II42 = 2_753, 2_653, 2_643, 2_642
+IV, IV6 = 4_530, 4_630
+IV7 = 4_753
 V, V6  = 5_530, 5_630
 V7, V65, V43, V42 = 5_753, 5_653, 5_643, 5_642
+VI = 6_530
 VII6 = 7_630
 
 modes = {
@@ -36,8 +39,8 @@ major_scale_degrees = { 0:0, 2:1, 4:2, 5:3, 7:4, 9:5, 11:6 }
 minor_scale_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 10:6, 11:6 }
 
 expand_tonic1 = {
-	I: ((-V6, I), (VII6, I6), (VII6, -I), (-V65, I6), (V43, I6), 
-		(V42, -I6), (-V65, I), (V43, -I)), 
+	I: ((-V6, I), (VII6, I6), (VII6, -I), (-V65, I6), (V43, I6), (V42, -I6), 
+		(-V65, I), (V43, -I), (-IV6, -I6), (-VI, -I6)), 
 	I6: ((-V6, I), (-VII6, I6), (-VII6, -I), (-V65, I), (-V43, -I), 
 		(V42, -I6), (-V43, I6))
 }
@@ -46,49 +49,63 @@ expand_tonic2 = {
 	I: ((-V6, V43, -I), (V43, -V65, I), (-V65, V43, -I), (-V6, VII6, -I), 
 		(-V65, VII6, -I)),
 }
+expand_tonic3 = {
+	I: ((-V6, I), (VII6, -I), (-V65, I), (V43, -I))
+}
 accent_tonic = {
 	I: (I6,), I6: (-I,)
 }
 tonic_to_subdom = {
-	I: (II, II6, IV), I6: (II6, IV)
+	I: (II, II6, IV), I6: (II6, IV, II, II7, II65), VI: (-IV, -IV7, -II7, -II6, -II65), 
+	IV6: (-IV, -IV7, -II6)
 }
 accent_subdom = {
-	II: (II6,), II6: (-II,), IV: (-II, II6)
+	II: (II6,), II6: (-II, -II7), II7: (II65,), II65: (-II7, II43), 
+	II43: (-II65,), IV: (-II, II6), IV7: (II65,)
 }
 """Custom IV key for following dict"""
 expand_subdom = {
-	II: ((I6, II6),), II6: ((-I6, -II),), IV: ((II6, II),(II, II6))
+	II: ((I6, II6), (I6, II65)), II6: ((-I6, -II),), II7: ((I6, II65),), II65: ((-I6, -II7),),
+	IV: ((II6, II),(II, II6))
 }
 subdom_to_dom = {
-	II: (V, V7, -V65), II6: (V, V7, V42), IV: (V, V7, V42)
+	II: (V, V7, -V65), II6: (V, V7, V42), II65: (V, V7), II7: (V, V7), 
+	IV: (V, V7, V42)
 }
 accent_dom = {
 	V: (V6, V65), V6: (-V,), I64: (V, V7, V42)
 }
 bass_notes = {
-	I:0, II: 1, V43: 1, VII6: 1, I6: 2, IV: 3, II6: 3, V42: 3, V: 4, V7: 4, 
-	I64: 4, V6: 6, V65: 6
+	I:0, II42: 0, II: 1, II7: 1, V43: 1, VII6: 1, I6: 2, II6: 3, II65: 3,
+	IV: 3, IV7: 3, V42: 3, V: 4, V7: 4, I64: 4, II43: 5, IV6: 5, 
+	VI: 5, V6: 6, V65: 6 
 }
 dom_to_tonic = {
 	V: (-I,), V7: (-I,), V6: (I,), V65: (I,),  V43:(-I,), V42: (-I,)
 }
 # Flat is better than nested
-chord_tones = {
-	I: (0, 2, 4), I6: (0, 2, 4), I64: (0, 2, 4), II: (1, 3, 5),  II6: (1, 3, 5), 
-	IV: (3, 5, 0), V: (1, 4, 6), V6: (1, 4, 6), VII6: (1, 3, 6), 
-	V7: (1, 3, 4, 6), V65: (1, 3, 4, 6), V43: (1, 3, 4, 6), V42: (1, 3, 4, 6)
+chord_tones = { 
+	I: (0,2,4), I6: (0,2,4), I64: (0,2,4), II: (1,3,5),  II6: (1,3,5), 
+	II7: (1,3,5,7), II65: (1,3,5,0), II43: (1,3,5,0), II42: (1,3,5,0),
+	IV: (3,5,0), IV6: (3,5,0), IV7: (3,5,0,2), V: (1,4,6), V6: (1,4,6), 
+	VI: (5,0,2), VII6: (1,3,6), V7: (1,3,4,6), V65: (1,3,4,6), 
+	V43: (1,3,4,6), V42: (1,3,4,6)
 }
 """A and P for accent and passing chords. Both are based on preceding chords
 An accent chord sequence is a single chord added to a sequence. Addendum of 1 (e.g., I6)
 Passing chord: I VII6 I. Addendum of 2. First chord from prior sequence.
 A to P is an accent chord that become a passing chord: I6 I VII6 I Addendum of 3
-First chord from prior sequence. I is the accent here. """
+First chord from prior sequence. I is the accent here. 
+SP (same pass) is complete neighbor. Chord returns to original after pass."""
 antecedent = {
-	("P","A"):(2,2,2,2), ("A","P","A"): (2,1,1,2,2), ("A","A","P"):(2,2,1,1,2),
-	("A","P","P"):(2,1,1,1,1,2), ("P","P","A"): (1,1,1,1,2,2), 
+	("P","A"): (2,2,2,2), ("A","P","A"): (2,1,1,2,2), ("A","A","P"):(2,2,1,1,2),
+	("A","P","P"): (2,1,1,1,1,2), ("P","P","A"): (1,1,1,1,2,2), 
 	("P","A","P"): (1,1,2,1,1,2), ("A","A","P","A"): (1,1,1,1,2,2),
-	("A","A","DP"): (2,2,1,1,1,1), ("DP", "A", "A"): (1,1,1,1,2,2,)
+	("A","A","DP"): (2,2,1,1,1,1), ("DP", "A", "A"): (1,1,1,1,2,2,),
+	("SP", "VIV"): (2,2,2,2)
 }
+
+
 """F denotes the final chord, dominant or tonic depending on half/authentic cadence. 
 Final dominant can be V7 or V. Some chord combos may have multiple possible note combos
 This is designated with numbers. S for subdominant C for I64"""

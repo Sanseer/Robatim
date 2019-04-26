@@ -21,9 +21,8 @@ class Soprano(Voice):
 		self.add_notes()
 		self.create_consequent()
 		self.add_notes()
-		# print(Voice.soprano_motion, len(Voice.soprano_motion))
-		print(self.intervals, len(self.intervals))
-		print(self.motion_with_bass, len(self.motion_with_bass))
+		print(f"\n{self.intervals} {len(self.intervals)}")
+		# print(self.motion_with_bass, len(self.motion_with_bass))
 		self.convert_notes()
 		self.make_letters()
 		self.lily_convert()
@@ -35,7 +34,7 @@ class Soprano(Voice):
 		self.pitch_amounts = [first_pitch]
 		# print(Voice.idea1_length, Voice.idea2_length, Voice.idea3_length)
 		self.pitch_amounts.extend(("Blank",) * (Voice.idea1_length - 1 + Voice.idea2_length + Voice.idea3_length))
-		self.calculate_interval(Voice.main_pitches, first_pitch,self.intervals)
+		self.calculate_interval(Voice.bass_pitches, first_pitch, self.intervals)
 
 		self.possible_pitches = [self.pitch_amounts[0]]
 		self.possible_pitches.extend(("Blank",) * len(Voice.chord_path[1:]))
@@ -47,10 +46,7 @@ class Soprano(Voice):
 		Manually enter first note to figure out type of motion from 
 		previous note"""
 		self.validate_note(self.pitch_amounts[0])
-		# print(self.intervals)
-		# # print(f"Adding intervals: {self.intervals[1:Voice.idea1_length + Voice.idea2_length]}")
-		# # print(f"Adding motions: {Voice.soprano_motion[1:Voice.idea1_length + Voice.idea2_length]}")
-		# print(self.intervals)
+
 		if Voice.rhythm_sequence != ("A","A","P") and \
 		Voice.rhythm_sequence != ("A","P","P") and Voice.rhythm_sequence != ("P","A","P"):	
 			self.pitch_amounts.extend(self.pitch_amounts[:Voice.idea1_length + Voice.idea2_length])
@@ -63,9 +59,7 @@ class Soprano(Voice):
 			self.intervals.extend(self.intervals[1:Voice.idea1_length])
 			Voice.soprano_motion.extend(Voice.soprano_motion[:Voice.idea1_length - 1])
 			self.motion_with_bass.extend(self.motion_with_bass[:Voice.idea1_length - 1])
-		# print("Repeating portions")
-		# print(self.intervals)
-		# print(Voice.soprano_motion)
+
 		self.pitch_amounts.extend(("Blank",) * Voice.idea4_length)
 		self.populate_notes()
 
@@ -84,44 +78,36 @@ class Soprano(Voice):
 		attempts = 0
 		while "Blank" in self.pitch_amounts:
 			attempts += 1
-			assert(attempts < 40), "You ran out of tries!"
+			assert(attempts < 2000), f"You ran out of tries! {self.possible_pitches}"
 			if self.possible_pitches[self.note_index]:
 				pitch_choice = self.choose_pitch()
 				voice_lead = self.validate_note(pitch_choice)
-				if (self.note_index == Voice.idea1_length + 
-					Voice.idea2_length + Voice. idea3_length - 1):
-					print("")
 				if voice_lead:
 					self.pitch_amounts[self.note_index] = pitch_choice
 					last_pitch = pitch_choice
-					# print(f"Good choice")
-					print(self.validate_leap(pitch_choice), end=" ")
-					attempts = 0
+					print(f"Good", end=" ~ ")
 					self.note_index += 1
 					# print(f"\nGood choice! Move on. New index: {self.note_index}")
-					if self.note_index == len(self.pitch_amounts):
-						# print(f"You win: {self.pitch_amounts}")
-						break
+					# if self.note_index == len(self.pitch_amounts):
+					# 	# print(f"You win: {self.pitch_amounts}")
+					# 	break
 				else:
-					# print(f"Bad choice. Try another {self.note_index}")
-					print(self.note_index, end=" ")
+					# print(f"Bad", end=" ~ ")
 					self.possible_pitches[self.note_index].remove(pitch_choice)
-					self.intervals.pop()
-					Voice.soprano_motion.pop()
-					self.motion_with_bass.pop()
+					self.erase_last_note()
 			else:
 				# print("All roads lead to hell!")
 				self.possible_pitches[self.note_index] = "Blank" 
 				self.populate_notes()
-				self.intervals.pop()
-				Voice.soprano_motion.pop()
-				self.motion_with_bass.pop()
+				assert(self.note_index != 0), "You fail"
+				self.erase_last_note()
+
 				self.note_index -= 1
-				if self.note_index == 0:
-					print("You fail")
-				if last_pitch in self.possible_pitches[self.note_index]:
-					self.possible_pitches[self.note_index].remove(last_pitch)
-		# print(f"That took {attempts} tries.")
+				print(f"Go back to index {self.note_index}")
+				self.possible_pitches[self.note_index].remove(last_pitch)
+				self.pitch_amounts[self.note_index] = "Blank"
+				last_pitch = self.pitch_amounts[self.note_index - 1]
+		print(f"That took {attempts} tries.")
 
 	def calculate_pitch(self, old_scale_degree, new_scale_degree, direction):
 		old_position = old_scale_degree
@@ -171,6 +157,9 @@ class Soprano(Voice):
 				pitches.append(self.calculate_pitch(chord_root, note, 1) + 12)
 				pitches.append(self.calculate_pitch(chord_root, note, -1))
 				pitches.append(self.calculate_pitch(chord_root, note, -1) - 12)
+		pitches.append(self.calculate_pitch(0, chord_root, 1) + 12)
+		pitches.append(self.calculate_pitch(0, chord_root, 1) - 12)
+
 		return pitches
 
 	def choose_pitch(self):
@@ -185,20 +174,13 @@ class Soprano(Voice):
 
 		for new_pitch in choices:
 			pitch_leaps.append(abs(last_pitch - new_pitch))
+		# sorting one list using another
 		sorted_choices = [x for _,x in sorted(zip(pitch_leaps, choices))]
 
 		return sorted_choices[0]
 
 	def validate_note(self, pitch_choice):
-		"""Check if the vocal range exceeds a tenth (16 semitones in major)"""
-		# selected_pitches = [ pitch for pitch in self.pitch_amounts 
-		# if type(pitch) == int ]
-		# highest_pitch = max(selected_pitches)
-		# lowest_pitch = min(selected_pitches)
-		# vocal_range = highest_pitch - lowest_pitch
-		# print(vocal_range, end=" | ")
-		# if self.note_index == len(self.possible_pitches) - 1:
-		# 	print("End strongly", pitch_choice, self.possible_pitches)
+		"""Checks if note choice is valid"""
 
 		if pitch_choice < self.pitch_amounts[self.note_index - 1]:
 			Voice.soprano_motion.append(-1)
@@ -207,46 +189,43 @@ class Soprano(Voice):
 		elif pitch_choice == self.pitch_amounts[self.note_index - 1]:
 			Voice.soprano_motion.append(0)
 
-		self.calculate_interval(Voice.main_pitches, pitch_choice, self.intervals)
+		self.calculate_interval(Voice.bass_pitches, pitch_choice, self.intervals)
 		self.calculate_motion(Voice.bass_motion, Voice.soprano_motion, self.motion_with_bass)
-
-		# print(f"Considering note #{self.note_index + 1}")
 
 		return self.is_counterpoint(pitch_choice)
 
 
 	def is_counterpoint(self, pitch_choice):
 
-		if "P" in self.intervals[-1] and "P" in self.intervals[-2]:
+		if not self.is_voice_range():
+			return False
+		elif not self.validate_leap(pitch_choice):
+			# print("Leap too wide!")
+			return False
+		elif "P" in self.intervals[-1] and "P" in self.intervals[-2]:
 			# print("Double perfects. Delete!")
-			# print(self.intervals)
 			return False  
 		elif (self.note_index > 3 and self.intervals[-1] == self.intervals[-2] 
 		and self.intervals[-2] == self.intervals[-3] and 
 		self.intervals[-3] == self.intervals[-4]):
 			# print("Quadruple identical imperfects. Delete")
-			# print(self.intervals)
 			return False
 		elif (self.note_index > 2 and 
 		self.motion_with_bass[-1] == "Parallel" and 
 		self.motion_with_bass[-2] == "Parallel" and 
 		self.motion_with_bass[-3] == "Parallel"):
 			# print("Three consecutive parallels. Delete!")  
-			# print(self.intervals)
-			# print(self.motion_with_bass)
 			return False
 		elif (((self.pitch_amounts[self.note_index - 1] + 1) % 12 == 0) and 
 		pitch_choice % 12 != 0):
 			# print("Leading tone must progress to tonic")
 			return False
-		elif self.intervals[-2] == "d5" and "3" not in self.intervals[-1]:
-			# print("Diminished 5th must resolve to a third. Delete!")
-			# print(self.intervals)
-			return False
-		elif (self.intervals[-2] == "A4") and ("6" not in self.intervals[-1]):
-			# print("Augmented 4th must resolve to a sixth. Delete!")
-			# print(self.intervals)
-			return False
+		# elif self.intervals[-2] == "d5" and "3" not in self.intervals[-1]:
+		# 	# print("Diminished 5th must resolve to a third. Delete!")
+		# 	return False
+		# elif (self.intervals[-2] == "A4") and ("6" not in self.intervals[-1]):
+		# 	# print("Augmented 4th must resolve to a sixth. Delete!")
+		# 	return False
 		elif ((self.note_index != len(self.possible_pitches) - 1) and 
 		self.intervals[-1] == "P8"):
 			# print("Avoiding premature unison")
@@ -256,10 +235,8 @@ class Soprano(Voice):
 		and self.motion_with_bass[-1] == self.motion_with_bass[-2] and 
 		self.motion_with_bass[-2] == self.motion_with_bass[-3]):
 			# print(f"Triple {self.motion_with_bass[-1]}. Delete!")
-			# print(self.motion_with_bass)
 			return False
 		elif self.motion_with_bass[-1] == "No motion":
-			# print("No movement. Delete!")
 			return False
 		elif ((self.motion_with_bass[-1] == "Parallel" or
 		self.motion_with_bass[-1] == "Similar") and self.intervals[-1] == "P5"):
@@ -268,59 +245,39 @@ class Soprano(Voice):
 		elif (self.note_index > 1 and Voice.soprano_motion[-1] == 0 and 
 		Voice.soprano_motion[-2] == 0):
 			# print("Triple repeat. Delete!")
-			# print(Voice.soprano_motion)
 			return False
-		elif "7" in self.intervals[-1] or "2" in self.intervals[-1]:
-			# print(f"{self.intervals[-1]} is a dissonant interval.")
+		elif self.intervals[-1] in harmonic_dissonance:
 			return False
 		elif ((self.note_index == len(self.possible_pitches) - 1) and 
 			self.motion_with_bass[-1] != "Contrary"):
 			# print("Must end strong with contrary motion!")
 			return False
-		# elif not self.validate_leap(pitch_choice):
-		# 	print("Leap too wide!")
-		# 	return False
 
-		# Leaps higher than a 4th
 		# Protect transition to consequent
-		# Triple oblique infinite loop?
+		# Fix triple oblique infinite loop?
 		return True
+
+	def erase_last_note(self):
+		self.intervals.pop()
+		Voice.soprano_motion.pop()
+		self.motion_with_bass.pop()
 
 	def convert_notes(self):
 		"""Converts notes from relative pitch magnitudes degrees to 
-		absolute pitch magnitudes"""
-		# self.fixed_pitches = []
-		# for index, pitch in enumerate(self.pitch_amounts):
-		# 	if -12 < pitch < 0:
-		# 		self.fixed_pitches.append(pitch + 12)
-		# 	elif 12 < pitch < 24:
-		# 		self.fixed_pitches.append(pitch - 12)
-		# 	elif 0 <= pitch <= 12:
-		# 		self.fixed_pitches.append(pitch)
-		# 	else:
-		# 		self.fixed_pitches.append(f"What? {pitch}")
-		# print(self.fixed_pitches)  
-		self.real_notes = [note + 60 + tonics[Voice.tonic] for note in self.pitch_amounts]
+		absolute pitch magnitudes""" 
 
+		self.real_notes = [note + 60 + tonics[Voice.tonic] for note in self.pitch_amounts]
 		vocal_range = True
 		for real_note in self.real_notes:
 			if real_note < 59:
 				vocal_range = False
 				print("Perform octave transposition")
-				# print(self.real_notes)
 				break
 
 		if not vocal_range:
 			for index, real_note in enumerate(self.real_notes):
 				self.real_notes[index] += 12
 			print("Vocal range fixed")
-			# print(self.real_notes)
 
+		Voice.soprano_pitches = self.real_notes
 
-
-		# for index in range(len(self.real_notes)):
-		# 	# Raise seventh only for ascending
-		# 	if self.mode == "aeolian" and self.fixed_pitches[index] == 11:
-		# 		print("Actual RAISED SEVENTH!")
-		# 	if Voice.tonic == "B":
-		# 		self.real_notes[index] -= 12
