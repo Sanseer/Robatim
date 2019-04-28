@@ -16,36 +16,23 @@ class MiddleVoices(Voice):
 		self.possible_pitches.extend(("Blank",) * 
 			((Voice.idea1_length + Voice.idea2_length) * 2 + 
 			Voice.idea3_length + Voice.idea4_length))
-		# print(len(Voice.bass_pitches), len(self.pitch_amounts))
-		# print(self.pitch_amounts)
 
 	def create_parts(self):
-		# print(Voice.soprano_pitches, len(Voice.soprano_pitches))
-		# print(Voice.bass_pitches, len(Voice.bass_pitches))
-		print("Populate first chord")
 		self.populate_note(0)
 		self.pitch_amounts[0] = random.choice(self.possible_pitches[0])
-		print("Chosen pitches",self.pitch_amounts)
-		# print(self.possible_pitches)
 		self.add_notes()
 		print(self.pitch_amounts)
 		self.split_notes()
-	
-	# def populate_notes(self):
-	# 	for index, value in enumerate(self.possible_pitches):
-	# 		if value == "Blank":
-	# 			self.possible_pitches[index] = \
-	# 			self.populate_note(index)
 
 	def populate_note(self, index):
 		current_chord = abs(Voice.chord_path[index])
 		chord_root = (current_chord // 1000) - 1
 		chord_length = len(chord_tones[current_chord]) - 1
 		all_pitches = self.create_chord_pitches(index, chord_length, chord_root)
-		# print(all_pitches)
+		if Voice.chromatics[index] == "2D":
+			all_pitches = self.add_chromatics(index, all_pitches)
 
 		for value in all_pitches[:]:
-			# print(value, end=" ")
 			if (value < 48) or (value > 73):
 				all_pitches.remove(value)
 
@@ -53,68 +40,53 @@ class MiddleVoices(Voice):
 		correct_combos = self.arrange_pitch_combos(index, pitch_combos)
 		self.possible_pitches[index] = correct_combos
 
-		# return correct_combos
-
-
 	def create_chord_pitches(self, index, chord_length, chord_root):
 		all_pitches = []
 		high_point = Voice.soprano_pitches[index]
 		low_point = Voice.bass_pitches[index]
-		# print(low_point, high_point, end=" ")
 
 		root_pitch = modes[Voice.mode][chord_root] + tonics[Voice.tonic]
-		# print(root_pitch, end=" ")
-		if Voice.mode == "aeolian" and chord_root == 6:
-			# print("Raising seventh")
-			root_pitch += 1
-			# print(root_pitch, end=" ")
-
-
+		
 		chord_pitches = [0]
-		# print(f"Chord root: {chord_root}", end=" | ")
 		new_position = chord_root + 2
 		for _ in range(chord_length):
-			# print(f"New position: {new_position}", end=" | ")
 			chord_pitches.append(modes[Voice.mode][new_position] - modes[Voice.mode][chord_root])
 			new_position += 2
 
-		# print(chord_pitches, end=" | ")
-
-		if Voice.mode == "aeolian" and chord_root == 5:
+		if Voice.mode == "aeolian" and chord_root == 4:
+			print(f"Index {index}", end=" ")
+			print("Raising seventh as upper", end=" ")
+			print(chord_pitches, end=" ")
 			chord_pitches[1] += 1
-			# print(chord_pitches, end=" | ")
+			print(chord_pitches)
+		elif Voice.mode == "aeolian" and chord_root == 6:
+			print(f"Index: {index}")
+			print("Raising seventh as bass", end=" ")
+			print(chord_pitches, end=" ")
+			chord_pitches[0] += 1
+			print(chord_pitches)
 
 
 		chord_slot = 0
 		current_pitch = root_pitch
 
 		while current_pitch < low_point:
-			# print(f"Current pitch {current_pitch}", end=" | ")
-			# print(f"Chord slot: {chord_slot}", end=" | ")
 			if chord_length >= chord_slot:
 				chord_slot += 1
 			if chord_length < chord_slot:
 				chord_slot = 0
 				root_pitch += 12
-			# print("Done")
 			current_pitch = root_pitch + chord_pitches[chord_slot]
-			# print(f"New pitch: {current_pitch}", end=" ")
-		# print("")
 
 		while current_pitch <= high_point:
-			# print(f"Current pitch {current_pitch}", end=" | ")
-			# print(f"Chord slot: {chord_slot}", end=" | ")
 			if chord_length >= chord_slot:
 				all_pitches.append(current_pitch)
 				chord_slot += 1
 			if chord_length < chord_slot:
 				chord_slot = 0
 				root_pitch += 12
-			# print("Done")
 			current_pitch = root_pitch + chord_pitches[chord_slot]
-			# print(f"New pitch: {current_pitch}", end=" | ")
 
-		# print("\n")
 		return all_pitches
 
 	def create_pitch_combos(self, all_pitches):
@@ -122,7 +94,6 @@ class MiddleVoices(Voice):
 			all_pitches, 2))
 		for (value1, value2) in pitch_combos[:]:
 			if (value1 < 54 and value2 < 54) or (value1 > 68 and value2 > 68):
-				# print(f"Removing combo: {value1} and {value2}")
 				pitch_combos.remove((value1, value2))
 		return pitch_combos
 
@@ -130,14 +101,14 @@ class MiddleVoices(Voice):
 		# Arrange by complete chords
 		complete_rank = []
 		scale_degrees = []
-		print(f"Index: {index}")
+		# print(f"Index: {index}")
 		# print(pitch_combos)
 		for notes in pitch_combos:
 			# print(notes, end=" ")
-			scale_degrees.append(self.make_scale_degree(notes[0]))
-			scale_degrees.append(self.make_scale_degree(notes[1]))
-			scale_degrees.append(self.make_scale_degree(Voice.soprano_pitches[index]))
-			scale_degrees.append(self.make_scale_degree(Voice.bass_pitches[index]))
+			scale_degrees.append(self.make_scale_pitch(notes[0]))
+			scale_degrees.append(self.make_scale_pitch(notes[1]))
+			scale_degrees.append(self.make_scale_pitch(Voice.soprano_pitches[index]))
+			scale_degrees.append(self.make_scale_pitch(Voice.bass_pitches[index]))
 			complete_rank.append(len(set(scale_degrees)))
 			# print(scale_degrees, end=" ")
 			scale_degrees = []
@@ -150,18 +121,15 @@ class MiddleVoices(Voice):
 			return complete_sort
 
 		complete_rank = sorted(complete_rank, reverse=True)
-		print(complete_rank)
+		# print(complete_rank)
 		complete_parts = []
 		set_rank = sorted(list(set(complete_rank)), reverse=True)
-		print(set_rank)
+		# print(set_rank)
 		for chord_type in set_rank[1:]:
 			complete_parts.append(complete_rank.index(chord_type))
-		print(complete_parts)
-		# if not complete_parts:
-		# 	print("Escaping sequence", print(complete_parts))
-		# 	return complete_sort
 
 		pitches_full_sort = []
+		# print("Complete parts",complete_parts)
 
 
 		for chord_type_index in range(len(complete_parts) - 1):
@@ -173,34 +141,35 @@ class MiddleVoices(Voice):
 		if len(complete_parts) > 1:
 			pitches_full_sort.extend(self.arrange_chord_motion(index, complete_sort[stop:]))
 			# print(pitches_full_sort)
-		else:
+		elif len(complete_parts) == 1:
 			divider = complete_parts[0]
 			pitches_full_sort.extend(self.arrange_chord_motion(index, complete_sort[:divider]))
 			# print(pitches_full_sort)
 			pitches_full_sort.extend(self.arrange_chord_motion(index, complete_sort[divider:]))
-			# print(pitches_full_sort)
+		else:
+			return complete_sort
 
 		return pitches_full_sort
 
 	def arrange_chord_motion(self, index, chord_group):
-		# print("Chord group",chord_group, len(chord_group))
 		chord_motions = []
 		old_tenor_note = self.pitch_amounts[index - 1][0]
 		old_alto_note = self.pitch_amounts[index - 1][1]
-		# print("Old tenor:", old_tenor_note, end=" | ")
-		# print("Old alto:", old_alto_note, end=" | ")
 		for chord in chord_group:
 			new_tenor_note = chord[0] 
 			new_alto_note = chord[1]
-			# print("New tenor:", new_tenor_note, end=" | ")
-			# print("New alto:", new_alto_note, end=" | ")
 			movement = abs(new_tenor_note - old_tenor_note)
 			movement += abs(new_alto_note - old_alto_note)
 			chord_motions.append(int(movement))
-		# print(chord_motions)
 		motion_sort = [x for _,x in sorted(zip(chord_motions, chord_group))]
-		# print(motion_sort)
+
 		return motion_sort
+
+	def add_chromatics(self, nc_index, all_pitches):
+		for index, pitch in enumerate(all_pitches[:]):
+			all_pitches[index] += self.make_sec_dom(
+				Voice.chord_path[nc_index], pitch)
+		return all_pitches
 
 	def add_notes(self):
 
@@ -244,12 +213,26 @@ class MiddleVoices(Voice):
 		return self.possible_pitches[self.note_index][0]
 
 	def validate_notes(self, combo_choice):
-		return random.choice((True,False))
+		if self.note_index != 0 and not self.validate_leap(combo_choice):
+			# print("Leap too wide")
+			return False
+
+		# Prevent using only two notes of a chord
+		return True
+
+	def validate_leap(self, combo_choice):
+		for index in range(len(combo_choice)):
+			old_pitch = self.pitch_amounts[self.note_index - 1][index]
+			pitch_change = combo_choice[index] - old_pitch
+			if abs(pitch_change) > 4: 
+				return False
+		return True
 
 	def split_notes(self):
 		for index, (value1, value2) in enumerate(self.pitch_amounts):
 			Voice.tenor_pitches.append(value1)
 			Voice.alto_pitches.append(value2)
+
 
 class Tenor(Voice):
 

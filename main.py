@@ -7,14 +7,20 @@ from soprano import *
 from alto_tenor import *
 from idioms import *
 
-def random_key(mode=""):
+def random_key(tonic="", mode=""):
 	"""Selects a random but practical key unless one is provided"""
 	if not mode:
 		mode = random.choice(["ionian", "aeolian"])
-	if mode == "ionian":
-		return random.choice(tuple(major_scales.keys())), mode
-	elif mode == "aeolian":
-		return random.choice(tuple(minor_scales.keys())), mode
+	# if mode == "ionian":
+	# 	return random.choice(tuple(major_scales.keys())), mode
+	# elif mode == "aeolian":
+	# 	return random.choice(tuple(minor_scales.keys())), mode
+	if mode == "ionian" and (not tonic):
+		tonic =  random.choice(tuple(major_scales.keys()))
+	elif mode == "aeolian" and (not tonic):
+		tonic = random.choice(tuple(minor_scales.keys()))
+	return tonic, mode
+
 
 def create_song(parts=4):
 	"""Creates a basic antecedent/consequent phrase"""
@@ -53,7 +59,7 @@ def make_lily_file():
 song_degrees = create_song(4)
 
 if __name__ ==  "__main__":
-	program = 22
+	program = 54
 	track    = 0
 	channel  = 0
 	time     = 0   # In beats
@@ -61,16 +67,19 @@ if __name__ ==  "__main__":
 	tempo    = 110  # In BPM
 	volume   = 100 # 0-127, as per the MIDI standard
 
-	MyMIDI = MIDIFile(2) # One track, defaults to format 1 (tempo track
+	MyMIDI = MIDIFile(4) # One track, defaults to format 1 (tempo track
 	                     # automatically created)
 	MyMIDI.addTempo(track,time, tempo)
 
 	# Slow ending
 	MyMIDI.addTempo(track, 26, tempo * .9)
 
-
-	MyMIDI.addProgramChange(track, channel, time, program)
-	MyMIDI.addProgramChange(track, 1, time, program)
+	for i in range(4):
+		MyMIDI.addProgramChange(track, i, time, program)
+	# MyMIDI.addProgramChange(track, channel, time, program)
+	# MyMIDI.addProgramChange(track, 1, time, program)
+	# MyMIDI.addProgramChange(track, 2, time, program)
+	# MyMIDI.addProgramChange(track, 3, time, program)
 
 	index = 0
 	for part in song_degrees:

@@ -32,7 +32,6 @@ class Soprano(Voice):
 		new_scale_degree = random.choice((0,4))
 		first_pitch = self.calculate_pitch(0, new_scale_degree, 1)
 		self.pitch_amounts = [first_pitch]
-		# print(Voice.idea1_length, Voice.idea2_length, Voice.idea3_length)
 		self.pitch_amounts.extend(("Blank",) * (Voice.idea1_length - 1 + Voice.idea2_length + Voice.idea3_length))
 		self.calculate_interval(Voice.bass_pitches, first_pitch, self.intervals)
 
@@ -47,8 +46,9 @@ class Soprano(Voice):
 		previous note"""
 		self.validate_note(self.pitch_amounts[0])
 
-		if Voice.rhythm_sequence != ("A","A","P") and \
-		Voice.rhythm_sequence != ("A","P","P") and Voice.rhythm_sequence != ("P","A","P"):	
+		# if Voice.rhythm_sequence != ("A","A","P") and \
+		# Voice.rhythm_sequence != ("A","P","P") and Voice.rhythm_sequence != ("P","A","P"):	
+		if not Voice.change_ending:
 			self.pitch_amounts.extend(self.pitch_amounts[:Voice.idea1_length + Voice.idea2_length])
 			self.intervals.extend(self.intervals[1:Voice.idea1_length + Voice.idea2_length])
 			Voice.soprano_motion.extend(Voice.soprano_motion[:Voice.idea1_length + Voice.idea2_length - 1])
@@ -132,17 +132,33 @@ class Soprano(Voice):
 			new_position = old_position + shift
 			new_pitch = modes[Voice.mode][new_position]
 
+		if Voice.chromatics[self.note_index] == "2D":
+			new_scale_degree %= 7
+			# print(f"Implemeting soprano: {new_pitch} to", end=" | ")
+			chord = abs(Voice.chord_path[self.note_index])
+			root_degree = chord_tones[chord][0]
+			# print("New scale degree", new_scale_degree, end= " | ")
+			alt_index = chord_tones[chord].index(new_scale_degree)
+			if Voice.mode == "ionian":
+				new_pitch += sec_dom_in_major[root_degree][alt_index] 
+			elif Voice.mode == "aeolian":
+				new_pitch += sec_dom_in_minor[root_degree][alt_index]
+			# print(new_pitch)
+
 		return new_pitch
 
 	def populate_notes(self):
+		temp_index = self.note_index
 		for index, value in enumerate(self.possible_pitches):
 			if value == "Blank":
+				self.note_index = index
 				current_chord = abs(Voice.chord_path[index])
 				chord_root = (current_chord // 1000) - 1
 				chord_notes = list(chord_tones[current_chord])
 				chord_notes.remove(chord_root)
 				self.possible_pitches[index] = self.populate_note(chord_root, chord_notes)
 		self.possible_pitches[-1] = [-12,0,12]
+		self.note_index = temp_index
 
 	def populate_note(self, chord_root, chord_notes):
 		pitches = [self.calculate_pitch(0, chord_root, 1)]

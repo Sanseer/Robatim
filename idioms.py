@@ -1,12 +1,14 @@
-I, I6, I64 = 1_530, 1_630, 1_640
-II, II6 = 2_530, 2_630
+I, I6, I64, DI65, DI43 = 1_530, 1_630, 1_640, 1_653, 1_643
+II, II6, DII65, DII43 = 2_530, 2_630, 2_653, 2_643
 II7, II65, II43, II42 = 2_753, 2_653, 2_643, 2_642
+DIII65, DIII43 = 3_653, 3_643 
 IV, IV6 = 4_530, 4_630
 IV7 = 4_753
 V, V6  = 5_530, 5_630
 V7, V65, V43, V42 = 5_753, 5_653, 5_643, 5_642
-VI = 6_530
-VII6 = 7_630
+VI, DVI65, DVI43 = 6_530, 6_653, 6_643
+VII6, DVII65, DVII43 = 7_630, 7_653, 7_643
+# borrowed secondary dominant of leading tone 
 
 modes = {
 	"aeolian": (0, 2, 3, 5, 7, 8, 10, 12, 14, 15, 17, 19, 20, 22, 24), 
@@ -35,8 +37,8 @@ tonics = {
 You can create fake passing chords by combining accents"""
 
 # Converting pitch to scale degree
-major_scale_degrees = { 0:0, 2:1, 4:2, 5:3, 7:4, 9:5, 11:6 }
-minor_scale_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 10:6, 11:6 }
+major_scale_degrees = { 0:0, 2:1, 4:2, 5:3, 7:4, 9:5, 11:6}
+minor_scale_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 10:6, 11:6}
 
 expand_tonic1 = {
 	I: ((-V6, I), (VII6, I6), (VII6, -I), (-V65, I6), (V43, I6), (V42, -I6), 
@@ -44,7 +46,6 @@ expand_tonic1 = {
 	I6: ((-V6, I), (-VII6, I6), (-VII6, -I), (-V65, I), (-V43, -I), 
 		(V42, -I6), (-V43, I6))
 }
-
 expand_tonic2 = {
 	I: ((-V6, V43, -I), (V43, -V65, I), (-V65, V43, -I), (-V6, VII6, -I), 
 		(-V65, VII6, -I)),
@@ -57,7 +58,10 @@ accent_tonic = {
 }
 tonic_to_subdom = {
 	I: (II, II6, IV), I6: (II6, IV, II, II7, II65), VI: (-IV, -IV7, -II7, -II6, -II65), 
-	IV6: (-IV, -IV7, -II6)
+	IV6: (-IV, -IV7, -II6), DVI65: (II,), DVI43: (II6,-II), DI65: (IV,)
+}
+tonic_to_subdom2 = {
+	I: (DVI65, DVI43, DI65), I6: (DVI43, DI65, DVI43)
 }
 accent_subdom = {
 	II: (II6,), II6: (-II, -II7), II7: (II65,), II65: (-II7, II43), 
@@ -65,8 +69,8 @@ accent_subdom = {
 }
 """Custom IV key for following dict"""
 expand_subdom = {
-	II: ((I6, II6), (I6, II65)), II6: ((-I6, -II),), II7: ((I6, II65),), II65: ((-I6, -II7),),
-	IV: ((II6, II),(II, II6))
+	II: ((I6, II6), (I6, II65)), II6: ((-I6, -II),), II7: ((I6, II65),), 
+	II65: ((-I6, -II7),), IV: ((II6, II), (II, II6))
 }
 subdom_to_dom = {
 	II: (V, V7, -V65), II6: (V, V7, V42), II65: (V, V7), II7: (V, V7), 
@@ -76,20 +80,23 @@ accent_dom = {
 	V: (V6, V65), V6: (-V,), I64: (V, V7, V42)
 }
 bass_notes = {
-	I:0, II42: 0, II: 1, II7: 1, V43: 1, VII6: 1, I6: 2, II6: 3, II65: 3,
-	IV: 3, IV7: 3, V42: 3, V: 4, V7: 4, I64: 4, II43: 5, IV6: 5, 
-	VI: 5, V6: 6, V65: 6 
+	I:0, II42: 0, DVI65: 0, II: 1, II7: 1, V43: 1, VII6: 1, DVII65: 1, I6: 2, 
+	DI65: 2, DVI43: 2, II6: 3, II65: 3, DII65: 3, IV: 3, IV7: 3, V42: 3, 
+	DVII43: 3, V: 4, V7: 4, I64: 4, DIII65: 4, DI43: 4, II43: 5, DII43: 5, 
+	IV6: 5, VI: 5, V6: 6, V65: 6, DII43: 6
 }
 dom_to_tonic = {
 	V: (-I,), V7: (-I,), V6: (I,), V65: (I,),  V43:(-I,), V42: (-I,)
 }
 # Flat is better than nested
 chord_tones = { 
-	I: (0,2,4), I6: (0,2,4), I64: (0,2,4), II: (1,3,5),  II6: (1,3,5), 
-	II7: (1,3,5,7), II65: (1,3,5,0), II43: (1,3,5,0), II42: (1,3,5,0),
-	IV: (3,5,0), IV6: (3,5,0), IV7: (3,5,0,2), V: (1,4,6), V6: (1,4,6), 
-	VI: (5,0,2), VII6: (1,3,6), V7: (1,3,4,6), V65: (1,3,4,6), 
-	V43: (1,3,4,6), V42: (1,3,4,6)
+	I: (0,2,4), I6: (0,2,4), I64: (0,2,4), DI65: (0,2,4,6), DI43: (0,2,4,6), 
+	II: (1,3,5),  II6: (1,3,5), II7: (1,3,5,0), II65: (1,3,5,0), 
+	II43: (1,3,5,0), II42: (1,3,5,0), DII65: (1,3,5,0), DII43: (1,3,5,0),
+	DIII65: (2,4,6,1), DIII43: (2,4,6,1), IV: (3,5,0), IV6: (3,5,0), 
+	IV7: (3,5,0,2), V: (4,6,1), V6: (4,6,1), V7: (4,6,1,3), V65: (4,6,1,3), 
+	V43: (4,6,1,3), V42: (4,6,1,3), VI: (5,0,2), DVI65: (5,0,2,4), 
+	DVI43: (5,0,2,4), VII6: (6,1,3), DVII65: (6,1,3,5), DVII43: (6,1,3,5)
 }
 """A and P for accent and passing chords. Both are based on preceding chords
 An accent chord sequence is a single chord added to a sequence. Addendum of 1 (e.g., I6)
@@ -97,12 +104,15 @@ Passing chord: I VII6 I. Addendum of 2. First chord from prior sequence.
 A to P is an accent chord that become a passing chord: I6 I VII6 I Addendum of 3
 First chord from prior sequence. I is the accent here. 
 SP (same pass) is complete neighbor. Chord returns to original after pass."""
+# antecedent = {
+# 	("P","A"): (2,2,2,2), ("A","P","A"): (2,1,1,2,2), ("A","A","P"):(2,2,1,1,2),
+# 	("A","P","P"): (2,1,1,1,1,2), ("P","P","A"): (1,1,1,1,2,2), 
+# 	("P","A","P"): (1,1,2,1,1,2), ("A","A","P","A"): (1,1,1,1,2,2),
+# 	("A","A","DP"): (2,2,1,1,1,1), ("DP", "A", "A"): (1,1,1,1,2,2,),
+# 	("SP", "VIV"): (2,2,2,2)
+# }
 antecedent = {
-	("P","A"): (2,2,2,2), ("A","P","A"): (2,1,1,2,2), ("A","A","P"):(2,2,1,1,2),
-	("A","P","P"): (2,1,1,1,1,2), ("P","P","A"): (1,1,1,1,2,2), 
-	("P","A","P"): (1,1,2,1,1,2), ("A","A","P","A"): (1,1,1,1,2,2),
-	("A","A","DP"): (2,2,1,1,1,1), ("DP", "A", "A"): (1,1,1,1,2,2,),
-	("SP", "VIV"): (2,2,2,2)
+	("P", "7A"): (2,2,2,2)
 }
 
 
@@ -138,3 +148,11 @@ interval_names = {
 
 harmonic_dissonance = ("d2", "A1", "m2", "M2", "d3", "A2", "d4", "A3", "P4", 
 	"A4", "d5", "d6", "A5", "d7", "A6", "m7", "M7", "d8")
+
+# Use root notes of chords
+sec_dom_in_major = {
+	0: (0,0,0,-1), 1: (0,1,0,0), 2: (0,1,0,0), 5: (0,1,0,0), 6: (0,1,1,0)
+}
+sec_dom_in_minor = {
+	0: (0,1,0,-1), 1: (0,1,1,0), 2: (0,0,-1,-1), 5: (1,1,1,0), 6: (-1,0,0,0) 
+}
