@@ -1,14 +1,20 @@
-I, I6, I64, DI65, DI43 = 1_530, 1_630, 1_640, 1_653, 1_643
-II, II6, DII65, DII43 = 2_530, 2_630, 2_653, 2_643
-II7, II65, II43, II42 = 2_753, 2_653, 2_643, 2_642
-DIII65, DIII43 = 3_653, 3_643 
-IV, IV6 = 4_530, 4_630
-IV7 = 4_753
-V, V6  = 5_530, 5_630
-V7, V65, V43, V42 = 5_753, 5_653, 5_643, 5_642
-VI, DVI65, DVI43 = 6_530, 6_653, 6_643
-VII6, DVII65, DVII43 = 7_630, 7_653, 7_643
-# borrowed secondary dominant of leading tone 
+# Chords expressed as numbers to allow negative numbers that represent descent
+
+# Create 2D to pass from subdom to dominant harmony
+
+I, I6, I64 = 1_530_1, 1_630_1, 1_640_1
+V65_IV, V43_IV = 5_653_4, 5_643_4
+II, II6,  = 2_530_1, 2_630_1, 
+V65_V, V43_V = 5_653_5, 5_643_5
+II7, II65, II43, II42 = 2_753_1, 2_653_1, 2_643_1, 2_642_1
+V65_VI, V43_VI = 5_653_6, 5_643_6 
+IV, IV6, IV7 = 4_530_1, 4_630_1, 4_753_1
+V, V6  = 5_530_1, 5_630_1
+V7, V65, V43, V42 = 5_753_1, 5_653_1, 5_643_1, 5_642_1
+VI = 6_530_1 
+V65_II, V43_II =  5_653_2, 5_643_2
+VII6 = 7_630_1
+V65_III, V43_III = 5_653_3, 5_643_3
 
 modes = {
 	"aeolian": (0, 2, 3, 5, 7, 8, 10, 12, 14, 15, 17, 19, 20, 22, 24), 
@@ -58,10 +64,10 @@ accent_tonic = {
 }
 tonic_to_subdom = {
 	I: (II, II6, IV), I6: (II6, IV, II, II7, II65), VI: (-IV, -IV7, -II7, -II6, -II65), 
-	IV6: (-IV, -IV7, -II6), DVI65: (II,), DVI43: (II6,-II), DI65: (IV,)
+	IV6: (-IV, -IV7, -II6), V65_II: (II,), V43_II: (II6,-II), V65_IV: (IV,)
 }
 tonic_to_subdom2 = {
-	I: (DVI65, DVI43, DI65), I6: (DVI43, DI65, DVI43)
+	I: (V65_II, V43_II, V65_IV), I6: (V43_II, V65_IV, V43_II)
 }
 accent_subdom = {
 	II: (II6,), II6: (-II, -II7), II7: (II65,), II65: (-II7, II43), 
@@ -77,26 +83,26 @@ subdom_to_dom = {
 	IV: (V, V7, V42)
 }
 accent_dom = {
-	V: (V6, V65), V6: (-V,), I64: (V, V7, V42)
+	V: (V6, V65, V7), V6: (-V,), I64: (V, V7, V42)
 }
 bass_notes = {
-	I:0, II42: 0, DVI65: 0, II: 1, II7: 1, V43: 1, VII6: 1, DVII65: 1, I6: 2, 
-	DI65: 2, DVI43: 2, II6: 3, II65: 3, DII65: 3, IV: 3, IV7: 3, V42: 3, 
-	DVII43: 3, V: 4, V7: 4, I64: 4, DIII65: 4, DI43: 4, II43: 5, DII43: 5, 
-	IV6: 5, VI: 5, V6: 6, V65: 6, DII43: 6
+	I:0, II42: 0, V65_II: 0, II: 1, II7: 1, V43: 1, VII6: 1, V65_III: 1, I6: 2, 
+	V65_IV: 2, V43_II: 2, II6: 3, II65: 3, V65_V: 3, IV: 3, IV7: 3, V42: 3, 
+	V43_III: 3, V: 4, V7: 4, I64: 4, V65_VI: 4, V43_IV: 4, II43: 5, V43_V: 5, 
+	IV6: 5, VI: 5, V6: 6, V65: 6, V43_V: 6
 }
 dom_to_tonic = {
 	V: (-I,), V7: (-I,), V6: (I,), V65: (I,),  V43:(-I,), V42: (-I,)
 }
 # Flat is better than nested
 chord_tones = { 
-	I: (0,2,4), I6: (0,2,4), I64: (0,2,4), DI65: (0,2,4,6), DI43: (0,2,4,6), 
+	I: (0,2,4), I6: (0,2,4), I64: (0,2,4), V65_IV: (0,2,4,6), V43_IV: (0,2,4,6), 
 	II: (1,3,5),  II6: (1,3,5), II7: (1,3,5,0), II65: (1,3,5,0), 
-	II43: (1,3,5,0), II42: (1,3,5,0), DII65: (1,3,5,0), DII43: (1,3,5,0),
-	DIII65: (2,4,6,1), DIII43: (2,4,6,1), IV: (3,5,0), IV6: (3,5,0), 
+	II43: (1,3,5,0), II42: (1,3,5,0), V65_V: (1,3,5,0), V43_V: (1,3,5,0),
+	V65_VI: (2,4,6,1), V43_VI: (2,4,6,1), IV: (3,5,0), IV6: (3,5,0), 
 	IV7: (3,5,0,2), V: (4,6,1), V6: (4,6,1), V7: (4,6,1,3), V65: (4,6,1,3), 
-	V43: (4,6,1,3), V42: (4,6,1,3), VI: (5,0,2), DVI65: (5,0,2,4), 
-	DVI43: (5,0,2,4), VII6: (6,1,3), DVII65: (6,1,3,5), DVII43: (6,1,3,5)
+	V43: (4,6,1,3), V42: (4,6,1,3), VI: (5,0,2), V65_II: (5,0,2,4), 
+	V43_II: (5,0,2,4), VII6: (6,1,3), V65_III: (6,1,3,5), V43_III: (6,1,3,5)
 }
 """A and P for accent and passing chords. Both are based on preceding chords
 An accent chord sequence is a single chord added to a sequence. Addendum of 1 (e.g., I6)

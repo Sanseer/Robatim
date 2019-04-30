@@ -92,7 +92,7 @@ class Soprano(Voice):
 					# 	# print(f"You win: {self.pitch_amounts}")
 					# 	break
 				else:
-					# print(f"Bad", end=" ~ ")
+					print(f"Bad", end=" ~ ")
 					self.possible_pitches[self.note_index].remove(pitch_choice)
 					self.erase_last_note()
 			else:
@@ -153,7 +153,7 @@ class Soprano(Voice):
 			if value == "Blank":
 				self.note_index = index
 				current_chord = abs(Voice.chord_path[index])
-				chord_root = (current_chord // 1000) - 1
+				chord_root = chord_tones[current_chord][0]
 				chord_notes = list(chord_tones[current_chord])
 				chord_notes.remove(chord_root)
 				self.possible_pitches[index] = self.populate_note(chord_root, chord_notes)
@@ -163,7 +163,7 @@ class Soprano(Voice):
 	def populate_note(self, chord_root, chord_notes):
 		pitches = [self.calculate_pitch(0, chord_root, 1)]
 		for note in chord_notes:
-			if Voice.mode == "aeolian" and note == 6 and 1 in chord_notes:
+			if Voice.mode == "aeolian" and note == 6 and 1 in chord_notes and 2 not in chord_notes:
 				pitches.append(self.calculate_pitch(chord_root, note, 1) + 1)
 				pitches.append(self.calculate_pitch(chord_root, note, 1) + 13)
 				pitches.append(self.calculate_pitch(chord_root, note, -1) + 1)
@@ -213,6 +213,9 @@ class Soprano(Voice):
 
 	def is_counterpoint(self, pitch_choice):
 
+		# Some rules depend on a previous note and won't work for the first note
+		# Short circuit evaluation
+
 		if not self.is_voice_range():
 			return False
 		elif not self.validate_leap(pitch_choice):
@@ -234,7 +237,7 @@ class Soprano(Voice):
 			return False
 		elif (((self.pitch_amounts[self.note_index - 1] + 1) % 12 == 0) and 
 		pitch_choice % 12 != 0):
-			# print("Leading tone must progress to tonic")
+			# print("Leading tone must progress to tonic") EXCEPT SECONDARY DOMINANTS
 			return False
 		# elif self.intervals[-2] == "d5" and "3" not in self.intervals[-1]:
 		# 	# print("Diminished 5th must resolve to a third. Delete!")
@@ -269,8 +272,7 @@ class Soprano(Voice):
 			# print("Must end strong with contrary motion!")
 			return False
 
-		# Protect transition to consequent
-		# Fix triple oblique infinite loop?
+
 		return True
 
 	def erase_last_note(self):

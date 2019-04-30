@@ -1,5 +1,6 @@
-from midiutil import MIDIFile
 import random
+
+from midiutil import MIDIFile
 
 from voice import *
 from bass import *
@@ -11,10 +12,6 @@ def random_key(tonic="", mode=""):
 	"""Selects a random but practical key unless one is provided"""
 	if not mode:
 		mode = random.choice(["ionian", "aeolian"])
-	# if mode == "ionian":
-	# 	return random.choice(tuple(major_scales.keys())), mode
-	# elif mode == "aeolian":
-	# 	return random.choice(tuple(minor_scales.keys())), mode
 	if mode == "ionian" and (not tonic):
 		tonic =  random.choice(tuple(major_scales.keys()))
 	elif mode == "aeolian" and (not tonic):
@@ -34,6 +31,7 @@ def create_song(parts=4):
 		song_notes.append(Alto().create_part())
 	if parts >= 4:
 		song_notes.append(Tenor().create_part())
+	print(Voice.chord_symbols)
 	make_lily_file()
 	return song_notes
 
@@ -56,30 +54,30 @@ def make_lily_file():
 	with open("new_layout.txt", 'w') as f:
 		f.write(new_file)	
 
-song_degrees = create_song(4)
 
 if __name__ ==  "__main__":
-	program = 54
+	song_degrees = create_song(4)
+	program = 48
 	track    = 0
 	channel  = 0
 	time     = 0   # In beats
-	# duration = 1   # In beats
-	tempo    = 110  # In BPM
 	volume   = 100 # 0-127, as per the MIDI standard
 
 	MyMIDI = MIDIFile(4) # One track, defaults to format 1 (tempo track
 	                     # automatically created)
-	MyMIDI.addTempo(track,time, tempo)
 
-	# Slow ending
-	MyMIDI.addTempo(track, 26, tempo * .9)
+	for ch in range(4):
+		MyMIDI.addProgramChange(track, ch, time, program)
 
-	for i in range(4):
-		MyMIDI.addProgramChange(track, i, time, program)
-	# MyMIDI.addProgramChange(track, channel, time, program)
-	# MyMIDI.addProgramChange(track, 1, time, program)
-	# MyMIDI.addProgramChange(track, 2, time, program)
-	# MyMIDI.addProgramChange(track, 3, time, program)
+	if Voice.mode == "aeolian":
+		tempo = 110
+	elif Voice.mode == "ionian":
+		tempo = 120
+	MyMIDI.addTempo(0,0,tempo)
+
+	# optional slow ending
+	if random.choice((0,1)) == 1:
+		MyMIDI.addTempo(track, 26, tempo * .9)
 
 	index = 0
 	for part in song_degrees:
@@ -90,7 +88,6 @@ if __name__ ==  "__main__":
 		    time = time + (Voice.note_values[index]) 
 		    index += 1
 		channel += 1
-
 
 	with open("my_song0.mid", "wb") as output_file:
 	    MyMIDI.writeFile(output_file)

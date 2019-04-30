@@ -6,11 +6,12 @@ from idioms import *
 class Bass(Voice):
 	"""Creates a bass part with an explicit chord progression"""
 
-	def __init__(self, tonic="D", mode="ionian"):
+	def __init__(self, tonic="C", mode="ionian"):
 		Voice.chord_path = [I]
 		Voice.tonic = tonic
-		self.pitch_amounts = [0]
 		Voice.mode = self.mode = mode
+		Voice.chromatics.append(None)
+		self.pitch_amounts = [0]
 		self.real_notes = []
 		self.sheet_notes = []
 		if mode == "ionian":
@@ -20,7 +21,6 @@ class Bass(Voice):
 		self.voice = "bass"
 		self.lily_notes = []
 		self.old_chord = Voice.chord_path[-1]
-		Voice.chromatics.append(None)
 
 	def create_part(self):
 		"""Creates the bass portion of the song"""
@@ -29,7 +29,6 @@ class Bass(Voice):
 		self.add_notes()
 		self.convert_notes()
 		self.make_letters()
-		print(Voice.note_values, len(Voice.note_values))
 		self.lily_convert()
 		return self.real_notes
 
@@ -45,10 +44,8 @@ class Bass(Voice):
 			Voice.change_ending = False
 		if not Voice.change_ending:
 			print("Standard ending", end=" | ")
-			# Voice.chord_path.extend(tonic_chords)
 			Voice.chord_path.extend(
 				Voice.chord_path[:Voice.idea1_length + Voice.idea2_length])
-			# Voice.note_values.extend(tonic_note_values)
 			Voice.note_values.extend(
 				Voice.note_values[:Voice.idea1_length + Voice.idea2_length])
 			self.old_chord = Voice.chord_path[-1]
@@ -56,9 +53,7 @@ class Bass(Voice):
 				Voice.chromatics[0:Voice.idea1_length + Voice.idea2_length])
 		else:
 			print("Changing ending", end=" | ")
-			# Voice.chord_path.extend(tonic_chords[:-2])
 			Voice.chord_path.extend(Voice.chord_path[:Voice.idea1_length + 1])
-			# Voice.note_values.extend(tonic_note_values)
 			Voice.note_values.extend(Voice.note_values[:Voice.idea1_length + Voice.idea2_length])
 
 			self.old_chord = Voice.chord_path[-1]
@@ -66,20 +61,20 @@ class Bass(Voice):
 			Voice.chromatics.extend(Voice.chromatics[0:Voice.idea1_length + 1])
 			self.create_passing_chords(chord_options)
 
-
 		self.make_authentic_cadence(rhythm_sequence)
-		print(Voice.chromatics, len(Voice.chromatics))
 		# print(Voice.idea1_length, Voice.idea2_length, Voice.idea3_length, Voice.idea4_length)
 		Voice.rhythm_sequence = rhythm_sequence
 
 
-	def create_passing_chords(self, chord_options, nonchrom=False):
+	def create_passing_chords(self, chord_options, nonchrom=False, amount=None):
 		"""Adds two chords to the current progression"""
 		chords_chosen = random.choice(chord_options)
 		[Voice.chord_path.append(chord) for chord in chords_chosen]
 		self.old_chord = Voice.chord_path[-1]
 		if nonchrom == True:
-			self.nonchrom.indices.extend(("2D",None))
+			Voice.chromatics.extend(("2D",None))
+		elif amount == 2:
+			Voice.chromatics.extend((None, None, None))
 		else:
 			Voice.chromatics.extend((None, None))
 
@@ -104,7 +99,7 @@ class Bass(Voice):
 				self.create_passing_chords(chord_options)
 			elif "DP" in rhythm:
 				chord_options = expand_tonic2[abs(self.old_chord)]
-				self.create_passing_chords(chord_options)
+				self.create_passing_chords(chord_options, amount=2)
 			elif "P" in rhythm:
 				chord_options = expand_tonic1[abs(self.old_chord)]
 				self.create_passing_chords(chord_options)
@@ -128,7 +123,6 @@ class Bass(Voice):
 		song_length = len(Voice.note_values)
 		Voice.idea1_length = len(Voice.note_values[:stop_index + 1])
 		Voice.idea2_length = song_length - Voice.idea1_length
-		# return Voice.chord_path[:], Voice.note_values[:], self.old_chord, rhythm_sequence
 		return rhythm_sequence
 
 	def make_half_cadence(self, old_rhythm):
@@ -262,8 +256,6 @@ class Bass(Voice):
 		self.real_notes = [note + 60 + tonics[Voice.tonic] for note in self.pitch_amounts]
 
 		#alter pitches and bass motion based on secondary dominants
-		print(self.real_notes)
-		print(Voice.bass_motion)
 		for nc_index in range(len(Voice.chromatics)):
 			if Voice.chromatics[nc_index] == "2D":
 				self.real_notes[nc_index] += self.make_sec_dom(
@@ -275,8 +267,6 @@ class Bass(Voice):
 				Voice.bass_motion[nc_index - 1] = self.move_direction(move)
 				move = next_note - current_note
 				Voice.bass_motion[nc_index] = self.move_direction(move)
-		print(self.real_notes)
-		print(Voice.bass_motion)
 
 
 		for index in range(len(self.real_notes)):

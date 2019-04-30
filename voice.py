@@ -114,14 +114,19 @@ class Voice:
 	def make_letters(self):
 		for real_note in self.real_notes:
 			self.sheet_notes.append(self.make_letter(real_note))
-		print(self.sheet_notes)
 
 	def convert_chords(self):
 		new_chords_names = []
 		for chord in Voice.chord_path:
 			chord = str(abs(chord))
 			root = chord[0]
-			position = chord[-3:]
+			position = chord[-4:-1]
+			if chord[-1] == "1":
+				chord = chord[:-1]
+			else:
+				reference = names[chord[-1]]
+				chord = chord[:-1]
+				chord = " of ".join([chord, reference])
 			correct_name = chord.replace(root, names[root],1)
 			correct_name = correct_name.replace(position, names[position])
 			new_chords_names.append(correct_name)
@@ -130,8 +135,7 @@ class Voice:
 	def lily_convert(self):
 		self.lily_notes = []
 		rhythm = self.invert_note_values()
-		chord_symbols = self.convert_chords()
-		print(chord_symbols, len(chord_symbols))
+		Voice.chord_symbols = self.convert_chords()
 		index = 0
 		for sheet_note in self.sheet_notes:
 			new_symbol = ""
@@ -172,35 +176,24 @@ class Voice:
 		return self.real_notes
 
 	def make_scale_pitch(self, pitch):
-		# print("Real note:", pitch, end=" | ")
 		natural_pitch = pitch - tonics[Voice.tonic]
-		# print("Main note:", natural_pitch, end=" | ")
 		corrected_pitch = natural_pitch % 12
-		# print("Main note:", corrected_pitch, end=" | ")
 		return corrected_pitch
 
 	def make_sec_dom(self, chord, real_note):
 		chord = abs(chord)
-		print("Chord:", chord, end=" | ")
-		# print("Real note:", real_note, end=" | ")
-		# main_note = real_note - tonics[Voice.tonic]
-		# print("Main note:", main_note, end=" | ")
-		# main_note %= 12
-		# print("Main note:", main_note, end=" | ")
 		main_note = self.make_scale_pitch(real_note)
 		if Voice.mode == "ionian":
 			scale_degree = major_scale_degrees[main_note]
 		elif Voice.mode == "aeolian":
 			scale_degree = minor_scale_degrees[main_note]
-		print("Scale degree:", scale_degree, end=" | ")
+
 		position = chord_tones[chord].index(scale_degree)
-		print("Position in chord", position, end=" | ")
 		root_degree = chord_tones[chord][0]
 		if Voice.mode == "ionian":
 			shift = sec_dom_in_major[root_degree][position]
 		elif Voice.mode == "aeolian":
 			shift = sec_dom_in_minor[root_degree][position]
-		print("Shift:", shift)
 
 		return shift
 
@@ -214,28 +207,20 @@ class Voice:
 
 	def center_sec_dom(self, pitch):
 		chord = abs(Voice.chord_path[self.note_index])
-		# print("Pitch", pitch, end=" | ")
 		root_degree = chord_tones[chord][0]
-		# print("Root degree", root_degree, end=" | ")
 		chord_degrees = chord_tones[chord]
-		# print("Chord degrees", chord_degrees, end=" | ")
 		chord_pitches = []
 		for degree in chord_degrees:
 			chord_pitches.append(modes[Voice.mode][degree])
-		# print("Chord pitches", chord_pitches, end=" | ")
 		accidentals = [pitch, pitch - 1, pitch + 1]
+
 		for index in range(len(chord_pitches)):
 			if chord_pitches[index] in accidentals:
 				degree_index = index
-		# print("Degree index", degree_index, end=" | ")
 		note_degree = chord_tones[chord][degree_index]
-		# print("Note Degree", note_degree, end=" | ")
 		final_position = 4 + note_degree - root_degree
-		# print("Position", final_position, end=" | ")
 		if final_position > 7 or final_position < 0:
 			final_position %= 7
-		# print("Position", final_position, end=" | ")
-		# print("Final pitch", modes[Voice.mode][final_position])
 
 		return modes[Voice.mode][final_position]
 

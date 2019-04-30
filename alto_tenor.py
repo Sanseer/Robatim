@@ -1,5 +1,5 @@
-import random
 import itertools
+import random
 
 from voice import *
 from idioms import *
@@ -26,7 +26,7 @@ class MiddleVoices(Voice):
 
 	def populate_note(self, index):
 		current_chord = abs(Voice.chord_path[index])
-		chord_root = (current_chord // 1000) - 1
+		chord_root = chord_tones[current_chord][0]
 		chord_length = len(chord_tones[current_chord]) - 1
 		all_pitches = self.create_chord_pitches(index, chord_length, chord_root)
 		if Voice.chromatics[index] == "2D":
@@ -55,17 +55,12 @@ class MiddleVoices(Voice):
 
 		if Voice.mode == "aeolian" and chord_root == 4:
 			print(f"Index {index}", end=" ")
-			print("Raising seventh as upper", end=" ")
-			print(chord_pitches, end=" ")
+			print("Raising seventh as upper")
 			chord_pitches[1] += 1
-			print(chord_pitches)
 		elif Voice.mode == "aeolian" and chord_root == 6:
-			print(f"Index: {index}")
-			print("Raising seventh as bass", end=" ")
-			print(chord_pitches, end=" ")
+			print(f"Index: {index}", end=" ")
+			print("Raising seventh as bass")
 			chord_pitches[0] += 1
-			print(chord_pitches)
-
 
 		chord_slot = 0
 		current_pitch = root_pitch
@@ -217,7 +212,11 @@ class MiddleVoices(Voice):
 			# print("Leap too wide")
 			return False
 
-		# Prevent using only two notes of a chord
+		# You can omit the 5th but nothing else. Might need to remake soprano.
+		# No more than two consecutive unisons between soprano/alto or bass/tenor
+		# Remove duplicate leading tones, including with secondary dominants
+		# leading tone of secondary dominant and regular chord must progress to tonic
+		# Prevent using only two notes of a seventh chord
 		return True
 
 	def validate_leap(self, combo_choice):
