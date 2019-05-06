@@ -1,17 +1,22 @@
-from idioms import *
+import idioms as idms
 
-class Voice:
+class Voice(object):
 
 	mode = ""
 	tonic = ""
 	accidental = ""
-	idea1_length = 0
-	idea2_length = 0
-	idea3_length = 0
-	idea4_length = 0
+	# idea1_length = 0
+	# idea2_length = 0
+	# idea3_length = 0
+	# idea4_length = 0
 	chord_path = []
 	note_values = [] 
-	change_ending = False
+	# change_ending = False
+
+	measure_length = 4
+	beat_division = 2
+	half_rest_ending = False
+	consequent_rhythm_change = False
 	bass_pitches = []
 	bass_motion = []
 	soprano_pitches = []

@@ -1,8 +1,8 @@
 import itertools
 import random
 
-from voice import *
-from idioms import *
+from voice import Voice
+import idioms as idms
 
 class MiddleVoices(Voice):
 

@@ -1,0 +1,31 @@
+\version "2.18.2"
+
+\header {
+  title = "Symphony"
+  composer = "Aniebiet James"
+}
+
+bass = { \voiceFour PART_SLOT }
+soprano = { \voiceOne PART_SLOT }
+alto = { \voiceTwo PART_SLOT}
+tenor = { \voiceThree PART_SLOT}
+
+
+
+\score {
+    \new PianoStaff <<
+      \new Staff <<
+        \new Voice \clef "treble" { \soprano }
+        \new Voice { \alto }
+      >>
+      \new Staff  <<
+        \new Voice \clef "bass" { \tenor }
+        \new Voice {  \bass}
+      >>
+    >>
+  \layout {}
+}
+
+
+
+

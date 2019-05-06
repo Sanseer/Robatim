@@ -1,29 +1,39 @@
+"""This program creates a short four-part tune using period form 
+from the classical style. It creates a chord progression (bass),
+picks a rhythm, and then adds the remaining voices using 
+the conventions of counterpoint and voice leading. 
+The rhythm is embellished with nonchord tones, the sheet music created,
+and the MIDI file exported."""
+
 import random
 
 from midiutil import MIDIFile
 
-from voice import *
-from bass import *
-from soprano import *
-from alto_tenor import *
-from idioms import *
+from voice import Voice
+from bass import Bass
+from soprano import Soprano
+from alto_tenor import MiddleVoices, Alto, Tenor
+import idioms as idms
 
-def random_key(tonic="", mode=""):
-	"""Selects a random but practical key unless one is provided"""
+def random_settings(time_sig="", tonic="", mode=""):
+	"""Selects a random, but practical key and time sig unless one is provided"""
 	if not mode:
 		mode = random.choice(["ionian", "aeolian"])
-	if mode == "ionian" and (not tonic):
-		tonic =  random.choice(tuple(major_scales.keys()))
-	elif mode == "aeolian" and (not tonic):
-		tonic = random.choice(tuple(minor_scales.keys()))
-	return tonic, mode
+	if mode == "ionian" and not tonic:
+		tonic =  random.choice(tuple(idms.major_accidentals.keys()))
+	elif mode == "aeolian" and not tonic:
+		tonic = random.choice(tuple(idms.minor_accidentals.keys()))
+	if not time_sig:
+		time_sig = random.choice(idms.time_sigs)
+
+	return time_sig, tonic, mode
 
 
 def create_song(parts=4):
-	"""Creates a basic antecedent/consequent phrase"""
+	"""Creates up to four voices sequentially"""
 	song_notes = []
 	if parts >= 1:
-		song_notes.append(Bass(*random_key()).create_part())
+		song_notes.append(Bass(*random_settings()).create_part())
 	if parts >= 2:
 		song_notes.append(Soprano().create_part())
 	if parts >= 3:
@@ -36,7 +46,7 @@ def create_song(parts=4):
 	return song_notes
 
 def make_lily_file():
-	"""Creates a lilyPond file"""
+	"""Creates a lilyPond file using a pre-defined layout"""
 	if Voice.mode == "ionian":
 		mode = "major "
 	elif Voice.mode == "aeolian":
@@ -82,11 +92,10 @@ if __name__ ==  "__main__":
 	index = 0
 	for part in song_degrees:
 		time = 0
-		index = 0
 		for pitch, duration in zip(part, Voice.note_values):
-		    MyMIDI.addNote(track, channel, pitch, time, duration, volume)
-		    time = time + (Voice.note_values[index]) 
-		    index += 1
+			if type(duration) == int:
+				MyMIDI.addNote(track, channel, pitch, time, duration, volume)
+			time = time + duration
 		channel += 1
 
 	with open("my_song0.mid", "wb") as output_file:
