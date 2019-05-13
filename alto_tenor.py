@@ -11,11 +11,12 @@ class MiddleVoices(Voice):
 		self.pitch_amounts = []
 		self.possible_pitches = []
 		self.pitch_amounts.extend(("Blank",) * 
-			((Voice.idea1_length + Voice.idea2_length) * 2 + 
-			Voice.idea3_length + Voice.idea4_length))
+			((Voice.idea1_length + Voice.idea2_length + 
+			Voice.idea3_length + Voice.idea4_length)))
 		self.possible_pitches.extend(("Blank",) * 
 			((Voice.idea1_length + Voice.idea2_length) * 2 + 
 			Voice.idea3_length + Voice.idea4_length))
+		print(len(Voice.chord_path), len(self.possible_pitches))
 
 	def create_parts(self):
 		self.populate_note(0)
@@ -26,8 +27,8 @@ class MiddleVoices(Voice):
 
 	def populate_note(self, index):
 		current_chord = abs(Voice.chord_path[index])
-		chord_root = chord_tones[current_chord][0]
-		chord_length = len(chord_tones[current_chord]) - 1
+		chord_root = idms.chord_tones[current_chord][0]
+		chord_length = len(idms.chord_tones[current_chord]) - 1
 		all_pitches = self.create_chord_pitches(index, chord_length, chord_root)
 		if Voice.chromatics[index] == "2D":
 			all_pitches = self.add_chromatics(index, all_pitches)
@@ -45,12 +46,12 @@ class MiddleVoices(Voice):
 		high_point = Voice.soprano_pitches[index]
 		low_point = Voice.bass_pitches[index]
 
-		root_pitch = modes[Voice.mode][chord_root] + tonics[Voice.tonic]
+		root_pitch = idms.modes[Voice.mode][chord_root] + idms.tonics[Voice.tonic]
 		
 		chord_pitches = [0]
 		new_position = chord_root + 2
 		for _ in range(chord_length):
-			chord_pitches.append(modes[Voice.mode][new_position] - modes[Voice.mode][chord_root])
+			chord_pitches.append(idms.modes[Voice.mode][new_position] - idms.modes[Voice.mode][chord_root])
 			new_position += 2
 
 		if Voice.mode == "aeolian" and chord_root == 4:
@@ -167,6 +168,10 @@ class MiddleVoices(Voice):
 		return all_pitches
 
 	def add_notes(self):
+		"""This melody creation is naturally recursive but I modeled it 
+		with iteration. You try notes until you get a good note. 
+		If all of your note choices at the current position are bad, 
+		then your previous note is bad and should be removed as well."""
 
 		self.note_index = 0
 		while self.pitch_amounts[self.note_index] != "Blank":
@@ -177,22 +182,21 @@ class MiddleVoices(Voice):
 		attempts = 0
 		while "Blank" in self.pitch_amounts:
 			attempts += 1
-			assert(attempts < 500), f"You ran out of tries"
+			# Prevent CPU overload
+			assert(attempts < 2000), f"You ran out of tries"
 			if self.possible_pitches[self.note_index]:
 				combo_choice = self.choose_combo()
-				voice_lead = self.validate_notes(combo_choice)
-				if voice_lead:
+				# voice_lead = self.validate_notes(combo_choice)
+				if self.validate_notes(combo_choice):
 					self.pitch_amounts[self.note_index] = combo_choice
 					last_combo = combo_choice
 					print("Good", end=" ~ ")
-					# print(self.pitch_amounts)
 					self.note_index += 1
 					if self.note_index < len(self.pitch_amounts):
 						self.populate_note(self.note_index)
 				else:
 					print("Bad", end=" ~ ")
 					self.possible_pitches[self.note_index].remove(combo_choice)
-					# print(self.pitch_amounts)
 			else:
 				self.possible_pitches[self.note_index] = "Blank"
 				self.populate_note(self.note_index)
@@ -208,23 +212,37 @@ class MiddleVoices(Voice):
 		return self.possible_pitches[self.note_index][0]
 
 	def validate_notes(self, combo_choice):
-		if self.note_index != 0 and not self.validate_leap(combo_choice):
-			# print("Leap too wide")
-			return False
+		for voice_index in range(len(combo_choice)):
+			if self.note_index != 0 and not self.validate_leap(
+				self.pitch_amounts[self.note_index - 1][voice_index], 
+				combo_choice[voice_index]):
+				# print("Leap too wide")
+				return False
+			if (self.note_index > 0 and voice_index == 0 and 
+			Voice.bass_pitches[self.note_index] == combo_choice[voice_index] and 
+			Voice.bass_pitches[self.note_index - 1] == 
+			self.pitch_amounts[self.note_index - 1][voice_index]):
+				# print("No more than two consecutive unisons between voices")
+				return False
+			elif (self.note_index > 0 and voice_index == 1 and 
+			Voice.soprano_pitches[self.note_index] == combo_choice[voice_index] and 
+			Voice.soprano_pitches[self.note_index - 1] == 
+			self.pitch_amounts[self.note_index - 1][voice_index]):
+				# print("No more than two consecutive unisons between voices")
+				return False
 
-		# You can omit the 5th but nothing else. Might need to remake soprano.
 		# No more than two consecutive unisons between soprano/alto or bass/tenor
 		# Remove duplicate leading tones, including with secondary dominants
 		# leading tone of secondary dominant and regular chord must progress to tonic
 		# Prevent using only two notes of a seventh chord
 		return True
 
-	def validate_leap(self, combo_choice):
-		for index in range(len(combo_choice)):
-			old_pitch = self.pitch_amounts[self.note_index - 1][index]
-			pitch_change = combo_choice[index] - old_pitch
-			if abs(pitch_change) > 4: 
-				return False
+	def validate_leap(self, old_pitch, new_pitch):
+		# for index in range(len(combo_choice)):
+			# old_pitch = self.pitch_amounts[self.note_index - 1][index]
+		pitch_change = new_pitch - old_pitch
+		if abs(pitch_change) > 4: 
+			return False
 		return True
 
 	def split_notes(self):
