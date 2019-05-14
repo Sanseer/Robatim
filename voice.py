@@ -1,4 +1,5 @@
 import idioms as idms
+import pysnooper
 
 class Voice(object):
 
@@ -148,6 +149,7 @@ class Voice(object):
 		Voice.rhythm = self.invert_note_values()
 		print(Voice.rhythm, len(Voice.rhythm))
 		Voice.chord_symbols = self.convert_chords()
+		print(Voice.chord_symbols)
 		index = 0
 		# rest_indices = []
 		# for lily_index, item in enumerate(Voice.note_values):

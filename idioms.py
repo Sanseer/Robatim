@@ -70,8 +70,9 @@ expand_tonic3 = {
 accent_tonic = {
 	I: (I6,), I6: (-I,), III: (-I, I6), VI: (-III, -I6)
 }
+# you can't repeat chord from weak to strong beat
 restart_tonic = {
-	I: (I, I6, III), I6: (-I, I6, III), III: (-I, I6, III), V: (VI, -I6, -III),
+	I: (I6, III), I6: (-I, III), III: (-I, I6), V: (VI, -I6, -III),
 	VI: (I,), V7: (VI, -I6, -III), V65: (I,), V43: (-I, I6, III), 
 	V42: (-I6, -III), V65_II:(II), V43_II:(-II,-IV), V65_IV:(IV,),
 }

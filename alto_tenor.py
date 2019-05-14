@@ -14,9 +14,9 @@ class MiddleVoices(Voice):
 			((Voice.idea1_length + Voice.idea2_length + 
 			Voice.idea3_length + Voice.idea4_length)))
 		self.possible_pitches.extend(("Blank",) * 
-			((Voice.idea1_length + Voice.idea2_length) * 2 + 
-			Voice.idea3_length + Voice.idea4_length))
-		print(len(Voice.chord_path), len(self.possible_pitches))
+			((Voice.idea1_length + Voice.idea2_length + 
+			Voice.idea3_length + Voice.idea4_length)))
+		print(len(Voice.chord_path), len(self.possible_pitches), "WTF")
 
 	def create_parts(self):
 		self.populate_note(0)

@@ -12,9 +12,10 @@ from voice import Voice
 from bass import Bass
 from soprano import Soprano
 from alto_tenor import MiddleVoices, Alto, Tenor
+from kb_upper_voices import KBUpperVoices, KBTenor, KBAlto, KBSoprano
 import idioms as idms
 
-def random_settings(time_sig="", tonic="", mode=""):
+def random_settings(time_sig="", tonic="", mode="", style="song"):
 	"""Selects a random, but practical key and time sig unless one is provided"""
 	if not mode:
 		mode = random.choice(["ionian", "aeolian"])
@@ -25,11 +26,11 @@ def random_settings(time_sig="", tonic="", mode=""):
 	if not time_sig:
 		time_sig = random.choice(idms.time_sigs)
 
-	return time_sig, tonic, mode
+	return time_sig, tonic, mode, style 
 
 
-def create_song(parts=4):
-	"""Creates up to four voices sequentially"""
+def create_chorale(parts=4):
+	"""Creates up to four independent voices sequentially """
 	song_notes = []
 	if parts >= 1:
 		song_notes.append(Bass(*random_settings()).create_part())
@@ -41,6 +42,20 @@ def create_song(parts=4):
 	if parts >= 4:
 		song_notes.append(Tenor().create_part())
 	print(Voice.chord_symbols)
+	make_lily_file()
+	return song_notes
+
+def create_song(parts=4):
+	"""Creates a tune in keyboard style"""
+	# Double the bass an octave below (randomly?)
+	song_notes = []
+	if parts >= 1:
+		song_notes.append(Bass(*random_settings()).create_part())
+	if parts >= 4: 
+		UpperVoices().create_parts()
+		song_notes.append(KBSoprano().create_part())
+		song_notes.append(KBAlto().create_part())
+		song_notes.append(KBTenor().create_part())
 	make_lily_file()
 	return song_notes
 

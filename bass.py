@@ -7,13 +7,14 @@ class Bass(Voice):
 	"""Creates a bass voice with an explicit chord progression. 
 	Initializes settings for the entire song."""
 
-	def __init__(self, time_sig=(4,2), tonic="C", mode="ionian"):
+	def __init__(self, time_sig=(4,2), tonic="C", mode="ionian", style="song"):
 		Voice.chord_path = [idms.I]
 		Voice.tonic = tonic
 		Voice.mode = mode
 		Voice.chromatics.append(None)
 		Voice.measure_length = time_sig[0]
 		Voice.beat_division = time_sig[1]
+		self.style = style
 		if Voice.measure_length == 4:
 			Voice.half_rest_ending = random.choice((True,False))
 		Voice.consequent_rhythm_change = random.choice((True,False))
@@ -39,6 +40,7 @@ class Bass(Voice):
 		print(f"Song in {Voice.tonic} {Voice.mode} with {Voice.accidental}'s")
 		print(f"{Voice.measure_length} beats divided in {Voice.beat_division}")
 		self.create_chord_progression()
+		self.fix_rhythm()
 		self.add_notes()
 		self.convert_notes()
 		self.make_letters()
@@ -110,10 +112,11 @@ class Bass(Voice):
 		will fail either because I have yet to implement all the techniques 
 		or because such a sequence doesn't exist in the common practice 
 		period style."""
+		# Don't repeat chord from weak to strong beat
 		print("Chord types",chord_types, end=" | ")
 		for chord_type in chord_types:
 			chord_type = chord_type.replace("2","")
-			print("Chord type:", chord_type)
+			# print("Chord type:", chord_type)
 		# explicit if statements prevent redundant dicts with same destination 
 			if chord_type == "PDA":
 				chord_options = (idms.V,)
@@ -202,6 +205,13 @@ class Bass(Voice):
 
 		self.add_chords(self.chord_style4)
 		print("Rhythm:",Voice.note_values, len(Voice.note_values))
+
+	def fix_rhythm(self):
+		# Now that you've applied the optional rests you can align the 
+		# rhythm to the actual notes
+		if Voice.half_rest_ending:
+			Voice.idea2_length -= 1
+			Voice.idea4_length -= 1
 
 	def add_notes(self):
 		"""Add notes to bass based on chords. First chord must be tonic"""
@@ -293,6 +303,5 @@ class Bass(Voice):
 				self.real_notes[index] -= 12
 			else:
 				self.real_notes[index] -= 24
-		# print(Voice.chromatics)
 
 		Voice.bass_pitches = self.real_notes

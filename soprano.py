@@ -325,7 +325,7 @@ class Soprano(Voice):
 			for note in self.pitch_amounts]
 
 		if min(self.real_notes) < 59:
-			for index in self.real_notes:
+			for index in self.real_notes[:]:
 				self.real_notes[index] += 12
 			print("Vocal range fixed")
 
