@@ -34,7 +34,7 @@ minor_accidentals = {"A":"#", "E":"#", "B":"#", "F#":"#", "C#":"#", "G#":"#",
 	"D#":"#", "Bb":"b", "F":"b", "C":"b", "G":"b", "D":"b"
 }
 """Do you need pedantic accidental designations based on key signature 
-such as Cb or E#. If so use all_notes instead of tonics variable, 
+such as Cb or E#. If so, use all_notes instead of tonics variable, 
 the latter of which has dependencies"""
 all_notes = (
 	"A", ("A#","Bb"), ("B","Cb"), ("B#","C"), ("C#", "Db"), "D",

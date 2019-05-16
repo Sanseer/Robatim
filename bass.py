@@ -76,6 +76,7 @@ class Bass(Voice):
 
 		contrast_idea1_rhythm = self.basic_idea1_rhythm
 		# int represents note, str represents rest
+		# [2,2,2,2,2,2,2,2] should have half rest
 		print("Half rest?", Voice.half_rest_ending)
 		if Voice.half_rest_ending:
 			if contrast_idea_start == "tonic":
@@ -287,7 +288,7 @@ class Bass(Voice):
 		#alter pitches and bass motion based on secondary dominants
 		for nc_index in range(len(Voice.chromatics)):
 			if Voice.chromatics[nc_index] == "2D":
-				self.real_notes[nc_index] += self.make_sec_dom(
+				self.real_notes[nc_index] += self.convert_sec_dom(
 					Voice.chord_path[nc_index], self.real_notes[nc_index])
 				old_note = self.real_notes[nc_index - 1]
 				current_note = self.real_notes[nc_index]

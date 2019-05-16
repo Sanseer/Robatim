@@ -208,8 +208,9 @@ class Soprano(Voice):
 
 		Voice.soprano_jumps.append(abs(
 			pitch_choice - self.pitch_amounts[self.note_index - 1]))
-		self.calculate_interval(Voice.bass_pitches, pitch_choice, self.intervals)
-		self.calculate_motion(Voice.bass_motion, Voice.soprano_motion, self.motion_with_bass)
+		self.add_interval(Voice.bass_pitches, pitch_choice, self.intervals)
+		self.add_motion_type(Voice.bass_motion, Voice.soprano_motion, 
+			self.motion_with_bass, self.intervals)
 		self.append_slope(Voice.soprano_slope, Voice.soprano_motion, pitch_choice)
 		# print("Slope:", Voice.soprano_slope)
 
@@ -220,14 +221,17 @@ class Soprano(Voice):
 
 		# Some rules depend on a previous note and won't work for the first note
 		# Short circuit evaluation
+		old_pitch = self.pitch_amounts[self.note_index - 1]
+
 
 		if not self.is_voice_range():
 			return False
-		elif self.calculate_leap(pitch_choice) > 12:
+		elif self.calculate_leap(self.pitch_amounts[self.note_index - 1], 
+		pitch_choice) > 12:
 			print("Leap too wide!", end="")
 			return False
 		elif (self.note_index > 1 and Voice.soprano_jumps[self.note_index - 1] > 5 
-		and (self.calculate_leap(pitch_choice) > 2 or 
+		and (self.calculate_leap(old_pitch, pitch_choice) > 2 or 
 		Voice.soprano_motion[self.note_index - 1] == 
 		Voice.soprano_motion[self.note_index - 2] and
 		abs(Voice.soprano_motion[self.note_index - 1]) == 1)):

@@ -12,7 +12,8 @@ from voice import Voice
 from bass import Bass
 from soprano import Soprano
 from alto_tenor import MiddleVoices, Alto, Tenor
-from kb_upper_voices import KBUpperVoices, KBTenor, KBAlto, KBSoprano
+from kb_upper_voices import KBUpperVoices, KBTenor, KBAlto
+from kb_melody import KBMelody
 import idioms as idms
 
 def random_settings(time_sig="", tonic="", mode="", style="song"):
@@ -52,8 +53,8 @@ def create_song(parts=4):
 	if parts >= 1:
 		song_notes.append(Bass(*random_settings()).create_part())
 	if parts >= 4: 
-		UpperVoices().create_parts()
-		song_notes.append(KBSoprano().create_part())
+		KBUpperVoices().create_parts()
+		song_notes.append(KBMelody().create_part())
 		song_notes.append(KBAlto().create_part())
 		song_notes.append(KBTenor().create_part())
 	make_lily_file()
@@ -92,10 +93,9 @@ if __name__ ==  "__main__":
 	time     = 0   # In beats
 	volume   = 100 # 0-127, as per the MIDI standard
 
-	MyMIDI = MIDIFile(4) # One track, defaults to format 1 (tempo track
+	MyMIDI = MIDIFile(5) # One track, defaults to format 1 (tempo track
 	                     # automatically created)
-	# for ch in range(4):
-	# 	MyMIDI.addProgramChange(track, ch, time, program)
+
 	[MyMIDI.addProgramChange(track,ch,time,program) for ch in range(4)]
 
 	if Voice.mode == "aeolian":
