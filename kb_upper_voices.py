@@ -3,6 +3,7 @@ import random
 
 from voice import Voice
 import idioms as idms
+import pysnooper
 
 class KBUpperVoices(Voice):
 	"""Creates chords using bass notes for a keyboard style tune"""
@@ -58,7 +59,7 @@ class KBUpperVoices(Voice):
 
 	def populate_note(self, index):
 		# use index attribute?
-		current_chord = abs(Voice.chord_path[index])
+		current_chord = abs(Voice.chord_path[self.note_index])
 		chord_root = idms.chord_tones[current_chord][0]
 		chord_length = len(idms.chord_tones[current_chord])
 		all_pitches = self.create_chord_pitches(index,chord_length, chord_root)
@@ -66,7 +67,7 @@ class KBUpperVoices(Voice):
 			all_pitches = self.add_chromatics(index, all_pitches)
 
 		pitch_combos = self.create_pitch_combos(all_pitches)
-		self.possible_pitches[index] = self.arrange_pitch_combos(
+		self.possible_pitches[self.note_index] = self.arrange_pitch_combos(
 			index, pitch_combos)
 		print(len(self.possible_pitches[self.note_index]), "options left", end=" ")
 
@@ -221,10 +222,11 @@ class KBUpperVoices(Voice):
 		last_combo = self.pitch_amounts[self.note_index - 1]
 		attempts = 0
 
+		# an invalid combo at a note index is often context-sensitive
 		while "Blank" in self.pitch_amounts:
 			attempts += 1
-			# Prevent CPU overload
-			assert(attempts < 32000), f"You ran out of tries"
+			# Prevent CPU overload/encourage optimization
+			assert(attempts < 16000), f"You ran out of tries"
 			if self.possible_pitches[self.note_index]:
 				self.combo_choice = self.choose_combo()
 				if self.validate_notes():
@@ -241,7 +243,7 @@ class KBUpperVoices(Voice):
 					self.erase_last_note()
 			else:
 				self.possible_pitches[self.note_index] = "Blank"
-				self.populate_note(self.note_index)
+				# self.populate_note(self.note_index)
 				assert(self.note_index != 0), "You fail"
 				self.erase_last_note()
 
@@ -325,26 +327,81 @@ class KBUpperVoices(Voice):
 	def preprocess_combo(self, t_pitch, a_pitch, s_pitch):
 		"""Clears out inappropriate pitch combos"""
 		b_pitch = Voice.bass_pitches[self.note_index]
+		pitch_combo = (t_pitch, a_pitch, s_pitch)
 		if (s_pitch < t_pitch) or (s_pitch < a_pitch):
 			return False
 		elif (self.make_scale_pitch(b_pitch) == 
 		self.make_scale_pitch(t_pitch) == self.make_scale_pitch(a_pitch) == 
 		self.make_scale_pitch(s_pitch)):
 			return False
+		elif ((self.make_scale_pitch(b_pitch), self.make_scale_pitch(t_pitch),
+		self.make_scale_pitch(a_pitch), 
+		self.make_scale_pitch(s_pitch)).count(11) >= 2):
+			# print("Don't repeat leading tone", end=" ")
+			return False
+		elif (self.is_seventh_chord() and 
+		(self.make_scale_pitch(b_pitch), self.make_scale_pitch(t_pitch),
+		self.make_scale_pitch(a_pitch), 
+		self.make_scale_pitch(s_pitch)).count(self.chord_degree_to_pitch(
+			3,0,Voice.chromatics[self.note_index])) >= 2):
+			# print("Don't repeat chordal 7th", end=" ")
+			return False
 		if self.note_index == 0:
 			return True
+
+		for voice_index, new_pitch in enumerate(pitch_combo):
+			old_pitch = self.pitch_amounts[self.note_index - 1][voice_index]
+			if self.calculate_leap(old_pitch, new_pitch) > 12:
+				# print("Leap too wide", end=" ")
+				return False
+			elif ((self.make_scale_pitch(old_pitch) + 1) == 12 and 
+			self.make_scale_pitch(new_pitch) != 0 and 
+			not Voice.chromatics[self.note_index]):
+				# print("Leading tone must progress to tonic", end=" ")
+				return False
+			elif (Voice.chromatics[self.note_index - 1] and 
+				self.revert_sec_dom(old_pitch, -1) == 11 and
+				self.calculate_leap(old_pitch, new_pitch) != 1):
+				# print("Leading tone of 2D must resolve to tonic", end=" ")
+				return False
+			elif (self.is_seventh_chord(-1) and 
+			self.calculate_leap(old_pitch, new_pitch) > 2):
+				old_chord = abs(Voice.chord_path[self.note_index - 1])
+				new_chord = abs(Voice.chord_path[self.note_index])
+				dissonant_pitch = self.chord_degree_to_pitch(
+					3, -1, Voice.chromatics[self.note_index - 1])
+				if (self.make_scale_pitch(old_pitch) == dissonant_pitch and 
+				not self.is_seventh_chord()):
+					return False
+				elif (self.make_scale_pitch(old_pitch) == dissonant_pitch and
+				self.is_seventh_chord() and
+				new_chord // 10000 != old_chord // 10000):
+					return False
+				elif (self.make_scale_pitch(old_pitch) == dissonant_pitch and
+				self.is_seventh_chord() and 
+				new_chord // 10000 == old_chord / 10000 and 
+				dissonant_pitch != self.make_scale_pitch(self.combo_choice[0]) and 
+				dissonant_pitch != self.make_scale_pitch(self.combo_choice[1]) and
+				dissonant_pitch != self.make_scale_pitch(self.combo_choice[2])):
+					return False
+
+
 
 		# prevents recursive clutter later on by removing obvious bad notes 
 		# preprocess > assign culprit > single deletion
 		bass_soprano_interval = [self.bass_soprano_intervals[-1]]
 		self.add_interval(b_pitch, s_pitch, bass_soprano_interval)
-		soprano_move = []
-		self.add_voice_motion(soprano_move, 2, s_pitch)
+		if self.note_index > 1:
+			soprano_motion = [Voice.soprano_motion[-1]]
+			soprano_jumps = [Voice.soprano_jumps[-1]]
+		else:
+			soprano_motion = []
+		self.add_voice_motion(soprano_motion, 2, s_pitch)
 		bass_soprano_move = []
-		self.add_motion_type(Voice.bass_motion, soprano_move, 
+		self.add_motion_type(Voice.bass_motion, soprano_motion, 
 		bass_soprano_move, bass_soprano_interval)
-
 		old_soprano_note = self.pitch_amounts[self.note_index - 1][2]
+
 		if ((self.note_index == len(self.pitch_amounts) - 1) and 
 		(bass_soprano_move[-1] != "Contrary" or 
 		bass_soprano_interval[-1] != "P8" or
@@ -367,6 +424,21 @@ class KBUpperVoices(Voice):
 		bass_soprano_interval[-1] == "P5"):
 			# print("No hidden 5ths")
 			return False
+		elif (self.note_index == 
+		Voice.idea1_length +  Voice.idea2_length - 1 and
+		self.calculate_leap(old_soprano_note, s_pitch) > 2):
+			# print("End half cadence with stepwise motion")
+			return False
+		elif (self.note_index > 1 and Voice.soprano_motion[-1] == 0 and 
+		soprano_motion[-2] == 0):
+			# print("Triple repeat")
+			return False
+		elif (self.note_index > 1 and soprano_jumps[-1] > 5 and
+		(self.calculate_leap(old_soprano_note, s_pitch) > 2 or 
+		self.calculate_leap(old_soprano_note, s_pitch) == 0 or
+		soprano_motion[-1] == soprano_motion[-2])):
+			# print("Leaps must be followed by contrary steps")
+			return False
 
 		return True
 
@@ -377,56 +449,23 @@ class KBUpperVoices(Voice):
 			motion_list[-1] == "Parallel"):
 				return self.assign_culprit(None)
 
-		for voice_index, new_pitch in enumerate(self.combo_choice):
-			old_pitch = self.pitch_amounts[self.note_index -1][voice_index]
-			if self.calculate_leap(old_pitch, new_pitch) > 12:
-				# print("Leap too wide")
-				return self.assign_culprit(voice_index)
-			elif ((self.make_scale_pitch(old_pitch) + 1) == 12 and 
-			self.make_scale_pitch(new_pitch) != 0 and 
-			not Voice.chromatics[self.note_index]):
-				# print("Leading tone must progress to tonic")
-				return self.assign_culprit(voice_index)
-			elif (Voice.chromatics[self.note_index - 1] and 
-				self.revert_sec_dom(old_pitch, -1) == 11 and
-				self.calculate_leap(old_pitch, new_pitch) != 1):
-				# print("Leading tone of 2D must resolve to tonic")
-				return self.assign_culprit(None)
-			elif (not Voice.chromatics[self.note_index - 1] and 
-			self.is_seventh_chord(-1) and 
-			self.calculate_leap(old_pitch, new_pitch) != 1):
-				old_chord = abs(Voice.chord_path[self.note_index - 1])
-				new_chord = abs(Voice.chord_path[self.note_index])
-				dissonant_degree = idms.chord_tones[old_chord][3]
-				dissonant_pitch = self.degree_to_pitch(dissonant_degree, -1)
-				# print("Must transfer or resolve dissonant 7th")
-				if old_pitch == dissonant_pitch and not self.is_seventh_chord():
-					return self.assign_culprit(voice_index)
-				elif (old_pitch == dissonant_pitch and self.is_seventh_chord() and
-				new_chord // 10000 != old_chord // 10000):
-					return self.assign_culprit(None)
 		return True
 
 	def is_specific_counterpoint(self):
 		old_soprano_note = self.pitch_amounts[self.note_index - 1][2]
 
-		if (self.note_index > 1 and Voice.soprano_motion[-1] == 0 and 
-		Voice.soprano_motion[-2] == 0):
-			# print("Triple repeat")
-			return self.assign_culprit(2)
-		elif (self.note_index > 1 and Voice.soprano_jumps[-2] > 5 and
-		(self.calculate_leap(old_soprano_note, self.combo_choice[2]) > 2 or 
-		self.calculate_leap(old_soprano_note, self.combo_choice[2]) == 0 or
-		Voice.soprano_motion[-1] == Voice.soprano_motion[-2])):
-			# print("Leaps must be followed by contrary steps")
-			return self.assign_culprit(2)
-		elif (self.note_index > 2 and 
+		if (self.note_index > 2 and 
 		self.bass_soprano_motion[-1] == "Parallel" and
 		self.bass_soprano_motion[-2] == "Parallel" and
 		self.bass_soprano_motion[-3] == "Parallel"):
 			# print("Three consecutive parallels. Delete!")
 			return self.assign_culprit(2)
 		elif not self.is_voice_range(2):
+			return self.assign_culprit(2)
+		elif (self.note_index > 3 and 
+		self.bass_soprano_intervals[-1] == self.bass_soprano_intervals[-2] ==
+		self.bass_soprano_intervals[-3] == self.bass_soprano_intervals[-4]):
+			print("Quadruple identical imperfects.")
 			return self.assign_culprit(2)
 
 		return True

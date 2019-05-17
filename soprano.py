@@ -291,6 +291,7 @@ class Soprano(Voice):
 			self.motion_with_bass[-1] != "Contrary"):
 			print("Must end strong with contrary motion!")
 			return False
+		
 
 		old_chord = abs(Voice.chord_path[self.note_index - 1])
 		old_chord_position = old_chord // 10 % 1000

@@ -1,4 +1,5 @@
 import idioms as idms
+import pysnooper
 
 class Voice(object):
 
@@ -242,9 +243,13 @@ class Voice(object):
 		corrected_pitch = natural_pitch % 12
 		return corrected_pitch
 
-	def convert_sec_dom(self, chord, real_note):
+	# @pysnooper.snoop()
+	def convert_sec_dom(self, chord, real_note, scale_pitch=False):
 		chord = abs(chord)
-		main_note = self.make_scale_pitch(real_note)
+		if scale_pitch:
+			main_note = real_note
+		else:
+			main_note = self.make_scale_pitch(real_note)
 		if Voice.mode == "ionian":
 			scale_degree = idms.major_scale_degrees[main_note]
 		elif Voice.mode == "aeolian":
@@ -267,15 +272,14 @@ class Voice(object):
 		else:
 			return 0
 
-	def revert_sec_dom(self, pitch, index_shift=0, base_pitch=False):
+	def revert_sec_dom(self, pitch, index_shift=0, scale_pitch=False):
 		chord = abs(Voice.chord_path[self.note_index + index_shift])
 		root_degree = idms.chord_tones[chord][0]
 		chord_degrees = idms.chord_tones[chord]
 		chord_pitches = []
 		for degree in chord_degrees:
 			chord_pitches.append(idms.modes[Voice.mode][degree])
-		# pitch = pitch % 12
-		if not base_pitch:
+		if not scale_pitch:
 			pitch = self.make_scale_pitch(pitch)
 		accidentals = [pitch, pitch - 1, pitch + 1]
 
@@ -293,15 +297,34 @@ class Voice(object):
 		chord = abs(Voice.chord_path[self.note_index + index_shift]) 
 		return (chord // 10 % 10 != 0)
 
-	def degree_to_pitch(self, degree, index_shift=0):
-		pitch = idms.modes[Voice.mode][degree]
-		root_degree = abs(Voice.chord_path[self.note_index + index_shift]) // 10000
+	# def scale_degree_to_pitch(self, degree, index_shift=0, chromatics=None):
+	# 	pitch = idms.modes[Voice.mode][degree]
+	# 	chord = abs(Voice.chord_path[self.note_index + index_shift])
+	# 	root_degree = chord // 10000
+	# 	if (Voice.mode == "aeolian" and 
+	# 	(root_degree == 4 or root_degree == 6) and pitch == 10):
+	# 		pitch = 11
+	# 	if chromatics:
+	# 		pitch += self.convert_sec_dom(chord, pitch, True)
+	# 	return pitch
+
+	def chord_degree_to_pitch(
+		self, chord_position, index_shift=0, chromatics=None):
+		chord = abs(Voice.chord_path[self.note_index + index_shift])
+		scale_degree = idms.chord_tones[chord][chord_position]
+		pitch = idms.modes[Voice.mode][scale_degree]
+		root_degree = chord // 10000
 		if (Voice.mode == "aeolian" and 
-		(root_degree == 4 or root_degree == 6)):
-			pitch += 1
+		(root_degree == 4 or root_degree == 6) and pitch == 10):
+			pitch = 11
+		if chromatics:
+			pitch += self.convert_sec_dom(chord, pitch, True)
 		return pitch
 
+
+# never convert twice to scale pitch
 # chord to abs chord to root degree using index shift
+# obtain chord using index +- shift within class function
 
 
 

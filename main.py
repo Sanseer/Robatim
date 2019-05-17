@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """This program creates a short four-part tune using period form 
 from the classical style. It creates a chord progression (bass),
 picks a rhythm, and then adds the remaining voices using 
@@ -19,7 +21,7 @@ import idioms as idms
 def random_settings(time_sig="", tonic="", mode="", style="song"):
 	"""Selects a random, but practical key and time sig unless one is provided"""
 	if not mode:
-		mode = random.choice(["ionian", "aeolian"])
+		mode = random.choice(("ionian", "aeolian"))
 	if mode == "ionian" and not tonic:
 		tonic =  random.choice(tuple(idms.major_accidentals.keys()))
 	elif mode == "aeolian" and not tonic:
