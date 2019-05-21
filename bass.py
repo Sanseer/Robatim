@@ -3,6 +3,8 @@ import random
 from voice import Voice
 import idioms as idms
 
+import pysnooper
+
 class Bass(Voice):
 	"""Creates a bass voice with an explicit chord progression. 
 	Initializes settings for the entire song."""
@@ -45,7 +47,7 @@ class Bass(Voice):
 		self.convert_notes()
 		self.make_letters()
 		self.lily_convert()
-		return self.real_notes
+		return self.create_rests(self.real_notes[:])
 
 	def create_chord_progression(self):
 		"""Creates the chord progression, the basis for all notes 
@@ -76,7 +78,10 @@ class Bass(Voice):
 
 		contrast_idea1_rhythm = self.basic_idea1_rhythm
 		# int represents note, str represents rest
-		# [2,2,2,2,2,2,2,2] should have half rest
+		# [2,2,2,2,2,2,2,2] should always use half rest?
+		if self.basic_idea1_rhythm == (2,2,2,2):
+			print("Changing rhythm!")
+			Voice.half_rest_ending = True
 		print("Half rest?", Voice.half_rest_ending)
 		if Voice.half_rest_ending:
 			if contrast_idea_start == "tonic":

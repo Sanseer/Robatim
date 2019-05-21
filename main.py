@@ -7,6 +7,7 @@ the conventions of counterpoint and voice leading.
 The rhythm is embellished, the sheet music created, and the MIDI file exported."""
 
 import random
+import pysnooper
 
 from midiutil import MIDIFile
 
@@ -52,15 +53,20 @@ def create_song(parts=4):
 	"""Creates a tune in keyboard style"""
 	# Double the bass an octave below (randomly?)
 	song_notes = []
+	voice_list = []
 	if parts >= 1:
-		song_notes.append(Bass(*random_settings()).create_part())
+		voice_list.append(Bass(*random_settings()))
+		song_notes.append(voice_list[0].create_part())
 	if parts >= 4: 
 		KBUpperVoices().create_parts()
-		song_notes.append(KBMelody().create_part())
-		song_notes.append(KBAlto().create_part())
-		song_notes.append(KBTenor().create_part())
+		voice_list.append(Tenor())
+		voice_list.append(KBAlto())
+		[song_notes.append(voice_list[i].create_part()) for i in range(1,3)]
+		voice_list.append(KBMelody())
+		voice_list[-1].do_stuff()
+		song_notes.append(voice_list[-1].create_part())
 	make_lily_file()
-	return song_notes
+	return song_notes, voice_list
 
 def make_lily_file():
 	"""Creates a lilyPond file using a pre-defined layout"""
@@ -73,7 +79,7 @@ def make_lily_file():
 		time_sig = "/".join([str(Voice.measure_length * 3),"12"])
 	elif Voice.beat_division == 2:
 		time_sig = "/".join([str(Voice.measure_length),"4"])
-	title = " ".join(["Cantus in", Voice.tonic, mode.replace(" ","")])
+	title = " ".join(("Cantus in", Voice.tonic, mode.replace(" ","")))
 	with open("old_layout.txt", 'r') as f:
 		new_file = f.read()
 
@@ -88,7 +94,7 @@ def make_lily_file():
 
 
 if __name__ ==  "__main__":
-	song_degrees = create_song(4)
+	song_degrees, voice_list = create_song(4)
 	program = 73
 	track    = 0
 	channel  = 0
@@ -113,11 +119,10 @@ if __name__ ==  "__main__":
 		MyMIDI.addTempo(track, 20, tempo * .9)
 
 	# index = 0
-	for part in song_degrees:
-		Voice.create_rests(part)
+	for part, voice_obj in zip(song_degrees, voice_list):
 		time = 0
-		for pitch, duration in zip(part, Voice.note_values):
-			if type(duration) == int:
+		for pitch, duration in zip(part, voice_obj.get_rhythm()):
+			if type(duration) == int or type(duration) == float:
 				MyMIDI.addNote(track, channel, pitch, time, duration, volume)
 				time = time + duration
 			elif type(duration) == str:

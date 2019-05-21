@@ -125,10 +125,10 @@ class Voice(object):
 		return note_symbol
 
 	def make_letters(self):
-		# for real_note in self.real_notes:
-		# 	self.sheet_notes.append(self.make_letter(real_note))
-		[self.sheet_notes.append(self.make_letter(real_note)) 
-			for real_note in self.real_notes]
+		for real_note in self.real_notes:
+			self.sheet_notes.append(self.make_letter(real_note))
+
+		print(self.sheet_notes, len(self.sheet_notes))
 
 	def convert_chords(self):
 		new_chords_names = []
@@ -149,99 +149,87 @@ class Voice(object):
 
 	def lily_convert(self):
 		self.lily_notes = []
-		Voice.rhythm = self.invert_note_values()
-		print(Voice.rhythm, len(Voice.rhythm))
-		Voice.chord_symbols = self.convert_chords()
-		print(Voice.chord_symbols)
+		self.rhythm = self.invert_note_values()
+		print(self.rhythm, len(self.rhythm))
+		if not Voice.chord_symbols:
+			Voice.chord_symbols = self.convert_chords()
 		index = 0
-		# rest_indices = []
-		# for lily_index, item in enumerate(Voice.note_values):
-		# 	if type(item) == str:
-		# 		rest_indices.append(lily_index)
-		# # print(rest_indices)
-		# # print(self.sheet_notes)
-		# for lily_index in rest_indices[::-1]:
-		# 	self.sheet_notes.insert(lily_index, rhythm[lily_index])
-		# # print(self.sheet_notes)
-		Voice.create_rests(self.sheet_notes)
-		print(self.sheet_notes)
+		self.create_rests(self.sheet_notes)
 
-		assert(len(Voice.rhythm) == len(self.sheet_notes))
+		assert(len(self.rhythm) == len(self.sheet_notes))
 
 		for index, sheet_note in enumerate(self.sheet_notes):
-		# for lily_index, item in enumerate(rhythm):
-			# if lily_index in rest_indices:
-			# 	self.lily_notes.append(item)
-			# 	continue
 			if "r" in sheet_note:
 				self.lily_notes.append(sheet_note) 
 				# index += 1
 				continue
-			# print(self.sheet_notes)
 			new_symbol = ""
 			octave_mark = ""
 			letter = sheet_note[0].lower()
-			# letter = self.sheet_notes[lily_index][0].lower()
-			# print("Letter:", letter, end=" | ")
 			octave = int(sheet_note[-1])
-			# octave = int(self.sheet_notes[lily_index][-1])
-			# print("Octave:", octave, end=" | ")
 			if octave < 3:
 				shift = 3 - octave
 				octave_mark =  str(shift * ",")
 			elif octave > 3:
 				shift = octave - 3
 				octave_mark = str(shift * "'")
-			# print("Octave mark:", octave_mark, end=" | ")
 			if "#" in sheet_note or "b" in sheet_note:
-			# if ("#" in self.sheet_notes[lily_index] 
-			# 	or "b" in self.sheet_notes[lily_index]):
 				old_symbol = sheet_note[1]
-				# old_symbol = self.sheet_notes[lily_index][1]
 				if old_symbol == "#":
 					new_symbol = "is"
 				elif old_symbol == "b":
 					new_symbol = "es"
-			# print("New symbol:", new_symbol)
-			lily_note = letter + new_symbol + octave_mark + str(Voice.rhythm[index]) + " "
-			# lily_note = letter + new_symbol + octave_mark + str(item) + " "
+			lily_note = letter + new_symbol + octave_mark + str(self.rhythm[index])
 			self.lily_notes.append(lily_note)
-			# index += 1
+		if any("t" in note for note in self.lily_notes):
+			pass
 
-		lily_string = ""
+		# lily_string = ""
 
 		print(self.lily_notes, len(self.lily_notes))
-		for note in self.lily_notes:
-			lily_string += note
+		lily_string = " ".join(note for note in self.lily_notes)
+
+		# for note in self.lily_notes:
+		# 	lily_string += note
 		Voice.lily_parts.append(lily_string)
 
 	def invert_note_values(self):
-		correct_durations = {1:4, 4:1, 2:2, 3:"2.", "2":"r2 ", "1":"r4 "}
+		correct_durations = {
+			1:"4", 4:"1", 2:"2", 3:"2.", "2":"r2 ", "1":"r4 ",
+			0.5:"8", 1*idms.THIRD:"t1", 2*idms.THIRD:"t2", 1.5:"4.", .75:"8."}
 		fixed_durations = []
-		for index in range(len(Voice.note_values)):
-			time = Voice.note_values[index]
+		for index in range(len(self.note_values)):
+			time = self.note_values[index]
 			fixed_durations.append(correct_durations[time])
 		return fixed_durations
 
-	@staticmethod
-	def create_rests(sequence):
+	def create_rests(self, sequence):
 		rest_indices = []
-		for lily_index, item in enumerate(Voice.note_values):
+		for lily_index, item in enumerate(self.note_values):
 			if type(item) == str:
 				rest_indices.append(lily_index)
 		# rests added in reverse to prevent moving target
 		for lily_index in rest_indices[::-1]:
-			sequence.insert(lily_index, Voice.rhythm[lily_index])
+			sequence.insert(lily_index, self.rhythm[lily_index])
+
+		return sequence
 
 	def create_part(self):
 		self.make_letters()
 		self.lily_convert()
-		return self.real_notes
+		return self.create_rests(self.real_notes[:])
 
 	def make_scale_pitch(self, pitch):
 		natural_pitch = pitch - idms.tonics[Voice.tonic]
 		corrected_pitch = natural_pitch % 12
 		return corrected_pitch
+
+	def make_scale_degree(self, pitch):
+		if self.mode == "ionian":
+			scale_degree = idms.major_scale_degrees[pitch]
+		elif self.mode == "aeolian":
+			scale_degree = idms.minor_scale_degrees[pitch]
+		return scale_degree
 
 	# @pysnooper.snoop()
 	def convert_sec_dom(self, chord, real_note, scale_pitch=False):
@@ -297,17 +285,6 @@ class Voice(object):
 		chord = abs(Voice.chord_path[self.note_index + index_shift]) 
 		return (chord // 10 % 10 != 0)
 
-	# def scale_degree_to_pitch(self, degree, index_shift=0, chromatics=None):
-	# 	pitch = idms.modes[Voice.mode][degree]
-	# 	chord = abs(Voice.chord_path[self.note_index + index_shift])
-	# 	root_degree = chord // 10000
-	# 	if (Voice.mode == "aeolian" and 
-	# 	(root_degree == 4 or root_degree == 6) and pitch == 10):
-	# 		pitch = 11
-	# 	if chromatics:
-	# 		pitch += self.convert_sec_dom(chord, pitch, True)
-	# 	return pitch
-
 	def chord_degree_to_pitch(
 		self, chord_position, index_shift=0, chromatics=None):
 		chord = abs(Voice.chord_path[self.note_index + index_shift])
@@ -320,6 +297,16 @@ class Voice(object):
 		if chromatics:
 			pitch += self.convert_sec_dom(chord, pitch, True)
 		return pitch
+
+	def get_rhythm(self):
+		return self.note_values
+
+	def is_diatonic(self, pitch):
+		pitch = self.make_scale_pitch(pitch)
+		if pitch in idms.modes[self.mode] or pitch == 11:
+			return True
+		return False
+
 
 
 # never convert twice to scale pitch

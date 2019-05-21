@@ -76,6 +76,7 @@ restart_tonic = {
 	VI: (I,), V7: (VI, -I6, -III), V65: (I,), V43: (-I, I6, III), 
 	V42: (-I6, -III), V65_II:(II), V43_II:(-II,-IV), V65_IV:(IV,),
 }
+# check for melodic augmented second
 tonic_to_subdom1 = {
 	I: (II, II6, IV), I6: (II6, IV, II, II7, II65), 
 	III: (II6, IV, II, II7, II65), VI: (-IV, -IV7, -II7, -II6, -II65), 
@@ -188,7 +189,8 @@ ci1_from_tonic_with_rest = {
 	# 	("TAS","SA","IDAITA")),
 	# (2,2,1,1,1,1):(("TPS-C","DAU"), ("TAS","SAU","DAU"), ("TAS","PDA","ITA"), 
 	# 	("TAS","IDA","PTA"), ("TAS","IDAITA")),
-	(2,1,2,1):(("TAS","DAU"),), (2,1,1,2): (("TAS","DAU"),),
+	(2,1,2,1):(("TAS","DAU"),), 
+	# (2,1,1,2): (("TAS","DAU"),),
 	# (2,1,1,1,1):(("TAS","DAU"),), 
 	(1,1,1,2,1): (("TPS-C","DAU"), ("TAS","SPD-C"), ("TAS","SAU","DAU"), 
 		("TAS","PDA","ITA"), ("TAS","IDA","PTA"), ("TAS","IDAITA")),
@@ -203,7 +205,7 @@ ci2_from_tonic_with_rest = {
 	# (1,1,2,1,1,2):(("TAS","SAU","PDAX","TAU"), ("TPS-C","PDAX","TAU"),
 	# 	("TAS","SPD-C","TAU")), (2,2,1,1,1,1):(("TAS","PDAX","TAU"),), 
 	(2,1,2,1):(("PDAX","TAU"),),
-	(2,1,1,2):(("PDA","TAU"),),
+	# (2,1,1,2):(("PDA","TAU"),),
 	# (2,1,1,1,1):(("PDAX","TAU"),), 
 	(1,1,1,2,1):(("TAS","PDAX","TAU"),)
 }
@@ -240,8 +242,8 @@ ci1_from_tonic_no_rest = {
 	# 	("TPS-C","SA","IDAITA"), ("TAS","SA","SP","DAU")),
 	(2,1,2,1):(("TPS-C","DAU"), ("TAS","SAU","DAU"), ("TAS","PDA","ITA"), 
 		("TAS","IDA","PTA"), ("TAS","IDAITA")),
-	(2,1,1,2):(("TPS-C","DAU"), ("TAS","SAU","DAU"), ("TAS","PDA","ITA"), 
-		("TAS","IDA","PTA"), ("TAS", "IDAITA")),
+	# (2,1,1,2):(("TPS-C","DAU"), ("TAS","SAU","DAU"), ("TAS","PDA","ITA"), 
+	# 	("TAS","IDA","PTA"), ("TAS", "IDAITA")),
 	# (2,1,1,1,1):(("TPS-C","SPD-C"), ("TPS-C","SAU","DAU"), ("TPS-C","PDA","ITA"),
 	# 	("TPS-C","IDA","PTA"), ("TPS-C","IDAITA"), ("TAS","SA","SPD-C")),
 	(1,1,1,2,1):(("TPS-C","SAU","DAU"), ("TAS","SAP","SAU","DAU",), 
@@ -255,12 +257,13 @@ ci2_from_tonic_no_rest = {
 	# (2,1,1,1,1,2):(("TAS","SAP","SAU","PDAX","TAU"), ("TPS-C","SAU","PDAX","TAU"), 
 	# 	("TAS","SP","PDAX","TAU")),
 	(1,1,1,1,2,2):(("TAS","SAP","SAU","PDAX","TAU"), ("TPS-C","SAU","PDAX","TAU"),
-		("TAS","SP","PDAX","TAU"), ("TAS","SA","SPD-C","DAU")),
+		("TAS","SP","PDAX","TAU"), ("TAS","SA","SPD-C","TAU")),
 	# (1,1,2,1,1,2):(("TAS","SAP","SAU","PDAX","TAU"), ("TPS-C","SAU","PDAX","TAU"),
 	# 	("TAS","SP","PDAX","TAU")),
 	# (2,2,1,1,1,1):(("TAS","SAP","SAU","PDAX","TAU"), ("TPS-C","SAU","PDAX","TAU"),
 	# 	("TAS","SA","SPD-C","PDAX")), 
-	(2,1,2,1):(("TAS","PDAX","TAU"),), (2,1,1,2):(("TAS","PDAX","TAU"),),
+	(2,1,2,1):(("TAS","PDAX","TAU"),), 
+	# (2,1,1,2):(("TAS","PDAX","TAU"),),
 	# (2,1,1,1,1):(("TAS","SAU","PDAX","TAU"), ("TPS-C","PDAX","TAU")), 
 	(1,1,1,2,1):(("TAS","SAU","PDAX","TAU"), ("TPS-C","PDAX","TAU"), 
 		("TAS","SPD-C","TAU"))
@@ -284,7 +287,7 @@ ci1_from_subdom_with_rest = {
 	# (2,2,1,1,1,1):(("SP","DAU"), ("SAP","SAU","DAU"), ("SAP","SAU","PDA","ITA"), 
 	# 	("SA","SA","IDA","PTA"), ("SA","SA","IDAITA")),
 	(2,1,2,1):(("SPD-C",), ("SAU","DAU"), ("PDA","ITA"), ("IDA","PTA"), ("IDAITA",)),
-	(2,1,1,2):(("SPD-C",), ("SAU","DAU"), ("PDA","ITA"), ("IDA","PTA"), ("IDAITA",)),
+	# (2,1,1,2):(("SPD-C",), ("SAU","DAU"), ("PDA","ITA"), ("IDA","PTA"), ("IDAITA",)),
 	# (2,1,1,1,1):(("SPD-C",), ("SAU","DAU"), ("PDA","ITA"), ("IDA","PTA"), ("IDAITA")),
 	(1,1,1,2,1):(("SP","DAU"), ("SA","SPD-C"))
 }
@@ -299,7 +302,8 @@ ci2_from_subdom_with_rest = {
 	# (1,1,2,1,1,2):(("SAP","SAU","PDAX","TAU"), ("SP","PDAX","TAU"), 
 	# 	("SA","SPD-C","TAU")),
 	# (2,2,1,1,1,1):(("SAU","PDAX","TAU"), ("SPD-C","TAU")),
-	(2,1,2,1):(("PDAX","TAU"),), (2,1,1,2):(("PDAX","TAU"),),
+	(2,1,2,1):(("PDAX","TAU"),), 
+	# (2,1,1,2):(("PDAX","TAU"),),
 	# (2,1,1,1,1):(("PDAX","TAU"),),
 	(1,1,1,2,1):(("SAU","PDAX","TAU"), ("SPD-C","TAU"))
 }
@@ -324,8 +328,8 @@ ci1_from_subdom_no_rest = {
 	# 	("SA","SA","SP","DAU")),
 	(2,1,2,1):(("SP","DAU"), ("SAP","SAU","DAU"), ("SA","PDA","ITA"), 
 		("SA","IDA","PTA"), ("SA","IDAITA")),
-	(2,1,1,2):(("SP","DAU"), ("SAP","SAU","DAU"), ("SA","PDA","ITA"), 
-		("SA","IDA","PTA"), ("SA","IDAITA")),
+	# (2,1,1,2):(("SP","DAU"), ("SAP","SAU","DAU"), ("SA","PDA","ITA"), 
+	# 	("SA","IDA","PTA"), ("SA","IDAITA")),
 	# (2,1,1,1,1):(("SP","SPD-C"), ("SP","SAU","PDA"), ("SP","PDA","ITA"), 
 	# 	("SP","IDA","PTA"), ("SP","IDAITA")),
 	(1,1,1,2,1):(("SP","SAU","DAU"), ("SP","PDA","ITA"), ("SP","IDA","PTA"), 
@@ -338,11 +342,11 @@ ci2_from_subdom_no_rest = {
 	# (2,2,1,1,2):(("SAP","SAU","PDAX","TAU"), ("SP","PDAX","TAU")),
 	# (2,1,1,1,1,2):(("SA","SP","PDAX","TAU"), ("SP","SAU","PDAX","TAU")),
 	(1,1,1,1,2,2):(("SA","SP","PDAX","TAU"), ("SP","SAU","PDAX","TAU"),
-		("SP","SPD-C","DAU")),
+		("SP","SPD-C","TAU")),
 	# (1,1,2,1,1,2):(("SA","SP","PDAX","TAU"), ("SP","SAU","PDAX","TAU")),
 	# (2,2,1,1,1,1):(("SP","SAU","PDAX","TAU"), ("SP","SPD-C","TAU")),
 	(2,1,2,1):(("SAU","PDAX","TAU"), ("SPD-C","TAU")),
-	(2,1,1,2):(("SAU","PDAX","TAU"), ("SPD-C","TAU")),
+	# (2,1,1,2):(("SAU","PDAX","TAU"), ("SPD-C","TAU")),
 	# (2,1,1,1,1):(("SAP","SAU","PDAX","TAU"), ("SP","PDAX","TAU")),
 	(1,1,1,2,1):(("SAP","SAU","PDAX","TAU"), ("SP","PDAX","TAU"), 
 		("SA","SPD-C","TAU"))
@@ -362,9 +366,9 @@ bi1_rhythms_of_3 = {
 	("TP","TA"):(2,1,2,1), ("TP","TPS-I"):(2,1,2,1), 
 	("TA","TAS","DAU"):(2,1,2,1), ("TPS-C","DAU"): (2,1,2,1), 
 	("TAS","SA","DAU"):(2,1,2,1), 
-	("TP2","TA"):(2,1,1,2), ("TP2","TPS-I"):(2,1,1,2),
-	("TA","TAS","DAU2"):(2,1,1,2), ("TPS-C","DAU2"):(2,1,1,2),
-	("TAS","SA","DAU2"):(2,1,1,2),
+	# ("TP2","TA"):(2,1,1,2), ("TP2","TPS-I"):(2,1,1,2),
+	# ("TA","TAS","DAU2"):(2,1,1,2), ("TPS-C","DAU2"):(2,1,1,2),
+	# ("TAS","SA","DAU2"):(2,1,1,2),
 	# ("TP","TP"):(2,1,1,1,1), ("TP","TA","TPS-I"):(2,1,1,1,1),
 	# ("TPS-C","SA","DAU"):(2,1,1,1,1), ("TPS-C","SPD-C"):(2,1,1,1,1),
 	# ("TA","TAS","SPD-C"):(2,1,1,1,1),
@@ -431,5 +435,40 @@ sec_doms_in_minor = {
 }
 
 # Check for duplicate overriding keys in dicts 
+THIRD = 0.3333
+simple_embellish_rhythms = {
+	(2,2):(1,1,2), (2,1):(1,1,1), (1,1):(0.5,0.5,1)
+}
+compound_embellish_rhythms = {
+	(2,2): (2 * THIRD, 2 * THIRD, 2 * THIRD, 2),
+	(2,1): (2 * THIRD, 2 * THIRD, 2 * THIRD, 1),
+	(1,1): (1 * THIRD, 1 * THIRD, 1 * THIRD, 1)
+}
+simple_0_semitones = \
+	((0, "DUN", 1), (0, "DLN", 1), (0, "CUN", 1), (0, "CLN", 0))
+compound_0_semitones = (
+	((0, "DUN", "DLN", 1), (0, "DLN", "DUN", 1), (0, "CUN", "CLN", 1), 
+	(0, "CLN", "CUN", 1)))
+simple_1_semitone = \
+	((0, "DUN", 1), (0, "DLN", 1), (0, "CUN", 1), (0, "CLN", 1))
+compound_1_semitone = \
+	((0, "DUN", 0, 1), (0, "DLN", 0, 1), (0, "CUN", 0, 1), (0, "CLN", 0, 1))
+simple_2_semitones = (
+	((0, "RCFILL0", 1), (0, "DUN", 1), (0, "DLN", 1), 
+	(0, "CUN", 1), (0, "CLN", 1)))
+compound_2_semitones = ((0, "RCFILL0", "RCON", 1),)
+simple_3_semitones = ((0, "RDFILL0", 1), (0, "RCFILL0", 1))
+compound_3_semitones = ((0, "LCFILL0", "RCFILL0", 1),)
+simple_4_semitones = ((0, "RDFILL0", 1),)
+compound_4_semitones = ((0, "LCFILL0", "RCFILL0", 1),)
+simple_5_semitones = ((0, "RDFILL0", 1),)
+compound_5_semitones = ((0, "LDFILL0", "RDFILL0",0))
 
-
+figurations = {
+	(2,0): simple_0_semitones, (3,0): compound_0_semitones,
+	(2,1): simple_1_semitone, (3,1): compound_1_semitone,
+	(2,2): simple_2_semitones, (3,2): compound_2_semitones,
+	(2,3): simple_3_semitones, (3,3): compound_3_semitones,
+	(2,4): simple_4_semitones, (3,4): compound_4_semitones,
+	(2,5): simple_5_semitones, (3,5): compound_5_semitones
+}

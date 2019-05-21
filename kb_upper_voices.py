@@ -328,7 +328,7 @@ class KBUpperVoices(Voice):
 		"""Clears out inappropriate pitch combos"""
 		b_pitch = Voice.bass_pitches[self.note_index]
 		pitch_combo = (t_pitch, a_pitch, s_pitch)
-		if (s_pitch < t_pitch) or (s_pitch < a_pitch):
+		if (s_pitch <= t_pitch) or (s_pitch <= a_pitch):
 			return False
 		elif (self.make_scale_pitch(b_pitch) == 
 		self.make_scale_pitch(t_pitch) == self.make_scale_pitch(a_pitch) == 
@@ -349,6 +349,11 @@ class KBUpperVoices(Voice):
 		if self.note_index == 0:
 			return True
 
+		# 2D seventh chords should be complete, beware of root position 
+		# frustrated leading tone
+
+		resolve_chromatics = (chrom_index + 1 for chrom_index, chrom_value in 
+			enumerate(Voice.chromatics) if chrom_value)
 		for voice_index, new_pitch in enumerate(pitch_combo):
 			old_pitch = self.pitch_amounts[self.note_index - 1][voice_index]
 			if self.calculate_leap(old_pitch, new_pitch) > 12:
@@ -356,7 +361,8 @@ class KBUpperVoices(Voice):
 				return False
 			elif ((self.make_scale_pitch(old_pitch) + 1) == 12 and 
 			self.make_scale_pitch(new_pitch) != 0 and 
-			not Voice.chromatics[self.note_index]):
+			not Voice.chromatics[self.note_index] and 
+			self.note_index not in resolve_chromatics):
 				# print("Leading tone must progress to tonic", end=" ")
 				return False
 			elif (Voice.chromatics[self.note_index - 1] and 
@@ -416,8 +422,8 @@ class KBUpperVoices(Voice):
 			return False
 		elif ("P" in bass_soprano_interval[-1] and 
 		"P" in bass_soprano_interval[-2]):
-			# print("Double perfects")
-			return False
+				# print("Double perfects")
+				return False
 		elif bass_soprano_move[-1] == "No motion":
 			return False
 		elif (bass_soprano_move[-1] == "Similar" and 
@@ -452,8 +458,6 @@ class KBUpperVoices(Voice):
 		return True
 
 	def is_specific_counterpoint(self):
-		old_soprano_note = self.pitch_amounts[self.note_index - 1][2]
-
 		if (self.note_index > 2 and 
 		self.bass_soprano_motion[-1] == "Parallel" and
 		self.bass_soprano_motion[-2] == "Parallel" and
@@ -508,6 +512,7 @@ class KBTenor(Voice):
 		self.real_notes = Voice.tenor_pitches
 		self.sheet_notes = []
 		self.lily_notes = []
+		self.note_values = Voice.note_values[:]
 
 class KBAlto(Voice):
 
@@ -515,4 +520,4 @@ class KBAlto(Voice):
 		self.real_notes = Voice.alto_pitches
 		self.sheet_notes = []
 		self.lily_notes = []
-
+		self.note_values = Voice.note_values[:]
