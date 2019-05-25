@@ -3,23 +3,26 @@ import random
 from voice import Voice
 import idioms as idms
 
-import pysnooper
-
 class Bass(Voice):
 	"""Creates a bass voice with an explicit chord progression. 
 	Initializes settings for the entire song."""
 
-	def __init__(self, time_sig=(4,2), tonic="C", mode="ionian", style="song"):
+	def __init__(self, time_sig=(4,2), tonic="C", mode="ionian"):
 		Voice.chord_path = [idms.I]
+		self.old_chord = Voice.chord_path[-1]
 		Voice.tonic = tonic
 		Voice.mode = mode
-		Voice.chromatics.append(None)
+		Voice.chromatics = [None]
 		Voice.measure_length = time_sig[0]
 		Voice.beat_division = time_sig[1]
-		self.style = style
 		if Voice.measure_length == 4:
 			Voice.half_rest_ending = random.choice((True,False))
 		Voice.consequent_rhythm_change = random.choice((True,False))
+		if mode == "ionian":
+			Voice.accidental = idms.major_accidentals[tonic]
+		elif mode == "aeolian":
+			Voice.accidental = idms.minor_accidentals[tonic]
+
 		self.chord_style1 = None
 		self.chord_style2 = None
 		self.chord_style3 = None
@@ -29,20 +32,13 @@ class Bass(Voice):
 		self.pitch_amounts = [0]
 		self.real_notes = []
 		self.sheet_notes = []
-		if mode == "ionian":
-			Voice.accidental = idms.major_accidentals[tonic]
-		elif mode == "aeolian":
-			Voice.accidental = idms.minor_accidentals[tonic]
-		self.voice = "bass"
 		self.lily_notes = []
-		self.old_chord = Voice.chord_path[-1]
 
 	def create_part(self):
 		"""Creates the bass portion of the tune"""
 		print(f"Song in {Voice.tonic} {Voice.mode} with {Voice.accidental}'s")
 		print(f"{Voice.measure_length} beats divided in {Voice.beat_division}")
 		self.create_chord_progression()
-		self.fix_rhythm()
 		self.add_notes()
 		self.convert_notes()
 		self.make_letters()
@@ -59,7 +55,12 @@ class Bass(Voice):
 		print("Creating consequent")
 		print("Rhythm change?",Voice.consequent_rhythm_change)
 		self.create_consequent()
-		# raise Exception("Stop")
+
+		# Now that you've applied the optional rests you can align the 
+		# rhythm to the actual notes
+		if Voice.half_rest_ending:
+			Voice.idea2_length -= 1
+			Voice.idea4_length -= 1
 
 	def create_antecedent(self):
 		"""Creates the antecedent section of the tune"""
@@ -77,7 +78,6 @@ class Bass(Voice):
 		contrast_idea_start = self.transition_idea(self.chord_style1)
 
 		contrast_idea1_rhythm = self.basic_idea1_rhythm
-		# int represents note, str represents rest
 		# [2,2,2,2,2,2,2,2] should always use half rest?
 		if self.basic_idea1_rhythm == (2,2,2,2):
 			print("Changing rhythm!")
@@ -111,7 +111,6 @@ class Bass(Voice):
 		print("Rhythm:",Voice.note_values, len(Voice.note_values))
 		assert(len(Voice.chord_path) == len(Voice.note_values) or 
 			Voice.half_rest_ending), "Chord error"
-		print("Adding first consequent note.")
 
 	def add_chords(self, chord_types):
 		"""Adds chord(s) to growing chord progression. Some chord sequences 
@@ -119,10 +118,11 @@ class Bass(Voice):
 		or because such a sequence doesn't exist in the common practice 
 		period style."""
 		# Don't repeat chord from weak to strong beat
-		print("Chord types",chord_types, end=" | ")
+		# Old chord should have property decorator
+		print("Chord types:",chord_types)
 		for chord_type in chord_types:
+			print("Chord type:", chord_type)
 			chord_type = chord_type.replace("2","")
-			# print("Chord type:", chord_type)
 		# explicit if statements prevent redundant dicts with same destination 
 			if chord_type == "PDA":
 				chord_options = (idms.V,)
@@ -138,21 +138,32 @@ class Bass(Voice):
 				chord_options = idms.chord_groups[chord_type][abs(self.old_chord)]
 			if chord_type == "SAU":
 				chord_options = list(chord_options)
-				chord_options.append(idms.I64)
+				print(chord_options)
+				chord_options.extend((idms.I64,) * 2)
+				print(chord_options)
 			chords_chosen = random.choice(chord_options)
 			if type(chords_chosen) == int:
 				chords_chosen = (chords_chosen,)
 			[Voice.chord_path.append(chord) for chord in chords_chosen]
-			[Voice.chromatics.append("2D") if abs(chord) % 10 != 1 else 
-				Voice.chromatics.append(None) for chord in chords_chosen]
+			for chord in chords_chosen:
+				if abs(chord) // 10000 in (8, 9):
+					Voice.chromatics.append("2Dim")
+				elif abs(chord) % 10 != 1:
+					Voice.chromatics.append("2Dom")
+				else:
+					Voice.chromatics.append(None)
+			# [Voice.chromatics.append("2Dom") if abs(chord) % 10 != 1 else 
+			# 	Voice.chromatics.append(None) for chord in chords_chosen]
 			self.old_chord = abs(Voice.chord_path[-1])
 
 	def add_single_chord(self, progression_type):
 		"""Add single chord to progression, usually at transition points"""
 		chord_options = progression_type[abs(self.old_chord)]
 		chord_choice = random.choice(chord_options)
-		if abs(chord_choice) % 10 != 1:
-			Voice.chromatics.append("2D")
+		if abs(chord_choice) // 10000 in (8, 9):
+			Voice.chromatics.append("2Dim")
+		elif abs(chord_choice) % 10 != 1:
+			Voice.chromatics.append("2Dom")
 		else:
 			Voice.chromatics.append(None)
 		Voice.chord_path.append(chord_choice)
@@ -212,12 +223,6 @@ class Bass(Voice):
 		self.add_chords(self.chord_style4)
 		print("Rhythm:",Voice.note_values, len(Voice.note_values))
 
-	def fix_rhythm(self):
-		# Now that you've applied the optional rests you can align the 
-		# rhythm to the actual notes
-		if Voice.half_rest_ending:
-			Voice.idea2_length -= 1
-			Voice.idea4_length -= 1
 
 	def add_notes(self):
 		"""Add notes to bass based on chords. First chord must be tonic"""
@@ -226,9 +231,6 @@ class Bass(Voice):
 		old_position = 0
 		for index, chord in enumerate(Voice.chord_path[1:]):
 			new_scale_degree = int(idms.bass_notes[abs(chord)])
-			# if Voice.chromatics[index + 1]:
-			# 	print("New scale degree", new_scale_degree)
-			# 	print("Chord", chord)
 
 			# Deciding between regular and inverted chord
 			# (e.g., III to V6 going downward)
@@ -254,9 +256,7 @@ class Bass(Voice):
 
 			Voice.bass_motion.append(shift)
 			pitch_change = new_pitch - old_pitch
-			self.pitch_amounts.append(new_pitch)
-			# if Voice.chromatics[index] == "2D":
-			# 	print(self.pitch_amounts) 
+			self.pitch_amounts.append(new_pitch) 
 			old_pitch = new_pitch
 			old_position = new_scale_degree
 			old_scale_degree = new_scale_degree
@@ -272,29 +272,47 @@ class Bass(Voice):
 		# Add feature when changing between basic and contrast ideas 
 		# to prevent octave shift
 		descents = (index for index, chord in enumerate(Voice.chord_path) 
-			if chord in (-idms.IV6, -idms.VI))
-		tonic_index = (Voice.idea1_length + Voice.idea2_length, 
-			len(Voice.chord_path ) - 1)
+			if chord in (-idms.IV6, -idms.VI, -idms.DIM7_DOWN_OF_VI, 
+				-idms.DIM7_UP_OF_VI, -idms.V43_OF_VI))
+		# tonic_index = (Voice.idea1_length + Voice.idea2_length, 
+		# 	len(Voice.chord_path ) - 1)
+		tonic_indices = [index for index, chord in enumerate(Voice.chord_path)
+			if abs(chord) == idms.I]
+		print(self.chord_path)
+		print(tonic_indices)
 		
+		past_index = -1
+		# Detect neighbor indect for nonchromatic chords
 		for index in descents:
+			if index == past_index + 1:
+				continue
+			past_index = index
 			index += 1
-			while index not in tonic_index:
+			while index not in tonic_indices:
 				self.pitch_amounts[index] -= 12
 				index += 1
 
-		for index, move in enumerate(Voice.bass_motion):
+		for index, move in enumerate(Voice.bass_motion[:]):
 			Voice.bass_motion[index] = self.move_direction(move)
 
 	def convert_notes(self):
 		"""Converts notes from diatonic scale degrees to pitch magnitudes"""
 		self.real_notes = [note + 60 + idms.tonics[Voice.tonic] 
 		for note in self.pitch_amounts]
+		print(self.chromatics)
+		print(self.chord_path)
+		print(self.real_notes)
 
 		#alter pitches and bass motion based on secondary dominants
 		for nc_index in range(len(Voice.chromatics)):
-			if Voice.chromatics[nc_index] == "2D":
+			if Voice.chromatics[nc_index] == "2Dom":
+				print(abs(Voice.chord_path[nc_index]))
+				print(self.real_notes[nc_index])
 				self.real_notes[nc_index] += self.convert_sec_dom(
-					Voice.chord_path[nc_index], self.real_notes[nc_index])
+					abs(Voice.chord_path[nc_index]), self.real_notes[nc_index])
+			elif Voice.chromatics[nc_index] == "2Dim":
+				self.real_notes[nc_index] += self.convert_sec_dim(
+					abs(Voice.chord_path[nc_index]), self.real_notes[nc_index])
 				old_note = self.real_notes[nc_index - 1]
 				current_note = self.real_notes[nc_index]
 				next_note = self.real_notes[nc_index + 1]
@@ -311,3 +329,4 @@ class Bass(Voice):
 				self.real_notes[index] -= 24
 
 		Voice.bass_pitches = self.real_notes
+		print(self.real_notes, len(self.real_notes))

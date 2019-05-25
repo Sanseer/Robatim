@@ -17,11 +17,11 @@ class KBMelody(Voice):
 		self.beat_index = 0
 		self.old_note, self.new_note = 0, 0
 		self.note_values = Voice.note_values[:]
-		
+
 	def do_stuff(self):
 		self.group_rhythm()
 		self.group_notes()
-		self.embellish()
+		# self.embellish()
 
 
 
@@ -50,12 +50,22 @@ class KBMelody(Voice):
 		self.note_index = 0
 
 	def embellish(self):
-		self.select_groove(4,7)
+		self.select_groove(6,7)
 		if self.pick_figuration():
 			self.create_nonchord_tones()
 			self.find_note_index()
 			self.fill_notes(1)
-		self.select_groove(self.measure_index - 4, self.measure_index - 3)
+		self.select_groove(4,6)
+		if self.pick_figuration():
+			self.create_nonchord_tones()
+			self.find_note_index()
+			self.fill_notes(1)
+		self.select_groove(2,3)
+		if self.pick_figuration():
+			self.create_nonchord_tones()
+			self.find_note_index()
+			self.fill_notes()
+		self.select_groove(0, 2)
 		if self.pick_figuration():
 			self.create_nonchord_tones()
 			self.find_note_index()

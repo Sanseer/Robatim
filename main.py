@@ -7,19 +7,16 @@ the conventions of counterpoint and voice leading.
 The rhythm is embellished, the sheet music created, and the MIDI file exported."""
 
 import random
-import pysnooper
 
 from midiutil import MIDIFile
 
 from voice import Voice
 from bass import Bass
-from soprano import Soprano
-from alto_tenor import MiddleVoices, Alto, Tenor
 from kb_upper_voices import KBUpperVoices, KBTenor, KBAlto
 from kb_melody import KBMelody
 import idioms as idms
 
-def random_settings(time_sig="", tonic="", mode="", style="song"):
+def random_settings(time_sig="", tonic="", mode=""):
 	"""Selects a random, but practical key and time sig unless one is provided"""
 	if not mode:
 		mode = random.choice(("ionian", "aeolian"))
@@ -30,38 +27,40 @@ def random_settings(time_sig="", tonic="", mode="", style="song"):
 	if not time_sig:
 		time_sig = random.choice(idms.time_sigs)
 
-	return time_sig, tonic, mode, style 
+	return time_sig, tonic, mode 
 
 
-def create_chorale(parts=4):
-	"""Creates up to four independent voices sequentially """
-	song_notes = []
-	if parts >= 1:
-		song_notes.append(Bass(*random_settings()).create_part())
-	if parts >= 2:
-		song_notes.append(Soprano().create_part())
-	if parts >= 3:
-		MiddleVoices().create_parts()
-		song_notes.append(Alto().create_part())
-	if parts >= 4:
-		song_notes.append(Tenor().create_part())
-	print(Voice.chord_symbols)
-	make_lily_file()
-	return song_notes
+# def create_chorale(parts=4):
+# 	"""Creates up to four independent voices sequentially """
+# 	song_notes = []
+# 	if parts >= 1:
+# 		song_notes.append(Bass(*random_settings()).create_part())
+# 	if parts >= 2:
+# 		song_notes.append(Soprano().create_part())
+# 	if parts >= 3:
+# 		MiddleVoices().create_parts()
+# 		song_notes.append(Alto().create_part())
+# 	if parts >= 4:
+# 		song_notes.append(Tenor().create_part())
+# 	print(Voice.chord_symbols)
+# 	make_lily_file()
+# 	return song_notes
 
 def create_song(parts=4):
 	"""Creates a tune in keyboard style"""
-	# Double the bass an octave below (randomly?)
 	song_notes = []
 	voice_list = []
 	if parts >= 1:
+		# try except clause to find proper chord progressions
 		voice_list.append(Bass(*random_settings()))
 		song_notes.append(voice_list[0].create_part())
 	if parts >= 4: 
 		KBUpperVoices().create_parts()
-		voice_list.append(Tenor())
+		voice_list.append(KBTenor())
+		song_notes.append(voice_list[-1].create_part())
 		voice_list.append(KBAlto())
-		[song_notes.append(voice_list[i].create_part()) for i in range(1,3)]
+		song_notes.append(voice_list[-1].create_part())
+
 		voice_list.append(KBMelody())
 		voice_list[-1].do_stuff()
 		song_notes.append(voice_list[-1].create_part())
@@ -76,7 +75,7 @@ def make_lily_file():
 		mode = "minor "
 	if Voice.beat_division == 3:
 	# For some reason, LilyPond doesn't correspond with regular time sigs
-		time_sig = "/".join([str(Voice.measure_length * 3),"12"])
+		time_sig = "/".join([str(Voice.measure_length * 3),"8"])
 	elif Voice.beat_division == 2:
 		time_sig = "/".join([str(Voice.measure_length),"4"])
 	title = " ".join(("Cantus in", Voice.tonic, mode.replace(" ","")))
@@ -118,10 +117,9 @@ if __name__ ==  "__main__":
 	elif Voice.measure_length == 3:
 		MyMIDI.addTempo(track, 20, tempo * .9)
 
-	# index = 0
 	for part, voice_obj in zip(song_degrees, voice_list):
 		time = 0
-		for pitch, duration in zip(part, voice_obj.get_rhythm()):
+		for pitch, duration in zip(part, voice_obj.groove):
 			if type(duration) == int or type(duration) == float:
 				MyMIDI.addNote(track, channel, pitch, time, duration, volume)
 				time = time + duration
