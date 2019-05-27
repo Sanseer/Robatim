@@ -10,17 +10,14 @@ class KBUpperVoices(Voice):
 
 	def __init__(self):
 		self.note_index = 0
-		self.fault_index = None
 		self.pitch_amounts = []
 		self.possible_pitches = []
-		self.pitch_amounts.extend(("Blank",) * 
+		self.pitch_amounts.extend((None,) * 
 			(Voice.idea1_length + Voice.idea2_length + 
 			Voice.idea3_length + Voice.idea4_length))
-		self.possible_pitches.extend(("Blank",) * 
+		self.possible_pitches.extend((None,) * 
 			(Voice.idea1_length + Voice.idea2_length + 
 			Voice.idea3_length + Voice.idea4_length))
-		print(self.pitch_amounts, len(self.pitch_amounts))
-		print(self.possible_pitches, len(self.possible_pitches))
 
 		self.bass_tenor_intervals = []
 		self.bass_alto_intervals = []
@@ -35,7 +32,6 @@ class KBUpperVoices(Voice):
 		self.tenor_soprano_motion = []
 		self.alto_soprano_motion = []
 
-		# Intentional alias
 		self.composite_intervals = [self.bass_tenor_intervals, 
 			self.bass_alto_intervals, self.bass_soprano_intervals, 
 			self.tenor_alto_intervals, self.tenor_soprano_intervals,
@@ -71,7 +67,7 @@ class KBUpperVoices(Voice):
 		pitch_combos = self.create_pitch_combos(all_pitches)
 		self.possible_pitches[self.note_index] = self.arrange_pitch_combos(
 			pitch_combos)
-		print([slot if slot == "Blank" else len(slot) 
+		print([slot if slot == None else len(slot) 
 			for slot in self.possible_pitches])
 
 	def create_chord_pitches(self, chord_length, chord_root_degree):
@@ -135,7 +131,6 @@ class KBUpperVoices(Voice):
 		for (t_pitch, a_pitch, s_pitch) in triple_pitch_combos:
 			if self.preprocess_combo(t_pitch, a_pitch, s_pitch):
 				approved_combos.append((t_pitch, a_pitch, s_pitch))
-
 		return approved_combos
 
 	def arrange_pitch_combos(self, pitch_combos):
@@ -181,7 +176,6 @@ class KBUpperVoices(Voice):
 				complete_chord_sort[divider:]))
 		else:
 			return complete_chord_sort
-
 		return smooth_chord_sort
 
 	def arrange_chord_motion(self, chord_group):
@@ -204,14 +198,14 @@ class KBUpperVoices(Voice):
 	def add_notes(self):
 		"""Fills up a blank template with notes for soprano, alto, and tenor"""
 		self.note_index = 0
-		while self.pitch_amounts[self.note_index] != "Blank":
+		while self.pitch_amounts[self.note_index] is not None:
 			self.note_index += 1
 		self.populate_note()
 		last_combo = self.pitch_amounts[self.note_index - 1]
 		attempts = 0
 
 		# an invalid combo at a note index is often context-sensitive
-		while "Blank" in self.pitch_amounts:
+		while None in self.pitch_amounts:
 			attempts += 1
 			# Prevent CPU overload/encourage optimization
 			# assert(attempts < 32000), f"You ran out of tries"
@@ -224,14 +218,14 @@ class KBUpperVoices(Voice):
 				if self.note_index < len(self.pitch_amounts):
 					self.populate_note()
 			else:
-				self.possible_pitches[self.note_index] = "Blank"
+				self.possible_pitches[self.note_index] = None
 				assert(self.note_index != 0), "You fail"
 				self.erase_last_note()
 
 				self.note_index -= 1
 				print(f"Go back to index {self.note_index}")
 				self.possible_pitches[self.note_index].remove(last_combo)
-				self.pitch_amounts[self.note_index] = "Blank"
+				self.pitch_amounts[self.note_index] = None
 				last_combo = self.pitch_amounts[self.note_index - 1]
 
 	def choose_combo(self):
@@ -250,18 +244,18 @@ class KBUpperVoices(Voice):
 			self.add_motion_types()
 
 	def add_voice_intervals(self):
-		self.add_interval(Voice.bass_pitches[self.note_index], self.combo_choice[0], 
-			self.bass_tenor_intervals)
-		self.add_interval(Voice.bass_pitches[self.note_index], self.combo_choice[1],
-			self.bass_alto_intervals)
-		self.add_interval(Voice.bass_pitches[self.note_index], self.combo_choice[2],
-			self.bass_soprano_intervals)
-		self.add_interval(self.combo_choice[0], self.combo_choice[1],
-			self.tenor_alto_intervals)
-		self.add_interval(self.combo_choice[0], self.combo_choice[2],
-			self.tenor_soprano_intervals)
-		self.add_interval(self.combo_choice[1], self.combo_choice[2],
-			self.alto_soprano_intervals)
+		self.bass_tenor_intervals.append(self.get_interval(
+			Voice.bass_pitches[self.note_index], self.combo_choice[0]))
+		self.bass_alto_intervals.append(self.get_interval(
+			Voice.bass_pitches[self.note_index], self.combo_choice[1]))
+		self.bass_soprano_intervals.append(self.get_interval(
+			Voice.bass_pitches[self.note_index], self.combo_choice[2]))
+		self.tenor_alto_intervals.append(self.get_interval(
+			self.combo_choice[0], self.combo_choice[1]))
+		self.tenor_soprano_intervals.append(self.get_interval(
+			self.combo_choice[0], self.combo_choice[2]))
+		self.alto_soprano_intervals.append(self.get_interval(
+			self.combo_choice[1], self.combo_choice[2]))
 
 	def add_voice_motion(self, voice_motion, voice_index, new_pitch):
 		if new_pitch < self.pitch_amounts[self.note_index - 1][voice_index]:
@@ -294,7 +288,7 @@ class KBUpperVoices(Voice):
 		self.make_scale_pitch(a_pitch), self.make_scale_pitch(s_pitch)))
 
 		bass_soprano_intervals = self.bass_soprano_intervals[:]
-		self.add_interval(b_pitch, s_pitch, bass_soprano_intervals)
+		bass_soprano_intervals.append(self.get_interval(b_pitch, s_pitch))
 
 		if (s_pitch <= t_pitch) or (s_pitch <= a_pitch):
 			return False
@@ -304,12 +298,10 @@ class KBUpperVoices(Voice):
 			# print("Don't repeat leading tone", end=" ")
 			return False
 		elif (self.is_seventh_chord() and 
-			full_scale_combo.count(self.chord_degree_to_pitch(
-				3, 0, Voice.chromatics[self.note_index])) >= 2):
+			full_scale_combo.count(self.chord_degree_to_pitch(3, 0)) >= 2):
 			# print("Don't repeat chordal 7th", end=" ")
 			return False
-		elif (self.chord_degree_to_pitch(1, 0, Voice.chromatics[self.note_index]) 
-		not in full_scale_combo):
+		elif (self.chord_degree_to_pitch(1) not in full_scale_combo):
 			return False
 		elif self.is_seventh_chord() and len(set(full_scale_combo)) < 3:
 			return False
@@ -345,7 +337,7 @@ class KBUpperVoices(Voice):
 				return False
 			elif (Voice.chromatics[self.note_index - 1] == "2Dom" and 
 			self.make_scale_pitch(old_pitch) == 
-			self.chord_degree_to_pitch(1, -1, True) and 
+			self.chord_degree_to_pitch(1, -1) and 
 			abs(new_pitch - old_pitch) != 1 
 			and (self.get_chord(-1) // 10 != 5_753 or 
 			self.make_scale_pitch(new_pitch) != 
@@ -354,8 +346,7 @@ class KBUpperVoices(Voice):
 				return False
 			elif (self.is_seventh_chord(-1) and 
 			abs(new_pitch - old_pitch) > 2):
-				dissonant_pitch = self.chord_degree_to_pitch(
-					3, -1, Voice.chromatics[self.note_index - 1])
+				dissonant_pitch = self.chord_degree_to_pitch(3, -1)
 				if (self.make_scale_pitch(old_pitch) == dissonant_pitch and 
 				not self.is_seventh_chord()):
 					return False
@@ -370,6 +361,14 @@ class KBUpperVoices(Voice):
 				dissonant_pitch != self.make_scale_pitch(self.combo_choice[1]) and
 				dissonant_pitch != self.make_scale_pitch(self.combo_choice[2])):
 					return False
+			# if (self.note_index > 1 and 
+			# abs((self.pitch_amounts[self.note_index - 1][voice_index] - 
+			# 	self.pitch_amounts[self.note_index - 2][voice_index]) > 5)):
+			# 	print(abs((self.pitch_amounts[self.note_index - 1][voice_index] - 
+			# 		self.pitch_amounts[self.note_index - 2][voice_index])))
+			# 	print(composite_motion[voice_index])
+			# 	print([group[voice_index] for group in self.pitch_amounts if type(group) == tuple ],
+			# 		new_pitch)
 			elif (self.note_index > 1 and self.note_index != 
 			Voice.idea1_length + Voice.idea2_length and
 			abs(self.pitch_amounts[self.note_index - 1][voice_index] - 
@@ -377,32 +376,28 @@ class KBUpperVoices(Voice):
 			and (abs(new_pitch - old_pitch) > 2 or 
 			abs(new_pitch - old_pitch) == 0 or 
 			composite_motion[voice_index][-1] == 
-			self.move_direction(new_pitch -  old_pitch))):
+			composite_motion[voice_index][-2])):
 				# print("Leaps must be followed by contrary steps")
 				return False
 			elif (self.note_index > 1 and 
-			composite_motion[voice_index][-1] == 
-			-self.move_direction(new_pitch - old_pitch) and 
+			composite_motion[voice_index][-2] == 
+			-composite_motion[voice_index][-1] and 
 			composite_motion[voice_index][-1] != 0):
 				current_melody = self.pitch_amounts[:self.note_index]
 				last_pitch = current_melody[-1][voice_index]
-				for previous_pitch, next_pitch in zip(
-					current_melody[-2::-1], current_melody[:0:-1]):
+				for beat_index in range(len(current_melody) - 1, 0, -1):
+					next_pitch = current_melody[beat_index][voice_index]
+					previous_pitch = current_melody[beat_index - 1][voice_index]
 					if (self.move_direction(next_pitch - previous_pitch) ==
 					self.move_direction(new_pitch - old_pitch)):
-						if (self.get_interval(next_pitch, last_pitch) in 
-						idms.harmonic_dissonance):
+						if abs(next_pitch - last_pitch) in (1,2,6,10,11):
 							return False
 						break
 				# print("Do not outline a dissonant interval")
 
-		# prevents recursive clutter later on by removing obvious bad notes 
-
 		bass_soprano_motion = self.bass_soprano_motion[:]
-
 		self.add_motion_type(Voice.bass_motion, soprano_motion, 
 			bass_soprano_motion, bass_soprano_intervals)
-
 		old_soprano_note = self.pitch_amounts[self.note_index - 1][2]
 
 		if ((self.note_index == len(self.pitch_amounts) - 1) and 
@@ -431,11 +426,12 @@ class KBUpperVoices(Voice):
 		soprano_motion[-2] == 0):
 			# print("Triple repeat")
 			return False
-		elif (self.note_index > 2 and 
+		elif (self.note_index > 3 and 
 		bass_soprano_motion[-1] in ("Parallel", "Similar") and
 		bass_soprano_motion[-2] in ("Parallel", "Similar") and
-		bass_soprano_motion[-3] in ("Parallel", "Similar")):
-			# print("Three consecutive parallels. Delete!")
+		bass_soprano_motion[-3] in ("Parallel", "Similar") and
+		bass_soprano_motion[-4] in ("Parallel", "Similar")):
+			# print("Quadruple consecutive parallels. Delete!")
 			return False
 		elif (self.note_index > 3 and 
 		bass_soprano_intervals[-1] == bass_soprano_intervals[-2] ==
@@ -455,11 +451,11 @@ class KBUpperVoices(Voice):
 		tenor_soprano_intervals = self.tenor_soprano_intervals[:]
 		alto_soprano_intervals = self.alto_soprano_intervals[:]
 
-		self.add_interval(t_pitch, a_pitch, tenor_alto_intervals)
-		self.add_interval(t_pitch, s_pitch, tenor_soprano_intervals)
-		self.add_interval(a_pitch, s_pitch, alto_soprano_intervals)
-		self.add_interval(b_pitch, t_pitch, bass_tenor_intervals)
-		self.add_interval(b_pitch, a_pitch, bass_alto_intervals)
+		tenor_alto_intervals.append(self.get_interval(t_pitch, a_pitch))
+		tenor_soprano_intervals.append(self.get_interval(t_pitch, s_pitch))
+		alto_soprano_intervals.append(self.get_interval(a_pitch, s_pitch))
+		bass_tenor_intervals.append(self.get_interval(b_pitch, t_pitch))
+		bass_alto_intervals.append(self.get_interval(b_pitch, a_pitch))
 
 		self.add_motion_type(Voice.bass_motion, tenor_motion, 
 			bass_tenor_motion, bass_tenor_intervals)

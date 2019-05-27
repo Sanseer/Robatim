@@ -18,6 +18,7 @@ import idioms as idms
 
 def random_settings(time_sig="", tonic="", mode=""):
 	"""Selects a random, but practical key and time sig unless one is provided"""
+	# tonic, mode = random.choice((("C", "ionian"), ("A", "aeolian")))
 	if not mode:
 		mode = random.choice(("ionian", "aeolian"))
 	if mode == "ionian" and not tonic:
@@ -27,24 +28,7 @@ def random_settings(time_sig="", tonic="", mode=""):
 	if not time_sig:
 		time_sig = random.choice(idms.time_sigs)
 
-	return time_sig, tonic, mode 
-
-
-# def create_chorale(parts=4):
-# 	"""Creates up to four independent voices sequentially """
-# 	song_notes = []
-# 	if parts >= 1:
-# 		song_notes.append(Bass(*random_settings()).create_part())
-# 	if parts >= 2:
-# 		song_notes.append(Soprano().create_part())
-# 	if parts >= 3:
-# 		MiddleVoices().create_parts()
-# 		song_notes.append(Alto().create_part())
-# 	if parts >= 4:
-# 		song_notes.append(Tenor().create_part())
-# 	print(Voice.chord_symbols)
-# 	make_lily_file()
-# 	return song_notes
+	return time_sig, tonic, mode
 
 def create_song(parts=4):
 	"""Creates a tune in keyboard style"""
@@ -74,7 +58,6 @@ def make_lily_file():
 	elif Voice.mode == "aeolian":
 		mode = "minor "
 	if Voice.beat_division == 3:
-	# For some reason, LilyPond doesn't correspond with regular time sigs
 		time_sig = "/".join([str(Voice.measure_length * 3),"8"])
 	elif Voice.beat_division == 2:
 		time_sig = "/".join([str(Voice.measure_length),"4"])

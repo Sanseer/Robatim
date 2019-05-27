@@ -1,17 +1,21 @@
 # Chords expressed as numbers to allow negative numbers 
 # that represent descending motion.
+# Add secondary diminished inversions 6/5 moves by half step
 I, I6, I64 = 1_530_1, 1_630_1, 1_640_1
 V7_OF_IV, V65_OF_IV, V43_OF_IV = 5_753_4, 5_653_4, 5_643_4
 DIM7_UP_OF_I, DIM7_DOWN_OF_I = 8_753_1, 9_753_1 
+DIM65_UP_OF_I = 11_653_1
 
 II, II6 = 2_530_1, 2_630_1, 
 II7, II65, II43, II42 = 2_753_1, 2_653_1, 2_643_1, 2_642_1
 V7_OF_V, V65_OF_V, V43_OF_V = 5_753_5, 5_653_5, 5_643_5
 DIM7_UP_OF_II, DIM7_DOWN_OF_II = 8_753_2, 9_753_2
+DIM65_UP_OF_II = 11_653_2
 
 III = 3_530_1
 V65_OF_VI, V43_OF_VI = 5_653_6, 5_643_6 
 DIM7_UP_OF_III, DIM7_DOWN_OF_III = 8_753_3, 9_753_3
+DIM65_UP_OF_II = 11_653_3
 
 IV, IV6, IV7 = 4_530_1, 4_630_1, 4_753_1
 DIM7_UP_OF_IV, DIM7_DOWN_OF_IV = 8_753_4, 9_753_4
@@ -87,7 +91,7 @@ restart_tonic = {
 tonic_to_subdom1 = {
 	I: (II, II6, IV), I6: (II6, IV, II, II7, II65), 
 	III: (II6, IV, II, II7, II65), VI: (-IV, -IV7, -II7, -II6, -II65), 
-	IV6: (-IV, -IV7, -II6), V65_OF_II: (II,), V43_OF_II: (II6,-II), 
+	IV6: (-IV, -IV7, -II6), V65_OF_II: (II,), V43_OF_II: (-II,), 
 	V65_OF_IV: (IV,), V43_OF_IV: (-IV,), V7_OF_IV: (IV,), 
 	DIM7_UP_OF_II: (II,), DIM7_DOWN_OF_II: (-II,), DIM7_UP_OF_IV: (IV,), 
 	DIM7_DOWN_OF_IV: (-IV,)
@@ -463,7 +467,7 @@ sec_doms_in_major = {
 	0: (0,0,0,-1), 1: (0,1,0,0), 2: (0,1,0,0), 5: (0,1,0,0), 6: (0,1,1,0)
 }
 sec_doms_in_minor = {
-	0: (0,1,0,-1), 1: (0,1,1,0), 2: (0,0,-1,-1), 5: (1,1,1,0), 6: (-1,0,0,0) 
+	0: (0,1,0,0), 1: (0,1,1,0), 2: (0,0,0,-1), 5: (1,1,1,0), 6: (-1,0,0,0) 
 }
 sec_dim_up_in_major = {
 	0:(1,0,0,-1), 1:(1,1,0,0), 2:(0,0,-1,-1), 3:(1,0,0,-1), 4: (1,0,0,0), 
@@ -502,8 +506,7 @@ compound_embellish_rhythms = {
 simple_0_semitones = \
 	((0, "DUN", 1), (0, "DLN", 1), (0, "CUN", 1), (0, "CLN", 0))
 compound_0_semitones = (
-	((0, "DUN", "DLN", 1), (0, "DLN", "DUN", 1), (0, "CUN", "CLN", 1), 
-	(0, "CLN", "CUN", 1)))
+	((0, "DUN", "DLN", 1), (0, "DLN", "DUN", 1)))
 simple_1_semitone = \
 	((0, "DUN", 1), (0, "DLN", 1), (0, "CUN", 1), (0, "CLN", 1))
 compound_1_semitone = \

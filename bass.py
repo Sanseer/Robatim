@@ -306,8 +306,6 @@ class Bass(Voice):
 		#alter pitches and bass motion based on secondary dominants
 		for nc_index in range(len(Voice.chromatics)):
 			if Voice.chromatics[nc_index] == "2Dom":
-				print(abs(Voice.chord_path[nc_index]))
-				print(self.real_notes[nc_index])
 				self.real_notes[nc_index] += self.convert_sec_dom(
 					abs(Voice.chord_path[nc_index]), self.real_notes[nc_index])
 			elif Voice.chromatics[nc_index] == "2Dim":
