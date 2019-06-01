@@ -12,7 +12,11 @@ class Voice(object):
 	idea4_length = 0
 	idea5_length = 0
 	chord_path = []
-	note_values = [] 
+	
+	note_values = []
+	middle_note_values = []
+	rhythm_styles = []
+	measure_rhythms = []
 	measure_length = 4
 	beat_division = 2
 	half_rest_ending = True
@@ -32,64 +36,103 @@ class Voice(object):
 	chord_symbols = []
 	chromatics = []
 
+	def __init__(self):
+		self.note_index = 0
+		self.measure_notes = []
+		self.sheet_notes = []
+		self.lily_notes = []
+		self.note_values = Voice.note_values[:]
+
+	def create_part(self):
+		self.make_letters()
+		self.lily_convert()
+		self.create_groove()
+		# return self.create_rests(self.real_notes[:])
+
+	# @property
+	# def notes(self):
+	# 	return self.create_rests(self.real_notes[:])
+
+	# @property
+	# def groove(self):
+	# 	return self.note_values
+
+	@property
+	def notes(self):
+		return self.final_notes
+
+	@property
+	def groove(self):
+		return self.final_rhythm
+
+	def get_chord(self, index_shift=0):
+		return abs(Voice.chord_path[self.note_index + index_shift])
+
+	def is_seventh_chord(self, index_shift=0):
+		chord = self.get_chord(index_shift) 
+		return len(idms.chord_tones[chord]) == 4
+
+	def make_scale_pitch(self, pitch):
+		return (pitch - idms.tonics[Voice.tonic]) % 12
+
+	def make_scale_degree(self, pitch):
+		if self.mode == "ionian":
+			return idms.major_scale_degrees[pitch]
+		elif self.mode == "aeolian":
+			return idms.minor_scale_degrees[pitch]
+
+	def center_scale_degree(self, scale_degree):
+		if not 0 <= scale_degree <= 6:
+			scale_degree %= 7
+		return scale_degree
+
+	def get_root_degree(self, index_shift=0):
+		chord = self.get_chord(index_shift)
+		return idms.chord_tones[chord][0]
+
+	def is_diatonic(self, pitch):
+		pitch = self.make_scale_pitch(pitch)
+		if pitch in idms.modes[self.mode] or pitch == 11:
+			return True
+		return False
+
 	def get_interval(self, old_pitch, new_pitch):
-		try:
-			leap = new_pitch - old_pitch
-			while not 0 <= leap <= 11:
-				leap %= 12 
-			if self.chromatics[self.note_index]:
-				if self.chromatics[self.note_index] == "2Dom":
-					chord_shift = 4
-					convert_func = self.convert_sec_dom
-				elif self.chromatics[self.note_index] == "2Dim":
-					chord_shift = 6 
-					convert_func = self.convert_sec_dim
-				old_pitch_degree = self.revert_pitch_to_degree(
-					old_pitch, chord_shift, convert_func)
-				new_pitch_degree = self.revert_pitch_to_degree(
-					new_pitch, chord_shift, convert_func)
-			elif self.chromatics[self.note_index] is None:
-				old_pitch = self.make_scale_pitch(old_pitch)
-				new_pitch = self.make_scale_pitch(new_pitch)
-				old_pitch_degree = self.make_scale_degree(old_pitch)
-				new_pitch_degree = self.make_scale_degree(new_pitch)
+		# try:
+		leap = new_pitch - old_pitch
+		if not 0 <= leap <= 11:
+			leap %= 12 
+		if self.chromatics[self.note_index]:
+			if self.chromatics[self.note_index] == "2Dom":
+				chord_shift = 4
+				convert_func = self.convert_sec_dom
+			elif self.chromatics[self.note_index] == "2Dim":
+				chord_shift = 6 
+				convert_func = self.convert_sec_dim
+			elif self.chromatics[self.note_index] in idms.modes.keys():
+				chord_shift = 0
+				convert_func = self.convert_mode
+			old_pitch_degree = self.revert_pitch_to_degree(
+				old_pitch, chord_shift, convert_func)
+			new_pitch_degree = self.revert_pitch_to_degree(
+				new_pitch, chord_shift, convert_func)
+		elif self.chromatics[self.note_index] is None:
+			old_pitch = self.make_scale_pitch(old_pitch)
+			new_pitch = self.make_scale_pitch(new_pitch)
+			old_pitch_degree = self.make_scale_degree(old_pitch)
+			new_pitch_degree = self.make_scale_degree(new_pitch)
 
-			generic_interval = new_pitch_degree - old_pitch_degree
-			if generic_interval < 0:
-				generic_interval += 7
-			return idms.interval_names[(leap, generic_interval)]
-		except:
-			print(self.mode)
-			print(self.chromatics[self.note_index])
-			print(self.get_chord())
-			print(old_pitch, new_pitch)
-			print(self.make_scale_pitch(old_pitch), 
-				self.make_scale_pitch(new_pitch))
-			with pysnooper.snoop(depth=3):
-				leap = new_pitch - old_pitch
-				while not 0 <= leap <= 11:
-					leap %= 12 
-				if self.chromatics[self.note_index]:
-					if self.chromatics[self.note_index] == "2Dom":
-						chord_shift = 4
-						convert_func = self.convert_sec_dom
-					elif self.chromatics[self.note_index] == "2Dim":
-						chord_shift = 6 
-						convert_func = self.convert_sec_dim
-					old_pitch_degree = self.revert_pitch_to_degree(
-						old_pitch, chord_shift, convert_func)
-					new_pitch_degree = self.revert_pitch_to_degree(
-						new_pitch, chord_shift, convert_func)
-				elif self.chromatics[self.note_index] is None:
-					old_pitch = self.make_scale_pitch(old_pitch)
-					new_pitch = self.make_scale_pitch(new_pitch)
-					old_pitch_degree = self.make_scale_degree(old_pitch)
-					new_pitch_degree = self.make_scale_degree(new_pitch)
-
-				generic_interval = new_pitch_degree - old_pitch_degree
-				if generic_interval < 0:
-					generic_interval += 7
-				return idms.interval_names[(leap, generic_interval)]
+		generic_interval = new_pitch_degree - old_pitch_degree
+		if generic_interval < 0:
+			generic_interval += 7
+		return idms.interval_names[(leap, generic_interval)]
+		# except:
+		# 	print(self.mode)
+		# 	print(self.chromatics[self.note_index])
+		# 	print(self.get_chord())
+		# 	print(old_pitch, new_pitch)
+		# 	print(self.make_scale_pitch(old_pitch), 
+		# 		self.make_scale_pitch(new_pitch))
+		# 	with pysnooper.snoop(depth=3):
 
 
 	def revert_pitch_to_degree(self, pitch, chord_shift, convert_func, scale_pitch=False):
@@ -142,30 +185,36 @@ class Voice(object):
 		position = idms.chord_tones[chord].index(scale_degree)
 		root_degree = idms.chord_tones[chord][0]
 
-		if chord // 10000 == 8:
+		if chord // 10000 == 70:
 			direction = "up"
-		elif chord // 10000 == 9:
+		elif chord // 10000 == 11:
 			direction = "down"
 
 		shift = idms.sec_dims[(direction, self.mode)][root_degree][position]
 
 		return shift
 
-	def center_scale_degree(self, scale_degree):
-		if not 0 <= scale_degree <= 6:
-			scale_degree %= 7
-		return scale_degree
+	def convert_mode(self, chord, main_note, scale_pitch=False):
+		if not scale_pitch:
+			main_note = self.make_scale_pitch(main_note)
+		scale_degree = self.make_scale_degree(main_note)
 
-	def is_voice_range(self, voice_index):
-		selected_pitches = [ combo[voice_index] for combo in self.pitch_amounts 
-		if type(combo) == tuple ]
-		highest_pitch = max(selected_pitches)
-		lowest_pitch = min(selected_pitches)
-		vocal_range = highest_pitch - lowest_pitch
+		new_mode = Voice.chromatics[self.note_index]
+		new_note = idms.modes[new_mode][scale_degree]
 
-		if vocal_range > 16:
-			return False
-		return True
+		if (new_mode == "aeolian" and new_note == 10 and 
+		idms.chord_tones[chord][0] in (4,6)):
+			new_note += 1
+
+		return new_note - main_note
+
+	def move_direction(self, move):
+		if move < 0:
+			return int(move / -move)
+		elif move > 0:
+			return int(move / move)
+		else:
+			return 0
 
 	def add_motion_type(self, old_motion, new_motion, movements, intervals):
 		# Bass motion list already created
@@ -210,15 +259,18 @@ class Voice(object):
 		for real_note in self.real_notes:
 			self.sheet_notes.append(self.make_letter(real_note))
 
-		print(self.sheet_notes, len(self.sheet_notes))
-
-	def convert_chords(self):
+	def create_chord_names(self):
 		new_chords_names = []
 		for chord in Voice.chord_path:
+			chord_flavor = abs(chord) // 10000
 			chord = str(abs(chord))
-			root = chord[0]
+			root = chord[:2]
 			position = chord[-4:-1]
-			if chord[-1] == "1":
+			if 21 <= chord_flavor <= 26:
+				root2 = "".join([chord[-1], "0"])
+				chord = chord[:-1]
+				chord = " ".join([idms.chord_names[root2], chord])
+			elif (chord[-1] == "1" and chord_flavor != 11):
 				chord = chord[:-1]
 			else:
 				reference = idms.chord_names[chord[-1]]
@@ -232,9 +284,6 @@ class Voice(object):
 	def lily_convert(self):
 		self.lily_notes = []
 		self.rhythm = self.invert_note_values()
-		if not Voice.chord_symbols:
-			Voice.chord_symbols = self.convert_chords()
-		print(Voice.chord_symbols, len(Voice.chord_symbols))
 		index = 0
 		self.create_rests(self.sheet_notes)
 
@@ -264,12 +313,7 @@ class Voice(object):
 			lily_note = letter + new_symbol + octave_mark + str(self.rhythm[index])
 			self.lily_notes.append(lily_note)
 
-		# lily_string = ""
-
 		lily_string = " ".join(note for note in self.lily_notes)
-
-		# for note in self.lily_notes:
-		# 	lily_string += note
 		Voice.lily_parts.append(lily_string)
 
 	def invert_note_values(self):
@@ -293,95 +337,10 @@ class Voice(object):
 		for lily_index, item in enumerate(self.note_values):
 			if type(item) == str:
 				rest_indices.append(lily_index)
-		# rests added in reverse to prevent moving target
+		# reverse insertion to prevent moving target
 		for lily_index in rest_indices[::-1]:
 			sequence.insert(lily_index, self.rhythm[lily_index])
-
 		return sequence
-
-	def create_part(self):
-		self.make_letters()
-		self.lily_convert()
-		return self.create_rests(self.real_notes[:])
-
-	def make_scale_pitch(self, pitch):
-		return (pitch - idms.tonics[Voice.tonic]) % 12
-
-	def make_scale_degree(self, pitch):
-		if self.mode == "ionian":
-			return idms.major_scale_degrees[pitch]
-		elif self.mode == "aeolian":
-			return idms.minor_scale_degrees[pitch]
-
-	def revert_sec_dom(self, pitch, index_shift=0, scale_pitch=False):
-		chord = self.get_chord(index_shift)
-		chord_degrees = idms.chord_tones[chord]
-		chord_pitches = []
-		for degree in chord_degrees:
-			chord_pitches.append(idms.modes[Voice.mode][degree])
-		if scale_pitch is False:
-			pitch = self.make_scale_pitch(pitch)
-		accidentals = [pitch, pitch - 1, pitch + 1]
-		for index in accidentals:
-			if 0 <= accidentals[index] <= 11:
-				accidentals[index] %= 12
-
-		for index in range(len(chord_pitches)):
-			if chord_pitches[index] in accidentals:
-				degree_index = index
-		note_degree = idms.chord_tones[chord][degree_index]
-		root_degree = idms.chord_tones[chord][0]
-		final_position = 4 + note_degree - root_degree
-
-		final_position = self.center_scale_degree(final_position)
-
-		return final_position
-
-	def revert_sec_dim(self, pitch, index_shift=0, scale_pitch=False):
-		# account for raised seventh of minor mode
-		chord = self.get_chord(index_shift)
-		chord_degrees = idms.chord_tones[chord]
-		chord_pitches = []
-		for degree in chord_degrees:
-			chord_pitches.append(idms.modes[Voice.mode][degree])
-		if not scale_pitch:
-			pitch = self.make_scale_pitch(pitch)
-		accidentals = [pitch, pitch - 1, pitch + 1]
-		for index in accidentals:
-			if 0 <= accidentals[index] <= 11:
-				accidentals[index] %= 12
-
-		for index in range(len(chord_pitches)):
-			if chord_pitches[index] in accidentals:
-				degree_index = index
-
-		note_degree = idms.chord_tones[chord][degree_index]
-		root_degree = idms.chord_tones[chord][0]
-		final_position = 6 + note_degree - root_degree
-		final_position = self.center_scale_degree(final_position)
-
-		return final_position
-
-		# if chord // 10000 == 8:
-		# 	direction = "up"
-		# 	note_degree -= 1
-		# 	note_degree = self.center_scale_degree(note_degree)
-		# elif chord // 10000 == 9:
-		# 	direction = "down"
-
-		# return idms.modes[Voice.mode][note_degree]
-
-	def move_direction(self, move):
-		if move < 0:
-			return int(move / -move)
-		elif move > 0:
-			return int(move / move)
-		else:
-			return 0
-
-	def is_seventh_chord(self, index_shift=0):
-		chord = self.get_chord(index_shift) 
-		return len(idms.chord_tones[chord]) == 4
 
 	def chord_degree_to_pitch(self, chord_position, index_shift=0):
 		chord = self.get_chord(index_shift)
@@ -395,26 +354,116 @@ class Voice(object):
 			pitch += self.convert_sec_dom(chord, pitch, True)
 		elif self.chromatics[self.note_index + index_shift] == "2Dim":
 			pitch += self.convert_sec_dim(chord, pitch, True)
+		elif self.chromatics[self.note_index + index_shift] in idms.modes.keys():
+			pitch += self.convert_mode(chord, pitch, True)
 		return pitch
 
-	@property
-	def groove(self):
-		return self.note_values
+	def is_voice_range(self, voice_index):
+		selected_pitches = [ combo[voice_index] for combo in self.pitch_amounts 
+		if type(combo) == tuple ]
+		highest_pitch = max(selected_pitches)
+		lowest_pitch = min(selected_pitches)
+		vocal_range = highest_pitch - lowest_pitch
 
-	def is_diatonic(self, pitch):
-		pitch = self.make_scale_pitch(pitch)
-		if pitch in idms.modes[self.mode] or pitch == 11:
-			return True
-		return False
+		if vocal_range > 16:
+			return False
+		return True
 
-	def get_chord(self, index_shift=0):
-		return abs(Voice.chord_path[self.note_index + index_shift])
+	def group_notes(self):
+		for rhythm in Voice.measure_rhythms:
+			array = []
+			for item in rhythm:
+				if type(item) == int:
+					array.append(self.real_notes[self.note_index])
+					self.note_index += 1
+			self.measure_notes.append(array)
 
-	def get_root_degree(self, index_shift=0):
-		chord = self.get_chord(index_shift)
-		return idms.chord_tones[chord][0]
+		print(self.measure_notes)
+		print(Voice.measure_rhythms)
+		print(self.note_values)
+
+		self.note_index = 0
+
+	def flatten_sequence(self, sequence):
+		new_list = []
+		for nest_sequence in sequence:
+			for item in nest_sequence:
+				new_list.append(item)
+
+		return new_list
+
+	# @pysnooper.snoop(watch_explode=("self"))
+	def create_groove(self):
+		self.group_notes()
+
+		self.final_rhythm = [ [] for _ in range(8)]
+		self.final_notes = [ [] for _ in range(8)]
+
+		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[:3]):
+			for r_index, rhythm_style in enumerate(chosen_measure):
+				if rhythm_style == "Waltz2":
+					self.final_rhythm[m_index].extend(("1",1))
+				elif rhythm_style == "Waltz3":
+					self.final_rhythm[m_index].extend(("1",1,1))
+				elif rhythm_style == "Waltz4":
+					self.final_rhythm[m_index].extend(("1",1,"1",1))
+				else:
+					self.final_rhythm[m_index].append(Voice.measure_rhythms[m_index][r_index])
+
+		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[4:7]):
+			for r_index, rhythm_style in enumerate(chosen_measure):
+				if rhythm_style == "Waltz2":
+					self.final_rhythm[m_index + 4].extend(("1",1))
+				elif rhythm_style == "Waltz3":
+					self.final_rhythm[m_index + 4].extend(("1",1,1))
+				elif rhythm_style == "Waltz4":
+					self.final_rhythm[m_index + 4].extend(("1",1,"1",1))
+				else:
+					self.final_rhythm[m_index + 4].append(Voice.measure_rhythms[m_index + 4][r_index])
 
 
+		self.final_rhythm[3] = Voice.measure_rhythms[3]
+		self.final_rhythm[7] = Voice.measure_rhythms[7]
+
+		# print(self.final_rhythm)
+		# print(Voice.rhythm_styles)
+
+		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[:3]):
+			for r_index, rhythm_style in enumerate(chosen_measure):
+				main_note = self.measure_notes[m_index][r_index]
+				if rhythm_style == "Waltz2":
+					self.final_notes[m_index].extend(("REST", main_note))
+				elif rhythm_style == "Waltz3":
+					self.final_notes[m_index].extend(("REST", main_note, main_note))
+				elif rhythm_style == "Waltz4":
+					self.final_notes[m_index].extend(("REST", main_note, "REST", main_note))
+				elif rhythm_style is None:
+					self.final_notes[m_index].append(main_note)
+
+
+		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[4:7]):
+			for r_index, rhythm_style in enumerate(chosen_measure):
+				main_note = self.measure_notes[m_index + 4][r_index]
+				if rhythm_style == "Waltz2":
+					self.final_notes[m_index + 4].extend(("REST", main_note))
+				elif rhythm_style == "Waltz3":
+					self.final_notes[m_index + 4].extend(("REST", main_note, main_note))
+				elif rhythm_style == "Waltz4":
+					self.final_notes[m_index + 4].extend(("REST", main_note, "REST", main_note))
+				elif rhythm_style is None:
+					self.final_notes[m_index + 4].append(main_note)
+
+		self.final_notes[3] = self.measure_notes[3]
+		self.final_notes[7] = self.measure_notes[7]
+		if Voice.half_rest_ending:
+			self.final_notes[3].append("REST")
+			self.final_notes[7].append("REST")
+
+		# print(self.final_notes)
+		self.final_rhythm = self.flatten_sequence(self.final_rhythm)
+		self.final_notes = self.flatten_sequence(self.final_notes)
+		# print(self.final_rhythm, len(self.final_rhythm))
+		# print(self.final_notes, len(self.final_notes))
 
 # never convert twice to scale pitch
 # chord to abs chord to root degree using index shift

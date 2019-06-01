@@ -1,12 +1,13 @@
 import itertools
-import random
+from tqdm import tqdm
+import pysnooper
 
 from voice import Voice
 import idioms as idms
-import pysnooper
 
 class KBUpperVoices(Voice):
-	"""Creates chords using bass notes for a keyboard style tune"""
+	"""Creates chords using bass notes and first-species counterpoint 
+	for a chorale style"""
 
 	def __init__(self):
 		self.note_index = 0
@@ -63,12 +64,15 @@ class KBUpperVoices(Voice):
 		elif Voice.chromatics[self.note_index] == "2Dim":
 			all_pitches = self.add_chromatics(
 				all_pitches, self.convert_sec_dim)
+		elif Voice.chromatics[self.note_index] in idms.modes.keys():
+			all_pitches = self.add_chromatics(
+				all_pitches, self.convert_mode)
 
 		pitch_combos = self.create_pitch_combos(all_pitches)
 		self.possible_pitches[self.note_index] = self.arrange_pitch_combos(
 			pitch_combos)
-		print([slot if slot == None else len(slot) 
-			for slot in self.possible_pitches])
+		# print([slot if slot == None else len(slot) 
+		# 	for slot in self.possible_pitches])
 
 	def create_chord_pitches(self, chord_length, chord_root_degree):
 		"""Create a list of all possible pitches for the current chord"""
@@ -205,28 +209,32 @@ class KBUpperVoices(Voice):
 		attempts = 0
 
 		# an invalid combo at a note index is often context-sensitive
-		while None in self.pitch_amounts:
-			attempts += 1
-			# Prevent CPU overload/encourage optimization
-			# assert(attempts < 32000), f"You ran out of tries"
-			if self.possible_pitches[self.note_index]:
-				self.combo_choice = self.choose_combo()
-				self.validate_notes()
-				self.pitch_amounts[self.note_index] = self.combo_choice
-				last_combo = self.combo_choice
-				self.note_index += 1
-				if self.note_index < len(self.pitch_amounts):
-					self.populate_note()
-			else:
-				self.possible_pitches[self.note_index] = None
-				assert(self.note_index != 0), "You fail"
-				self.erase_last_note()
+		with tqdm(total=len(self.possible_pitches[0])) as pbar:
+			while None in self.pitch_amounts:
+				attempts += 1
+				# Prevent CPU overload/encourage optimization
+				# assert(attempts < 32000), f"You ran out of tries"
+				if self.possible_pitches[self.note_index]:
+					self.combo_choice = self.choose_combo()
+					self.validate_notes()
+					self.pitch_amounts[self.note_index] = self.combo_choice
+					last_combo = self.combo_choice
+					self.note_index += 1
+					if self.note_index < len(self.pitch_amounts):
+						self.populate_note()
+				else:
+					self.possible_pitches[self.note_index] = None
+					if self.note_index == 1:
+						pbar.update(1)
+					assert(self.note_index != 0), "You fail"
+					self.erase_last_note()
 
-				self.note_index -= 1
-				print(f"Go back to index {self.note_index}")
-				self.possible_pitches[self.note_index].remove(last_combo)
-				self.pitch_amounts[self.note_index] = None
-				last_combo = self.pitch_amounts[self.note_index - 1]
+					self.note_index -= 1
+					# if attempts % 3000 == 0:
+					# 	print(f"Go back to index {self.note_index}")
+					self.possible_pitches[self.note_index].remove(last_combo)
+					self.pitch_amounts[self.note_index] = None
+					last_combo = self.pitch_amounts[self.note_index - 1]
 
 	def choose_combo(self):
 		"""Picks the fullest and smoothest chord from remaining options"""
@@ -306,7 +314,7 @@ class KBUpperVoices(Voice):
 		elif self.is_seventh_chord() and len(set(full_scale_combo)) < 3:
 			return False
 		elif (self.note_index == 0 and 
-		bass_soprano_intervals[-1] not in ("P5", "P8")):
+		bass_soprano_intervals[-1] not in ("P5", "P8", "M3", "m3")):
 			return False
 		if self.note_index == 0:
 			return True
@@ -330,7 +338,8 @@ class KBUpperVoices(Voice):
 			elif (self.make_scale_pitch(old_pitch) == 11 and 
 			self.make_scale_pitch(new_pitch) != 0 and 
 			not Voice.chromatics[self.note_index] and 
-			(self.get_chord(-1) // 10 != 5_753 or 
+			not Voice.chromatics[self.note_index - 1] and
+			(self.get_chord(-1) // 10 != 50_753 or 
 			self.make_scale_pitch(new_pitch) != 
 			self.chord_degree_to_pitch(2))):
 				# print("Leading tone must progress to tonic", end=" ")
@@ -339,7 +348,7 @@ class KBUpperVoices(Voice):
 			self.make_scale_pitch(old_pitch) == 
 			self.chord_degree_to_pitch(1, -1) and 
 			abs(new_pitch - old_pitch) != 1 
-			and (self.get_chord(-1) // 10 != 5_753 or 
+			and (self.get_chord(-1) // 10 != 50_753 or 
 			self.make_scale_pitch(new_pitch) != 
 			self.chord_degree_to_pitch(2))):
 				# print("Leading tone of 2D must resolve to tonic", end=" ")
@@ -369,8 +378,18 @@ class KBUpperVoices(Voice):
 			# 	print(composite_motion[voice_index])
 			# 	print([group[voice_index] for group in self.pitch_amounts if type(group) == tuple ],
 			# 		new_pitch)
-			elif (self.note_index > 1 and self.note_index != 
-			Voice.idea1_length + Voice.idea2_length and
+			# if (self.note_index > 1 and 
+			# abs(self.pitch_amounts[self.note_index - 1][voice_index] - 
+			# 	self.pitch_amounts[self.note_index - 2][voice_index]) > 5
+			# and (abs(new_pitch - old_pitch) > 2 or 
+			# abs(new_pitch - old_pitch) == 0 or 
+			# composite_motion[voice_index][-1] == 
+			# composite_motion[voice_index][-2])):
+			# 	print(self.pitch_amounts[self.note_index - 2][voice_index], end = " ")
+			# 	print(self.pitch_amounts[self.note_index - 1][voice_index], end=" ")
+			# 	print(new_pitch)
+			# 	print(composite_motion[voice_index])
+			if (self.note_index > 1 and
 			abs(self.pitch_amounts[self.note_index - 1][voice_index] - 
 				self.pitch_amounts[self.note_index - 2][voice_index]) > 5 
 			and (abs(new_pitch - old_pitch) > 2 or 
@@ -379,21 +398,9 @@ class KBUpperVoices(Voice):
 			composite_motion[voice_index][-2])):
 				# print("Leaps must be followed by contrary steps")
 				return False
-			elif (self.note_index > 1 and 
-			composite_motion[voice_index][-2] == 
-			-composite_motion[voice_index][-1] and 
-			composite_motion[voice_index][-1] != 0):
-				current_melody = self.pitch_amounts[:self.note_index]
-				last_pitch = current_melody[-1][voice_index]
-				for beat_index in range(len(current_melody) - 1, 0, -1):
-					next_pitch = current_melody[beat_index][voice_index]
-					previous_pitch = current_melody[beat_index - 1][voice_index]
-					if (self.move_direction(next_pitch - previous_pitch) ==
-					self.move_direction(new_pitch - old_pitch)):
-						if abs(next_pitch - last_pitch) in (1,2,6,10,11):
-							return False
-						break
-				# print("Do not outline a dissonant interval")
+			elif abs(new_pitch - old_pitch) in (6,10,11):
+				# print("No dissonant leaps")
+				return False
 
 		bass_soprano_motion = self.bass_soprano_motion[:]
 		self.add_motion_type(Voice.bass_motion, soprano_motion, 
@@ -404,7 +411,7 @@ class KBUpperVoices(Voice):
 		(bass_soprano_motion[-1] != "Contrary" or 
 		bass_soprano_intervals[-1] != "P8" or
 		abs(s_pitch - old_soprano_note) > 2)):
-			# print("Must end with contrary motion and tonic")
+			# print("Must end with contrary motion and tonic by step")
 			return False
 		elif (self.note_index != len(self.pitch_amounts) - 1 and 
 		bass_soprano_intervals[-1] == "P8"):
@@ -419,8 +426,9 @@ class KBUpperVoices(Voice):
 		elif bass_soprano_motion[-1] == "No motion":
 			return False
 		elif (bass_soprano_motion[-1] == "Similar" and 
-		bass_soprano_intervals[-1] == "P5"):
-			# print("No hidden 5ths")
+		"P" in bass_soprano_intervals[-1] and 
+		abs(s_pitch - old_soprano_note) > 2):
+			# print("No hidden 5ths/octaves except soprano moving by step")
 			return False
 		elif (self.note_index > 1 and Voice.soprano_motion[-1] == 0 and 
 		soprano_motion[-2] == 0):
@@ -438,6 +446,9 @@ class KBUpperVoices(Voice):
 		bass_soprano_intervals[-3] == bass_soprano_intervals[-4]):
 			# print("Quadruple identical imperfects.")
 			return False
+		elif (self.note_index == Voice.idea1_length + Voice.idea2_length - 1 and
+		abs(s_pitch - old_soprano_note) > 4):
+			return False 
 
 		bass_tenor_motion = self.bass_tenor_motion[:]
 		bass_alto_motion = self.bass_alto_motion[:]
@@ -483,7 +494,7 @@ class KBUpperVoices(Voice):
 			elif interval_list[-2] == "A4" and "6" not in interval_list[-1]:
 				return False
 			elif (interval_list[-2] == "d5" 
-			and "3" not in interval_list[-1] 
+			and interval_list[-1] not in ("M3", "m3") 
 			and self.get_chord(-1) != idms.VII6):
 				return False
 			elif (interval_list[-2] == "d5"
@@ -515,14 +526,13 @@ class KBTenor(Voice):
 
 	def __init__(self):
 		self.real_notes = Voice.tenor_pitches
-		self.sheet_notes = []
-		self.lily_notes = []
-		self.note_values = Voice.note_values[:]
+		super().__init__()
+
 
 class KBAlto(Voice):
 
 	def __init__(self):
 		self.real_notes = Voice.alto_pitches
-		self.sheet_notes = []
-		self.lily_notes = []
-		self.note_values = Voice.note_values[:]
+		super().__init__()
+
+

@@ -16,7 +16,7 @@ from kb_upper_voices import KBUpperVoices, KBTenor, KBAlto
 from kb_melody import KBMelody
 import idioms as idms
 
-def random_settings(time_sig="", tonic="", mode=""):
+def random_settings(time_sig="", tonic="", mode="ionian"):
 	"""Selects a random, but practical key and time sig unless one is provided"""
 	# tonic, mode = random.choice((("C", "ionian"), ("A", "aeolian")))
 	if not mode:
@@ -37,19 +37,23 @@ def create_song(parts=4):
 	if parts >= 1:
 		# try except clause to find proper chord progressions
 		voice_list.append(Bass(*random_settings()))
-		song_notes.append(voice_list[0].create_part())
+		# song_notes.append(voice_list[0].create_part())
+		voice_list[0].create_part()
 	if parts >= 4: 
 		KBUpperVoices().create_parts()
 		voice_list.append(KBTenor())
-		song_notes.append(voice_list[-1].create_part())
+		# song_notes.append(voice_list[-1].create_part())
+		voice_list[-1].create_part()
 		voice_list.append(KBAlto())
-		song_notes.append(voice_list[-1].create_part())
+		# song_notes.append(voice_list[-1].create_part())
+		voice_list[-1].create_part()
 
 		voice_list.append(KBMelody())
 		voice_list[-1].do_stuff()
-		song_notes.append(voice_list[-1].create_part())
-	make_lily_file()
-	return song_notes, voice_list
+		voice_list[-1].create_part()
+		make_lily_file()
+		# song_notes.append(voice_list[-1].create_part())
+	return voice_list
 
 def make_lily_file():
 	"""Creates a lilyPond file using a pre-defined layout"""
@@ -76,8 +80,8 @@ def make_lily_file():
 
 
 if __name__ ==  "__main__":
-	song_degrees, voice_list = create_song(4)
-	program = 73
+	voice_list = create_song(4)
+	program = 14 # 73, 48, 4
 	track    = 0
 	channel  = 0
 	time     = 0   # In beats
@@ -86,7 +90,7 @@ if __name__ ==  "__main__":
 	MyMIDI = MIDIFile(5) # One track, defaults to format 1 (tempo track
 	                     # automatically created)
 
-	[MyMIDI.addProgramChange(track,ch,time,program) for ch in range(4)]
+	[MyMIDI.addProgramChange(track,ch,time,73) for ch in range(4)]
 
 	if Voice.mode == "aeolian":
 		tempo = 110
@@ -94,15 +98,15 @@ if __name__ ==  "__main__":
 		tempo = 120
 	MyMIDI.addTempo(0,0,tempo)
 
-	# optional slow ending
+	# optional slow ending except whole note on measure 7
 	if Voice.measure_length == 4:
 		MyMIDI.addTempo(track, 26, tempo * .9)
 	elif Voice.measure_length == 3:
 		MyMIDI.addTempo(track, 20, tempo * .9)
 
-	for part, voice_obj in zip(song_degrees, voice_list):
+	for part in voice_list:
 		time = 0
-		for pitch, duration in zip(part, voice_obj.groove):
+		for pitch, duration in zip(part.notes, part.groove):
 			if type(duration) == int or type(duration) == float:
 				MyMIDI.addNote(track, channel, pitch, time, duration, volume)
 				time = time + duration
