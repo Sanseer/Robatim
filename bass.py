@@ -256,6 +256,8 @@ class Bass(Voice):
 			Voice.idea1_length:Voice.idea1_length + Voice.idea2_length])
 		Voice.idea4_length = Voice.idea2_length
 
+		# change half cadence and full cadence ending from 2,1 to 1,2
+
 		self.add_chords(self.chord_style4)
 		print("Rhythm:",Voice.note_values, len(Voice.note_values))
 
@@ -263,11 +265,13 @@ class Bass(Voice):
 		"""Add notes to bass based on chords. First chord must be tonic"""
 		old_pitch = 0
 		old_scale_degree = 0
-		for chord in Voice.chord_path[1:]:
+		for n_index, chord in enumerate(Voice.chord_path[1:]):
 			new_scale_degree = idms.bass_notes[abs(chord)]
 			new_pitch = idms.modes[self.mode][new_scale_degree]
-			if self.mode == "aeolian" and idms.bass_notes[abs(chord)] == 6:
-				new_pitch += 1
+			# You don't need to raise diatonic leading tone if modulation
+			if Voice.chromatics[n_index + 1] not in ("2Dom", "2Dim"):
+				if self.mode == "aeolian" and idms.bass_notes[abs(chord)] == 6:
+					new_pitch += 1
 			if old_scale_degree == new_scale_degree:
 				new_pitch = old_pitch
 			elif chord > 0 and old_pitch >= 0 and new_pitch > old_pitch:
@@ -373,7 +377,7 @@ class Bass(Voice):
 
 		for m_index, chosen_measure in enumerate(Voice.measure_rhythms[:3]):
 			for beat in chosen_measure:
-				if beat == 2:
+				if beat == 2 and chosen_measure:
 					self.final_rhythm[m_index].extend((1,"1"))
 					Voice.rhythm_styles[m_index].append("Waltz2")
 				elif beat == 3:

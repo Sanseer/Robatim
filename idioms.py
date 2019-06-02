@@ -428,7 +428,7 @@ sec_doms_in_major = {
 	0: (0,0,0,-1), 1: (0,1,0,0), 2: (0,1,0,0), 5: (0,1,0,0), 6: (0,1,1,0)
 }
 sec_doms_in_minor = {
-	0: (0,1,0,0), 1: (0,1,1,0), 2: (0,0,0,-1), 5: (1,1,1,0), 6: (-1,0,0,0) 
+	0: (0,1,0,0), 1: (0,1,1,0), 2: (0,0,0,-1), 5: (1,1,1,0), 6: (0,0,0,0) 
 }
 sec_dim_up_in_major = {
 	0:(1,0,0,-1), 1:(1,1,0,0), 2:(0,0,-1,-1), 3:(1,0,0,-1), 4: (1,0,0,0), 
@@ -439,11 +439,11 @@ sec_dim_down_in_major = {
 	5:(1,1,0,0)
 }
 sec_dim_up_in_minor = {
-	0: (1,1,0,0), 1: (0,0,0,-1), 2: (1,0,0,-1), 3: (1,1,0,0), 4: (0,-1,-1,-1), 
-	6:(0,0,0,0)
+	0: (1,1,0,0), 1: (0,0,0,-1), 2: (1,0,0,-1), 3: (1,1,0,0), 4: (0,0,-1,-1), 
+	6:(1,0,0,0)
 }
 sec_dim_down_in_minor = {
-	0: (1,1,0,0), 1:(1,1,1,0), 2:(1,0,0,-1), 3: (1,1,0,0), 4: (1,0,0,0), 
+	0: (1,1,0,0), 1:(1,1,1,0), 2:(1,0,0,-1), 3: (1,1,0,0), 4: (1,1,0,0), 
 	5:(1,0,0,-1)
 }
 sec_dims = {
@@ -455,39 +455,3 @@ sec_dims = {
 
 # Check for duplicate overriding keys in dicts 
 THIRD = 0.3333
-simple_embellish_rhythms = {
-	(2,2):(1,1,2), (2,1):(1,1,1), (1,1):(0.5,0.5,1)
-}
-compound_embellish_rhythms = {
-	(2,2): (2 * THIRD, 2 * THIRD, 2 * THIRD, 2),
-	(2,1): (2 * THIRD, 2 * THIRD, 2 * THIRD, 1),
-	(1,1): (1 * THIRD, 1 * THIRD, 1 * THIRD, 1)
-}
-simple_0_semitones = \
-	((0, "DUN", 1), (0, "DLN", 1), (0, "CUN", 1), (0, "CLN", 0))
-compound_0_semitones = (
-	((0, "DUN", "DLN", 1), (0, "DLN", "DUN", 1)))
-simple_1_semitone = \
-	((0, "DUN", 1), (0, "DLN", 1), (0, "CUN", 1), (0, "CLN", 1))
-compound_1_semitone = \
-	((0, "DUN", 0, 1), (0, "DLN", 0, 1), (0, "CUN", 0, 1), (0, "CLN", 0, 1))
-simple_2_semitones = (
-	((0, "RCFILL0", 1), (0, "DUN", 1), (0, "DLN", 1), 
-	(0, "CUN", 1), (0, "CLN", 1)))
-
-compound_2_semitones = ((0, "RCFILL0", "RCON", 1),)
-simple_3_semitones = ((0, "RDFILL0", 1), (0, "RCFILL0", 1))
-compound_3_semitones = ((0, "LCFILL0", "RCFILL0", 1),)
-simple_4_semitones = ((0, "RDFILL0", 1),)
-compound_4_semitones = ((0, "LCFILL0", "RCFILL0", 1),)
-simple_5_semitones = ((0, "RDFILL0", 1),)
-compound_5_semitones = ((0, "LDFILL0", "RDFILL0",0),)
-
-figurations = {
-	(2,0): simple_0_semitones, (3,0): compound_0_semitones,
-	(2,1): simple_1_semitone, (3,1): compound_1_semitone,
-	(2,2): simple_2_semitones, (3,2): compound_2_semitones,
-	(2,3): simple_3_semitones, (3,3): compound_3_semitones,
-	(2,4): simple_4_semitones, (3,4): compound_4_semitones,
-	(2,5): simple_5_semitones, (3,5): compound_5_semitones
-}

@@ -89,10 +89,11 @@ class KBUpperVoices(Voice):
 				idms.modes[Voice.mode][chord_root_degree]))
 			new_position += 2
 
-		if Voice.mode == "aeolian" and chord_root_degree == 4:
-			chord_increments[1] += 1
-		elif Voice.mode == "aeolian" and chord_root_degree == 6:
-			chord_increments[0] += 1
+		if Voice.chromatics[self.note_index] not in ("2Dom", "2Dim"):
+			if Voice.mode == "aeolian" and chord_root_degree == 4:
+				chord_increments[1] += 1
+			elif Voice.mode == "aeolian" and chord_root_degree == 6:
+				chord_increments[0] += 1
 
 		chord_slot = 0
 		current_pitch = root_pitch
@@ -335,6 +336,9 @@ class KBUpperVoices(Voice):
 			if abs(new_pitch - old_pitch) > 12:
 				# print("Leap too wide", end=" ")
 				return False
+			elif abs(new_pitch - old_pitch) in (6,10,11):
+				# print("No dissonant leaps")
+				return False
 			elif (self.make_scale_pitch(old_pitch) == 11 and 
 			self.make_scale_pitch(new_pitch) != 0 and 
 			not Voice.chromatics[self.note_index] and 
@@ -353,6 +357,17 @@ class KBUpperVoices(Voice):
 			self.chord_degree_to_pitch(2))):
 				# print("Leading tone of 2D must resolve to tonic", end=" ")
 				return False
+			elif (self.note_index > 1 and
+			abs(self.pitch_amounts[self.note_index - 1][voice_index] - 
+				self.pitch_amounts[self.note_index - 2][voice_index]) > 5 
+			and (abs(new_pitch - old_pitch) > 2 or 
+			abs(new_pitch - old_pitch) == 0 or 
+			composite_motion[voice_index][-1] == 
+			composite_motion[voice_index][-2])):
+				# print("Leaps must be followed by contrary steps")
+				return False
+			# Nested conditional simplifies expressions
+			# last item prevent chain skips
 			elif (self.is_seventh_chord(-1) and 
 			abs(new_pitch - old_pitch) > 2):
 				dissonant_pitch = self.chord_degree_to_pitch(3, -1)
@@ -370,37 +385,6 @@ class KBUpperVoices(Voice):
 				dissonant_pitch != self.make_scale_pitch(self.combo_choice[1]) and
 				dissonant_pitch != self.make_scale_pitch(self.combo_choice[2])):
 					return False
-			# if (self.note_index > 1 and 
-			# abs((self.pitch_amounts[self.note_index - 1][voice_index] - 
-			# 	self.pitch_amounts[self.note_index - 2][voice_index]) > 5)):
-			# 	print(abs((self.pitch_amounts[self.note_index - 1][voice_index] - 
-			# 		self.pitch_amounts[self.note_index - 2][voice_index])))
-			# 	print(composite_motion[voice_index])
-			# 	print([group[voice_index] for group in self.pitch_amounts if type(group) == tuple ],
-			# 		new_pitch)
-			# if (self.note_index > 1 and 
-			# abs(self.pitch_amounts[self.note_index - 1][voice_index] - 
-			# 	self.pitch_amounts[self.note_index - 2][voice_index]) > 5
-			# and (abs(new_pitch - old_pitch) > 2 or 
-			# abs(new_pitch - old_pitch) == 0 or 
-			# composite_motion[voice_index][-1] == 
-			# composite_motion[voice_index][-2])):
-			# 	print(self.pitch_amounts[self.note_index - 2][voice_index], end = " ")
-			# 	print(self.pitch_amounts[self.note_index - 1][voice_index], end=" ")
-			# 	print(new_pitch)
-			# 	print(composite_motion[voice_index])
-			if (self.note_index > 1 and
-			abs(self.pitch_amounts[self.note_index - 1][voice_index] - 
-				self.pitch_amounts[self.note_index - 2][voice_index]) > 5 
-			and (abs(new_pitch - old_pitch) > 2 or 
-			abs(new_pitch - old_pitch) == 0 or 
-			composite_motion[voice_index][-1] == 
-			composite_motion[voice_index][-2])):
-				# print("Leaps must be followed by contrary steps")
-				return False
-			elif abs(new_pitch - old_pitch) in (6,10,11):
-				# print("No dissonant leaps")
-				return False
 
 		bass_soprano_motion = self.bass_soprano_motion[:]
 		self.add_motion_type(Voice.bass_motion, soprano_motion, 

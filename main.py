@@ -16,7 +16,7 @@ from kb_upper_voices import KBUpperVoices, KBTenor, KBAlto
 from kb_melody import KBMelody
 import idioms as idms
 
-def random_settings(time_sig="", tonic="", mode="ionian"):
+def random_settings(time_sig="", tonic="", mode=""):
 	"""Selects a random, but practical key and time sig unless one is provided"""
 	# tonic, mode = random.choice((("C", "ionian"), ("A", "aeolian")))
 	if not mode:
@@ -99,10 +99,11 @@ if __name__ ==  "__main__":
 	MyMIDI.addTempo(0,0,tempo)
 
 	# optional slow ending except whole note on measure 7
-	if Voice.measure_length == 4:
-		MyMIDI.addTempo(track, 26, tempo * .9)
-	elif Voice.measure_length == 3:
-		MyMIDI.addTempo(track, 20, tempo * .9)
+	if not set(Voice.measure_rhythms[-2]) & {3,4}:
+		if Voice.measure_length == 4:
+			MyMIDI.addTempo(track, 26, tempo * .9)
+		elif Voice.measure_length == 3:
+			MyMIDI.addTempo(track, 20, tempo * .9)
 
 	for part in voice_list:
 		time = 0
