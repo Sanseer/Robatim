@@ -14,7 +14,6 @@ class Voice(object):
 	chord_path = []
 	
 	note_values = []
-	middle_note_values = []
 	rhythm_styles = []
 	measure_rhythms = []
 	measure_length = 4
@@ -25,6 +24,7 @@ class Voice(object):
 	bass_pitches = []
 	bass_motion = []
 	soprano_pitches = []
+	bass_soprano_intervals = []
 	soprano_motion = []
 	soprano_jumps = [0]
 	soprano_slope = []

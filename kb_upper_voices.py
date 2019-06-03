@@ -237,6 +237,9 @@ class KBUpperVoices(Voice):
 					self.pitch_amounts[self.note_index] = None
 					last_combo = self.pitch_amounts[self.note_index - 1]
 
+		print(self.bass_soprano_intervals)
+		Voice.bass_soprano_intervals = self.bass_soprano_intervals
+
 	def choose_combo(self):
 		"""Picks the fullest and smoothest chord from remaining options"""
 		return self.possible_pitches[self.note_index][0]

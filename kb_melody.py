@@ -17,7 +17,18 @@ class KBMelody(Voice):
 
 	def do_stuff(self):
 		self.group_notes()
-		self.embellish()
+		if random.choice((True,)):
+			self.embellish()
+		else:
+			self.final_notes = self.measure_notes
+			if Voice.half_rest_ending:
+				self.final_notes[3].append("REST")
+				self.final_notes[7].append("REST")
+			self.final_rhythm = Voice.measure_rhythms
+			self.final_rhythm = self.flatten_sequence(self.final_rhythm)
+			self.final_notes = self.flatten_sequence(self.final_notes)
+			print(self.final_notes)
+			print(self.final_rhythm)
 
 	def create_part(self):
 		self.make_letters()
@@ -154,10 +165,12 @@ class KBMelody(Voice):
 
 	def find_figures(self, current_note, next_note):
 		possible_figs = []
-		if abs(next_note - current_note) == 2:
-			possible_figs.append("CPT")
-		if Voice.beat_division == 3 and abs(next_note - current_note) == 3:
-			possible_figs.append("Double CPT")
+		if (Voice.bass_soprano_intervals[self.note_index + 1] 
+		not in idms.harmonic_dissonance):
+			if abs(next_note - current_note) == 2:
+				possible_figs.append("CPT")
+			if Voice.beat_division == 3 and abs(next_note - current_note) == 3:
+				possible_figs.append("Double CPT")
 		# current_scale_degree = self.make_scale_degree(current_note, False)
 		# next_scale_degree = self.make_scale_degree(next_note, False)
 		# move = self.move_direction(next_note - current_note)

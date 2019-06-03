@@ -256,6 +256,9 @@ class Bass(Voice):
 			Voice.idea1_length:Voice.idea1_length + Voice.idea2_length])
 		Voice.idea4_length = Voice.idea2_length
 
+		if Voice.note_values [-3:] == [3,2,1]:
+			Voice.note_values[-3:] = [3,1,2]
+
 		# change half cadence and full cadence ending from 2,1 to 1,2
 
 		self.add_chords(self.chord_style4)
