@@ -5,7 +5,7 @@ import pysnooper
 from voice import Voice
 import idioms as idms
 
-class KBUpperVoices(Voice):
+class UpperVoices(Voice):
 	"""Creates chords using bass notes and first-species counterpoint 
 	for a chorale style"""
 
@@ -504,19 +504,19 @@ class KBUpperVoices(Voice):
 		[interval_list.pop() for interval_list in self.composite_intervals]
 
 	def split_notes(self):
-		for index, (value1, value2, value3) in enumerate(self.pitch_amounts):
+		for (value1, value2, value3) in self.pitch_amounts:
 			Voice.tenor_pitches.append(value1)
 			Voice.alto_pitches.append(value2)
 			Voice.soprano_pitches.append(value3)
 
-class KBTenor(Voice):
+class Tenor(Voice):
 
 	def __init__(self):
 		self.real_notes = Voice.tenor_pitches
 		super().__init__()
 
 
-class KBAlto(Voice):
+class Alto(Voice):
 
 	def __init__(self):
 		self.real_notes = Voice.alto_pitches

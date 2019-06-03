@@ -12,8 +12,8 @@ from midiutil import MIDIFile
 
 from voice import Voice
 from bass import Bass
-from kb_upper_voices import KBUpperVoices, KBTenor, KBAlto
-from kb_melody import KBMelody
+from upper_voices import UpperVoices, Tenor, Alto
+from soprano import Soprano
 import idioms as idms
 
 def random_settings(time_sig="", tonic="", mode=""):
@@ -40,15 +40,15 @@ def create_song(parts=4):
 		# song_notes.append(voice_list[0].create_part())
 		voice_list[0].create_part()
 	if parts >= 4: 
-		KBUpperVoices().create_parts()
-		voice_list.append(KBTenor())
+		UpperVoices().create_parts()
+		voice_list.append(Tenor())
 		# song_notes.append(voice_list[-1].create_part())
 		voice_list[-1].create_part()
-		voice_list.append(KBAlto())
+		voice_list.append(Alto())
 		# song_notes.append(voice_list[-1].create_part())
 		voice_list[-1].create_part()
 
-		voice_list.append(KBMelody())
+		voice_list.append(Soprano())
 		voice_list[-1].do_stuff()
 		voice_list[-1].create_part()
 		make_lily_file()

@@ -417,8 +417,8 @@ class Voice(object):
 
 	def flatten_sequence(self, old_sequence):
 		new_list = []
-		for nest_sequence in old_sequence:
-			for item in nest_sequence:
+		for nested_sequence in old_sequence:
+			for item in nested_sequence:
 				new_list.append(item)
 
 		return new_list
@@ -429,75 +429,52 @@ class Voice(object):
 		self.final_rhythm = [ [] for _ in range(8)]
 		self.final_notes = [ [] for _ in range(8)]
 
-		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[:3]):
+		self.create_rhythm(0, 3)
+		self.create_rhythm(4, 7)
+
+		self.spread_notes(0, 3)
+		self.spread_notes(4, 7)
+
+		self.finalize_part()
+
+	def create_rhythm(self, start, stop):
+		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[start:stop]):
 			for r_index, rhythm_style in enumerate(chosen_measure):
 				if rhythm_style == "Waltz2":
-					self.final_rhythm[m_index].extend(("1",1))
+					self.final_rhythm[m_index + start].extend(("1",1))
 				elif rhythm_style == "Waltz3":
-					self.final_rhythm[m_index].extend(("1",1,1))
+					self.final_rhythm[m_index + start].extend(("1",1,1))
 				elif rhythm_style == "Waltz4":
-					self.final_rhythm[m_index].extend(("1",1,"1",1))
+					self.final_rhythm[m_index + start].extend(("1",1,"1",1))
 				else:
-					self.final_rhythm[m_index].append(Voice.measure_rhythms[m_index][r_index])
+					self.final_rhythm[m_index + start].append(Voice.measure_rhythms[m_index + start][r_index])
 
-		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[4:7]):
+	def spread_notes(self, start, stop):
+		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[start:stop]):
 			for r_index, rhythm_style in enumerate(chosen_measure):
+				main_note = self.measure_notes[m_index + start][r_index]
 				if rhythm_style == "Waltz2":
-					self.final_rhythm[m_index + 4].extend(("1",1))
+					self.final_notes[m_index + start].extend(("REST", main_note))
 				elif rhythm_style == "Waltz3":
-					self.final_rhythm[m_index + 4].extend(("1",1,1))
+					self.final_notes[m_index + start].extend(("REST", main_note, main_note))
 				elif rhythm_style == "Waltz4":
-					self.final_rhythm[m_index + 4].extend(("1",1,"1",1))
-				else:
-					self.final_rhythm[m_index + 4].append(Voice.measure_rhythms[m_index + 4][r_index])
+					self.final_notes[m_index + start].extend(("REST", main_note, "REST", main_note))
+				elif rhythm_style is None:
+					self.final_notes[m_index + start].append(main_note)
 
-
+	def finalize_part(self):
+		self.final_notes[3] = self.measure_notes[3]
+		self.final_notes[7] = self.measure_notes[7]
 		self.final_rhythm[3] = Voice.measure_rhythms[3]
 		self.final_rhythm[7] = Voice.measure_rhythms[7]
 
-		# print(self.final_rhythm)
-		# print(Voice.rhythm_styles)
-
-		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[:3]):
-			for r_index, rhythm_style in enumerate(chosen_measure):
-				main_note = self.measure_notes[m_index][r_index]
-				if rhythm_style == "Waltz2":
-					self.final_notes[m_index].extend(("REST", main_note))
-				elif rhythm_style == "Waltz3":
-					self.final_notes[m_index].extend(("REST", main_note, main_note))
-				elif rhythm_style == "Waltz4":
-					self.final_notes[m_index].extend(("REST", main_note, "REST", main_note))
-				elif rhythm_style is None:
-					self.final_notes[m_index].append(main_note)
-
-
-		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[4:7]):
-			for r_index, rhythm_style in enumerate(chosen_measure):
-				main_note = self.measure_notes[m_index + 4][r_index]
-				if rhythm_style == "Waltz2":
-					self.final_notes[m_index + 4].extend(("REST", main_note))
-				elif rhythm_style == "Waltz3":
-					self.final_notes[m_index + 4].extend(("REST", main_note, main_note))
-				elif rhythm_style == "Waltz4":
-					self.final_notes[m_index + 4].extend(("REST", main_note, "REST", main_note))
-				elif rhythm_style is None:
-					self.final_notes[m_index + 4].append(main_note)
-
-		self.final_notes[3] = self.measure_notes[3]
-		self.final_notes[7] = self.measure_notes[7]
 		if Voice.half_rest_ending:
 			self.final_notes[3].append("REST")
 			self.final_notes[7].append("REST")
 
-		# print(self.final_notes)
 		self.final_rhythm = self.flatten_sequence(self.final_rhythm)
 		self.final_notes = self.flatten_sequence(self.final_notes)
-		# print(self.final_rhythm, len(self.final_rhythm))
-		# print(self.final_notes, len(self.final_notes))
 
-# never convert twice to scale pitch
-# chord to abs chord to root degree using index shift
-# obtain chord using index +- shift within class function
 
 
 
