@@ -174,7 +174,7 @@ class Voice(object):
 		if not scale_pitch:
 			pitch = self.make_scale_pitch(pitch)
 		if (10 in chord_pitches and root_degree in (4, 6) 
-		and Voice.chromatics[self.note_index] not in ("2Dom", "2Dim")):
+		  and Voice.chromatics[self.note_index] not in ("2Dom", "2Dim")):
 			chord_pitches[chord_pitches.index(10)] += 1
 
 		for index, base_pitch in enumerate(chord_pitches[:]):
@@ -251,17 +251,16 @@ class Voice(object):
 		old_move = old_motion[self.note_index - 1]
 		new_move = new_motion[-1]
 		if (old_move == new_move and old_move != 0 and 
-		intervals[-1] == intervals[-2]):
+		  intervals[-1] == intervals[-2]):
 			movements.append("Parallel")
 		elif old_move == new_move and old_move == 0:
 			movements.append("No motion")
 		elif old_move == -(new_move) and old_move != 0:
 			movements.append("Contrary")
-		elif (old_move == new_move and 
-		intervals[-1] != intervals[-2]):
+		elif (old_move == new_move and intervals[-1] != intervals[-2]):
 			movements.append("Similar")
 		elif ((old_move == 0 or new_move == 0) and 
-		(old_move != 0 or new_move != 0)):
+		  (old_move != 0 or new_move != 0)):
 			movements.append("Oblique")
 		else:
 			movements.append("Blank")
@@ -340,7 +339,8 @@ class Voice(object):
 					new_symbol = "is"
 				elif old_symbol == "b":
 					new_symbol = "es"
-			lily_note = letter + new_symbol + octave_mark + str(self.rhythm[index])
+			lily_note = (letter + new_symbol + octave_mark + 
+				str(self.rhythm[index]))
 			self.lily_notes.append(lily_note)
 
 		lily_string = " ".join(note for note in self.lily_notes)
@@ -378,20 +378,22 @@ class Voice(object):
 		pitch = idms.modes[Voice.mode][scale_degree]
 		root_degree = idms.chord_tones[chord][0]
 		if (Voice.mode == "aeolian" and 
-		(root_degree == 4 or root_degree == 6) and pitch == 10 and
-		Voice.chromatics[self.note_index + index_shift] not in ("2Dom", "2Dim")):
+		  (root_degree == 4 or root_degree == 6) and pitch == 10 and
+		  Voice.chromatics[self.note_index + index_shift] not in 
+		  ("2Dom", "2Dim")):
 			pitch += 1
 		if self.chromatics[self.note_index + index_shift] == "2Dom":
 			pitch += self.convert_sec_dom(chord, pitch, True)
 		elif self.chromatics[self.note_index + index_shift] == "2Dim":
 			pitch += self.convert_sec_dim(chord, pitch, True)
-		elif self.chromatics[self.note_index + index_shift] in idms.modes.keys():
+		elif (self.chromatics[self.note_index + index_shift] in 
+		  idms.modes.keys()):
 			pitch += self.convert_mode(chord, pitch, True)
 		return pitch
 
 	def is_voice_range(self, voice_index):
 		selected_pitches = [ combo[voice_index] for combo in self.pitch_amounts 
-		if type(combo) == tuple ]
+			if type(combo) == tuple ]
 		highest_pitch = max(selected_pitches)
 		lowest_pitch = min(selected_pitches)
 		vocal_range = highest_pitch - lowest_pitch
@@ -438,7 +440,8 @@ class Voice(object):
 		self.finalize_part()
 
 	def create_rhythm(self, start, stop):
-		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[start:stop]):
+		for m_index, chosen_measure in enumerate(
+				Voice.rhythm_styles[start:stop]):
 			for r_index, rhythm_style in enumerate(chosen_measure):
 				if rhythm_style == "Waltz2":
 					self.final_rhythm[m_index + start].extend(("1",1))
@@ -447,18 +450,23 @@ class Voice(object):
 				elif rhythm_style == "Waltz4":
 					self.final_rhythm[m_index + start].extend(("1",1,"1",1))
 				else:
-					self.final_rhythm[m_index + start].append(Voice.measure_rhythms[m_index + start][r_index])
+					self.final_rhythm[m_index + start].append(
+						Voice.measure_rhythms[m_index + start][r_index])
 
 	def spread_notes(self, start, stop):
-		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[start:stop]):
+		for m_index, chosen_measure in enumerate(
+				Voice.rhythm_styles[start:stop]):
 			for r_index, rhythm_style in enumerate(chosen_measure):
 				main_note = self.measure_notes[m_index + start][r_index]
 				if rhythm_style == "Waltz2":
-					self.final_notes[m_index + start].extend(("REST", main_note))
+					self.final_notes[m_index + start].extend(
+						("REST", main_note))
 				elif rhythm_style == "Waltz3":
-					self.final_notes[m_index + start].extend(("REST", main_note, main_note))
+					self.final_notes[m_index + start].extend(
+						("REST", main_note, main_note))
 				elif rhythm_style == "Waltz4":
-					self.final_notes[m_index + start].extend(("REST", main_note, "REST", main_note))
+					self.final_notes[m_index + start].extend(
+						("REST", main_note, "REST", main_note))
 				elif rhythm_style is None:
 					self.final_notes[m_index + start].append(main_note)
 

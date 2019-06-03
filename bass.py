@@ -82,7 +82,8 @@ class Bass(Voice):
 				inversion = chord // 10 % 1000
 				root = chord % 10
 				print("Before", Voice.chord_path[index])
-				Voice.chord_path[index] = sign * (root * 100000 + inversion * 10 + 1)
+				Voice.chord_path[index] = (sign * 
+					(root * 100000 + inversion * 10 + 1))
 				print("After", Voice.chord_path[index])
 
 
@@ -227,7 +228,8 @@ class Bass(Voice):
 		if Voice.consequent_rhythm_change:
 			while self.basic_idea2_rhythm == self.basic_idea1_rhythm:
 				print("Duplicate! Try again")
-				self.chord_style3 = random.choice(tuple(self.tonic_rhythms.keys()))
+				self.chord_style3 = random.choice(
+					tuple(self.tonic_rhythms.keys()))
 				self.basic_idea2_rhythm = self.tonic_rhythms[self.chord_style3]
 		Voice.idea3_length = len(self.basic_idea2_rhythm)
 		Voice.note_values.extend(self.basic_idea2_rhythm)
@@ -272,9 +274,9 @@ class Bass(Voice):
 			new_scale_degree = idms.bass_notes[abs(chord)]
 			new_pitch = idms.modes[self.mode][new_scale_degree]
 			# You don't need to raise diatonic leading tone if modulation
-			if Voice.chromatics[n_index + 1] not in ("2Dom", "2Dim"):
-				if self.mode == "aeolian" and idms.bass_notes[abs(chord)] == 6:
-					new_pitch += 1
+			if (Voice.chromatics[n_index + 1] not in ("2Dom", "2Dim") and 
+			  self.mode == "aeolian" and idms.bass_notes[abs(chord)] == 6):
+				new_pitch += 1
 			if old_scale_degree == new_scale_degree:
 				new_pitch = old_pitch
 			elif chord > 0 and old_pitch >= 0 and new_pitch > old_pitch:
@@ -305,8 +307,8 @@ class Bass(Voice):
 		print(self.pitch_amounts)
 		print(Voice.bass_motion)
 		if (set(Voice.chord_path[:tonic_index]) & {-idms.VI, idms.IV6, 
-		-idms.DIM7_DOWN_OF_VI, -idms.VII7_OF_VI, -idms.V43_OF_VI} 
-		and self.pitch_amounts[tonic_index] < 0):
+		  -idms.DIM7_DOWN_OF_VI, -idms.VII7_OF_VI, -idms.V43_OF_VI} 
+		  and self.pitch_amounts[tonic_index] < 0):
 			print("Shifting pitches upward")
 			self.bass_motion[tonic_index - 1] = 1
 			for index in range(tonic_index, tonic_index + 
@@ -335,15 +337,16 @@ class Bass(Voice):
 		for nc_index in range(len(Voice.chromatics)):
 			if Voice.chromatics[nc_index]:
 				self.note_index = nc_index
+				nc_chord = abs(Voice.chord_path[nc_index])
 				if Voice.chromatics[nc_index] == "2Dom":
 					self.real_notes[nc_index] += self.convert_sec_dom(
-						abs(Voice.chord_path[nc_index]), self.real_notes[nc_index])
+						nc_chord, self.real_notes[nc_index])
 				elif Voice.chromatics[nc_index] == "2Dim":
 					self.real_notes[nc_index] += self.convert_sec_dim(
-						abs(Voice.chord_path[nc_index]), self.real_notes[nc_index])
+						nc_chord, self.real_notes[nc_index])
 				elif Voice.chromatics[nc_index] in idms.modes.keys():
 					self.real_notes[nc_index] += self.convert_mode(
-						abs(Voice.chord_path[nc_index]), self.real_notes[nc_index])
+						nc_chord, self.real_notes[nc_index])
 				old_note = self.real_notes[nc_index - 1]
 				current_note = self.real_notes[nc_index]
 				move = current_note - old_note
@@ -395,7 +398,8 @@ class Bass(Voice):
 
 
 	def create_rhythm(self, start, stop):
-		for m_index, chosen_measure in enumerate(Voice.measure_rhythms[start:stop]):
+		for m_index, chosen_measure in enumerate(
+				Voice.measure_rhythms[start:stop]):
 			for beat in chosen_measure:
 				if beat == 2 and chosen_measure:
 					self.final_rhythm[m_index + start].extend((1,"1"))
@@ -411,14 +415,18 @@ class Bass(Voice):
 					Voice.rhythm_styles[m_index + start].append(None)
 
 	def spread_notes(self, start, stop):
-		for m_index, chosen_measure in enumerate(Voice.rhythm_styles[start:stop]):
+		for m_index, chosen_measure in enumerate(
+				Voice.rhythm_styles[start:stop]):
 			for r_index, rhythm_style in enumerate(chosen_measure):
 				main_note = self.measure_notes[m_index + start][r_index]
 				if rhythm_style == "Waltz2":
-					self.final_notes[m_index + start].extend((main_note, "REST"))
+					self.final_notes[m_index + start].extend(
+						(main_note, "REST"))
 				elif rhythm_style == "Waltz3":
-					self.final_notes[m_index + start].extend((main_note, "REST", "REST"))
+					self.final_notes[m_index + start].extend(
+						(main_note, "REST", "REST"))
 				elif rhythm_style == "Waltz4":
-					self.final_notes[m_index + start].extend((main_note, "REST", main_note, "REST"))
+					self.final_notes[m_index + start].extend(
+						(main_note, "REST", main_note, "REST"))
 				elif rhythm_style is None:
 					self.final_notes[m_index + start].append(main_note)

@@ -144,7 +144,8 @@ class UpperVoices(Voice):
 
 		for notes in pitch_combos:
 			scale_pitches = []
-			scale_pitches.append(self.make_scale_pitch(Voice.bass_pitches[self.note_index]))
+			scale_pitches.append(self.make_scale_pitch(
+				Voice.bass_pitches[self.note_index]))
 			scale_pitches.append(self.make_scale_pitch(notes[0]))
 			scale_pitches.append(self.make_scale_pitch(notes[1]))
 			scale_pitches.append(self.make_scale_pitch(notes[2]))
@@ -231,8 +232,6 @@ class UpperVoices(Voice):
 					self.erase_last_note()
 
 					self.note_index -= 1
-					# if attempts % 3000 == 0:
-					# 	print(f"Go back to index {self.note_index}")
 					self.possible_pitches[self.note_index].remove(last_combo)
 					self.pitch_amounts[self.note_index] = None
 					last_combo = self.pitch_amounts[self.note_index - 1]
@@ -318,7 +317,7 @@ class UpperVoices(Voice):
 		elif self.is_seventh_chord() and len(set(full_scale_combo)) < 3:
 			return False
 		elif (self.note_index == 0 and 
-		bass_soprano_intervals[-1] not in ("P5", "P8", "M3", "m3")):
+		  bass_soprano_intervals[-1] not in ("P5", "P8", "M3", "m3")):
 			return False
 		if self.note_index == 0:
 			return True
@@ -343,36 +342,36 @@ class UpperVoices(Voice):
 				# print("No dissonant leaps")
 				return False
 			elif (self.make_scale_pitch(old_pitch) == 11 and 
-			self.make_scale_pitch(new_pitch) != 0 and 
-			not Voice.chromatics[self.note_index] and 
-			not Voice.chromatics[self.note_index - 1] and
-			(self.get_chord(-1) // 10 != 50_753 or 
-			self.make_scale_pitch(new_pitch) != 
-			self.chord_degree_to_pitch(2))):
+			  self.make_scale_pitch(new_pitch) != 0 and 
+			  not Voice.chromatics[self.note_index] and 
+			  not Voice.chromatics[self.note_index - 1] and
+			  (self.get_chord(-1) // 10 != 50_753 or 
+			  self.make_scale_pitch(new_pitch) != 
+			  self.chord_degree_to_pitch(2))):
 				# print("Leading tone must progress to tonic", end=" ")
 				return False
 			elif (Voice.chromatics[self.note_index - 1] == "2Dom" and 
-			self.make_scale_pitch(old_pitch) == 
-			self.chord_degree_to_pitch(1, -1) and 
-			abs(new_pitch - old_pitch) != 1 
-			and (self.get_chord(-1) // 10 != 50_753 or 
-			self.make_scale_pitch(new_pitch) != 
-			self.chord_degree_to_pitch(2))):
+			  self.make_scale_pitch(old_pitch) == 
+			  self.chord_degree_to_pitch(1, -1) and 
+			  abs(new_pitch - old_pitch) != 1 
+			  and (self.get_chord(-1) // 10 != 50_753 or 
+			  self.make_scale_pitch(new_pitch) != 
+			  self.chord_degree_to_pitch(2))):
 				# print("Leading tone of 2D must resolve to tonic", end=" ")
 				return False
 			elif (self.note_index > 1 and
-			abs(self.pitch_amounts[self.note_index - 1][voice_index] - 
-				self.pitch_amounts[self.note_index - 2][voice_index]) > 5 
-			and (abs(new_pitch - old_pitch) > 2 or 
-			abs(new_pitch - old_pitch) == 0 or 
-			composite_motion[voice_index][-1] == 
-			composite_motion[voice_index][-2])):
+			  abs(self.pitch_amounts[self.note_index - 1][voice_index] - 
+				  self.pitch_amounts[self.note_index - 2][voice_index]) > 5 
+			  and (abs(new_pitch - old_pitch) > 2 or 
+			  abs(new_pitch - old_pitch) == 0 or 
+			  composite_motion[voice_index][-1] == 
+			  composite_motion[voice_index][-2])):
 				# print("Leaps must be followed by contrary steps")
 				return False
 			# Nested conditional simplifies expressions
 			# last item prevent chain skips
 			elif (self.is_seventh_chord(-1) and 
-			abs(new_pitch - old_pitch) > 2):
+			  abs(new_pitch - old_pitch) > 2):
 				dissonant_pitch = self.chord_degree_to_pitch(3, -1)
 				if (self.make_scale_pitch(old_pitch) == dissonant_pitch and 
 				not self.is_seventh_chord()):
@@ -395,46 +394,46 @@ class UpperVoices(Voice):
 		old_soprano_note = self.pitch_amounts[self.note_index - 1][2]
 
 		if ((self.note_index == len(self.pitch_amounts) - 1) and 
-		(bass_soprano_motion[-1] != "Contrary" or 
-		bass_soprano_intervals[-1] != "P8" or
-		abs(s_pitch - old_soprano_note) > 2)):
+		  (bass_soprano_motion[-1] != "Contrary" or 
+		  bass_soprano_intervals[-1] != "P8" or
+		  abs(s_pitch - old_soprano_note) > 2)):
 			# print("Must end with contrary motion and tonic by step")
 			return False
 		elif (self.note_index != len(self.pitch_amounts) - 1 and 
-		bass_soprano_intervals[-1] == "P8"):
+		  bass_soprano_intervals[-1] == "P8"):
 			# print("Avoiding premature unison")
 			return False
 		# elif bass_soprano_intervals[-1] in idms.harmonic_dissonance:
 		# 	return False
 		elif ("P" in bass_soprano_intervals[-1] and 
-		"P" in bass_soprano_intervals[-2]):
+		  "P" in bass_soprano_intervals[-2]):
 			# print("Double perfects")
-				return False
+			return False
 		elif bass_soprano_motion[-1] == "No motion":
 			return False
 		elif (bass_soprano_motion[-1] == "Similar" and 
-		"P" in bass_soprano_intervals[-1] and 
-		abs(s_pitch - old_soprano_note) > 2):
+		  "P" in bass_soprano_intervals[-1] and 
+		  abs(s_pitch - old_soprano_note) > 2):
 			# print("No hidden 5ths/octaves except soprano moving by step")
 			return False
 		elif (self.note_index > 1 and Voice.soprano_motion[-1] == 0 and 
-		soprano_motion[-2] == 0):
+		  soprano_motion[-2] == 0):
 			# print("Triple repeat")
 			return False
 		elif (self.note_index > 3 and 
-		bass_soprano_motion[-1] in ("Parallel", "Similar") and
-		bass_soprano_motion[-2] in ("Parallel", "Similar") and
-		bass_soprano_motion[-3] in ("Parallel", "Similar") and
-		bass_soprano_motion[-4] in ("Parallel", "Similar")):
+		  bass_soprano_motion[-1] in ("Parallel", "Similar") and
+		  bass_soprano_motion[-2] in ("Parallel", "Similar") and
+		  bass_soprano_motion[-3] in ("Parallel", "Similar") and
+		  bass_soprano_motion[-4] in ("Parallel", "Similar")):
 			# print("Quadruple consecutive parallels. Delete!")
 			return False
 		elif (self.note_index > 3 and 
-		bass_soprano_intervals[-1] == bass_soprano_intervals[-2] ==
-		bass_soprano_intervals[-3] == bass_soprano_intervals[-4]):
+		  bass_soprano_intervals[-1] == bass_soprano_intervals[-2] ==
+		  bass_soprano_intervals[-3] == bass_soprano_intervals[-4]):
 			# print("Quadruple identical imperfects.")
 			return False
 		elif (self.note_index == Voice.idea1_length + Voice.idea2_length - 1 and
-		abs(s_pitch - old_soprano_note) > 4):
+		  abs(s_pitch - old_soprano_note) > 4):
 			return False 
 
 		bass_tenor_motion = self.bass_tenor_motion[:]
@@ -476,17 +475,17 @@ class UpperVoices(Voice):
 		for interval_list, motion_list in zip(
 		composite_intervals, composite_movements):
 			if (interval_list[-1] in ("P5","P8") and 
-			motion_list[-1] == "Parallel"):
+			  motion_list[-1] == "Parallel"):
 				return False
 			elif interval_list[-2] == "A4" and "6" not in interval_list[-1]:
 				return False
 			elif (interval_list[-2] == "d5" 
-			and interval_list[-1] not in ("M3", "m3") 
-			and self.get_chord(-1) != idms.VII6):
+			  and interval_list[-1] not in ("M3", "m3") 
+			  and self.get_chord(-1) != idms.VII6):
 				return False
 			elif (interval_list[-2] == "d5"
-			and self.get_chord(-1) == idms.VII6 and 
-			interval_list[-1] not in ("P5", "M3", "m3")):
+			  and self.get_chord(-1) == idms.VII6 and 
+			  interval_list[-1] not in ("P5", "M3", "m3")):
 				return False
 			elif interval_list[-2] == "d7" and interval_list[-1] != "P5":
 				return False

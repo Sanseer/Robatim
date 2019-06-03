@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """This program creates a short four-part tune using period form 
 from the classical style. It creates a chord progression (bass),
 picks a rhythm, and then adds the remaining voices using 
@@ -35,24 +33,19 @@ def create_song(parts=4):
 	song_notes = []
 	voice_list = []
 	if parts >= 1:
-		# try except clause to find proper chord progressions
 		voice_list.append(Bass(*random_settings()))
-		# song_notes.append(voice_list[0].create_part())
 		voice_list[0].create_part()
 	if parts >= 4: 
 		UpperVoices().create_parts()
 		voice_list.append(Tenor())
-		# song_notes.append(voice_list[-1].create_part())
 		voice_list[-1].create_part()
 		voice_list.append(Alto())
-		# song_notes.append(voice_list[-1].create_part())
 		voice_list[-1].create_part()
 
 		voice_list.append(Soprano())
 		voice_list[-1].do_stuff()
 		voice_list[-1].create_part()
 		make_lily_file()
-		# song_notes.append(voice_list[-1].create_part())
 	return voice_list
 
 def make_lily_file():

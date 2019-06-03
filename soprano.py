@@ -72,7 +72,7 @@ class Soprano(Voice):
 	def find_figures(self, current_note, next_note):
 		possible_figs = []
 		if (Voice.bass_soprano_intervals[self.note_index + 1] 
-		not in idms.harmonic_dissonance):
+		  not in idms.harmonic_dissonance):
 			if abs(next_note - current_note) == 2:
 				possible_figs.append("CPT")
 			if Voice.beat_division == 3 and abs(next_note - current_note) == 3:
@@ -86,7 +86,8 @@ class Soprano(Voice):
 		return possible_figs
 
 	def create_figures(self, start, stop):
- 		for m_index, chosen_measure in enumerate(self.measure_notes[start:stop]):
+ 		for m_index, chosen_measure in enumerate(
+ 				self.measure_notes[start:stop]):
  			for current_note in chosen_measure:
  				next_note = self.real_notes[self.note_index + 1]
  				self.fig_options[m_index + start].append(self.find_figures(current_note, next_note))
@@ -94,19 +95,23 @@ class Soprano(Voice):
  				self.note_index += 1
 
 	def add_notes(self, start, stop):
-		for m_index, chosen_measure in enumerate(self.measure_notes[start:stop]):
+		for m_index, chosen_measure in enumerate(
+				self.measure_notes[start:stop]):
 			for n_index, current_note in enumerate(chosen_measure):
 				if self.fig_options[m_index + start][n_index] != [None]:
-					nct = random.choice(self.fig_options[m_index + start][n_index])
+					nct = random.choice(
+						self.fig_options[m_index + start][n_index])
 					next_note = self.real_notes[self.note_index + 1]
 					increment = self.move_direction(next_note - current_note)
 					if nct == "CPT":
 						mid_note = current_note + increment
-						self.final_notes[m_index + start].extend((current_note, mid_note))
+						self.final_notes[m_index + start].extend(
+							(current_note, mid_note))
 					elif nct == "Double CPT":
 						mid_note1 = current_note + increment
 						mid_note2 = mid_note1 + increment
-						self.final_notes[m_index + start].extend((current_note, mid_note1, mid_note2))
+						self.final_notes[m_index + start].extend(
+							(current_note, mid_note1, mid_note2))
 				else:
 					nct = None
 					self.final_notes[m_index + start].append(current_note)
@@ -114,15 +119,18 @@ class Soprano(Voice):
 				self.note_index += 1
 
 	def create_rhythm(self, start, stop):
-		for m_index, chosen_measure in enumerate(Voice.measure_rhythms[start:stop]):
+		for m_index, chosen_measure in enumerate(
+				Voice.measure_rhythms[start:stop]):
 			for b_index, beat in enumerate(chosen_measure):
 				fig = self.fig_choices[m_index + start][b_index]
 				if fig:
 					if Voice.beat_division == 2:
-						self.final_rhythm[m_index + start].extend((beat / 2, beat / 2))
+						self.final_rhythm[m_index + start].extend(
+							(beat / 2, beat / 2))
 					elif Voice.beat_division == 3 and "Double" in fig:
 						self.final_rhythm[m_index + start].extend(
-							(beat * idms.THIRD, beat * idms.THIRD, beat * idms.THIRD))
+							((beat * idms.THIRD, beat * idms.THIRD, 
+								beat * idms.THIRD)))
 					elif Voice.beat_division == 3:
 						self.final_rhythm[m_index + start].extend(
 							(beat * idms.THIRD * 2, beat * idms.THIRD))
