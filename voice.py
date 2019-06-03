@@ -1,5 +1,5 @@
 import idioms as idms
-# import pysnooper
+import pysnooper
 
 class Voice(object):
 
@@ -44,9 +44,9 @@ class Voice(object):
 		self.note_values = Voice.note_values[:]
 
 	def create_part(self):
+		self.create_groove()
 		self.make_letters()
 		self.lily_convert()
-		self.create_groove()
 		# return self.create_rests(self.real_notes[:])
 
 	# @property
@@ -257,8 +257,12 @@ class Voice(object):
 		return note_symbol
 
 	def make_letters(self):
-		for real_note in self.real_notes:
-			self.sheet_notes.append(self.make_letter(real_note))
+		for final_note in self.final_notes:
+			if type(final_note) == int: 
+				self.sheet_notes.append(self.make_letter(final_note))
+			elif type(final_note) == str:
+				self.sheet_notes.append(final_note)
+		print(self.sheet_notes, len(self.sheet_notes))
 
 	def create_chord_names(self):
 		new_chords_names = []
@@ -293,7 +297,6 @@ class Voice(object):
 		for index, sheet_note in enumerate(self.sheet_notes):
 			if "r" in sheet_note:
 				self.lily_notes.append(sheet_note) 
-				# index += 1
 				continue
 			new_symbol = ""
 			octave_mark = ""
@@ -311,12 +314,21 @@ class Voice(object):
 					new_symbol = "is"
 				elif old_symbol == "b":
 					new_symbol = "es"
-			lily_note = (letter + new_symbol + octave_mark + 
-				str(self.rhythm[index]))
+			# lily_note = (letter + new_symbol + octave_mark + 
+			# 	str(self.rhythm[index]))
+			current_rhythm = self.rhythm[index]
+			if "C" not in current_rhythm:
+				lily_note = "".join([letter, new_symbol, octave_mark, 
+					self.rhythm[index]])
+			elif current_rhythm == "3C":
+				lily_note = "".join([letter, new_symbol, octave_mark, "2.~ ", 
+					letter, new_symbol, octave_mark, "4."])
 			self.lily_notes.append(lily_note)
 
 		lily_string = " ".join(note for note in self.lily_notes)
 		Voice.lily_parts.append(lily_string)
+
+		# raise Exception("Stop")
 
 	def invert_note_values(self):
 		if Voice.beat_division == 2:
@@ -326,22 +338,25 @@ class Voice(object):
 		# create tie in lily_convert for compound time
 		elif Voice.beat_division == 3:
 			correct_durations = {
-				1:"4.", 4:"1.", 2:"2.", 3:"2.FIX", "2":"r2.", "1":"r4.",
-				1*idms.THIRD:"8", 2*idms.THIRD:"4", 5*idms.THIRD:"1.FIX"}
+				1:"4.", 3 * idms.THIRD: "4.", 4:"1.", 2:"2.", 
+				3 * idms.THIRD * 2:"2.", 3:"3C", "2":"r2.", "1":"r4.", 
+				1 * idms.THIRD:"8", 2 * idms.THIRD:"4", 5 * idms.THIRD:"1.FIX", 
+				4 * idms.THIRD:"2"
+				}
 		fixed_durations = []
-		for index in range(len(self.note_values)):
-			time = self.note_values[index]
+		for index in range(len(self.final_rhythm)):
+			time = self.final_rhythm[index]
 			fixed_durations.append(correct_durations[time])
 		return fixed_durations
 
 	def create_rests(self, sequence):
 		rest_indices = []
-		for lily_index, item in enumerate(self.note_values):
+		for lily_index, item in enumerate(self.final_rhythm):
 			if type(item) == str:
 				rest_indices.append(lily_index)
 		# reverse insertion to prevent moving target
-		for lily_index in rest_indices[::-1]:
-			sequence.insert(lily_index, self.rhythm[lily_index])
+		for lily_index in rest_indices:
+			sequence[lily_index] = self.rhythm[lily_index]
 		return sequence
 
 	def chord_degree_to_pitch(self, chord_position, index_shift=0):

@@ -36,6 +36,7 @@ class Bass(Voice):
 		self.final_notes = []
 		self.sheet_notes = []
 		self.lily_notes = []
+		self.sheet_marks = []
 
 	@property
 	def old_chord(self):
@@ -48,9 +49,9 @@ class Bass(Voice):
 		self.create_chord_progression()
 		self.add_notes()
 		self.convert_notes()
+		self.create_groove()
 		self.make_letters()
 		self.lily_convert()
-		self.create_groove()
 		# return self.create_rests(self.real_notes[:])
 
 	def create_chord_progression(self):
@@ -257,8 +258,8 @@ class Bass(Voice):
 			Voice.idea1_length:Voice.idea1_length + Voice.idea2_length])
 		Voice.idea4_length = Voice.idea2_length
 
-		if Voice.note_values [-3:] == [3,2,1]:
-			Voice.note_values[-3:] = [3,1,2]
+		if Voice.note_values [-2:] == [2,1]:
+			Voice.note_values[-2:] = [1,2]
 
 		# change half cadence and full cadence ending from 2,1 to 1,2
 
@@ -329,10 +330,9 @@ class Bass(Voice):
 		for note in self.pitch_amounts]
 		print(self.chromatics, end="\n\n")
 		if max(self.real_notes) > 62:
-			for index, note in enumerate(self.real_notes[:]):
+			for index in range(len(self.real_notes)):
 				self.real_notes[index] -= 12
 
-		#alter pitches and bass motion based on secondary dominants
 		for nc_index in range(len(Voice.chromatics)):
 			if Voice.chromatics[nc_index]:
 				self.note_index = nc_index
@@ -391,7 +391,6 @@ class Bass(Voice):
 
 		self.finalize_part()
 
-		print(self.final_notes)
 		print(self.final_rhythm, len(self.final_rhythm))
 		print(self.final_notes, len(self.final_notes))
 

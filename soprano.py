@@ -8,11 +8,7 @@ class Soprano(Voice):
 
 	def __init__(self):
 		self.real_notes = Voice.soprano_pitches
-		self.sheet_notes = []
-		self.lily_notes = []
-		self.measure_notes = []
-		self.note_index = 0
-		self.note_values = Voice.note_values[:]
+		super().__init__()
 
 	def do_stuff(self):
 		self.group_notes()

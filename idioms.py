@@ -422,6 +422,10 @@ interval_names = {
 }
 harmonic_dissonance = ("d2", "A1", "m2", "M2", "d3", "A2", "d4", "A3", "P4", 
 	"A4", "d5", "d6", "A5", "d7", "A6", "m7", "M7", "d8")
+# I haven't learned the proper way to resolve these intervals, 
+# if such a technique exists
+unresolved_dissonance = ("d2", "A1", "m2", "M2", "d3", "d4", "A3", "P4", 
+	"d6", "A5", "A6", "m7", "M7", "d8")
 
 # Use root notes of chords
 sec_doms_in_major = {

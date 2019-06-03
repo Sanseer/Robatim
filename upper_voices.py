@@ -404,6 +404,8 @@ class UpperVoices(Voice):
 			return False
 		# elif bass_soprano_intervals[-1] in idms.harmonic_dissonance:
 		# 	return False
+		elif bass_soprano_intervals[-1] in idms.unresolved_dissonance:
+			return False
 		elif ("P" in bass_soprano_intervals[-1] and 
 		  "P" in bass_soprano_intervals[-2]):
 			# print("Double perfects")
@@ -476,7 +478,8 @@ class UpperVoices(Voice):
 			if (interval_list[-1] in ("P5","P8") and 
 			  motion_list[-1] == "Parallel"):
 				return False
-			elif interval_list[-2] == "A4" and "6" not in interval_list[-1]:
+			elif (interval_list[-2] == "A4" and 
+			  interval_list[-1] not in ("M6", "m6")):
 				return False
 			elif (interval_list[-2] == "d5" 
 			  and interval_list[-1] not in ("M3", "m3") 
