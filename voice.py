@@ -1,5 +1,5 @@
 import idioms as idms
-import pysnooper
+# import pysnooper
 
 class Voice(object):
 
@@ -99,70 +99,42 @@ class Voice(object):
 		return False
 
 	def get_interval(self, old_pitch, new_pitch):
-		try:
-			leap = new_pitch - old_pitch
-			if not 0 <= leap <= 11:
-				leap %= 12 
-			if self.chromatics[self.note_index]:
-				if self.chromatics[self.note_index] == "2Dom":
-					chord_shift = 4
-					convert_func = self.convert_sec_dom
-				elif self.chromatics[self.note_index] == "2Dim":
-					chord_shift = 6 
-					convert_func = self.convert_sec_dim
-				elif self.chromatics[self.note_index] in idms.modes.keys():
-					chord_shift = 0
-					convert_func = self.convert_mode
-				old_pitch_degree = self.revert_pitch_to_degree(
-					old_pitch, chord_shift, convert_func)
-				new_pitch_degree = self.revert_pitch_to_degree(
-					new_pitch, chord_shift, convert_func)
-			elif self.chromatics[self.note_index] is None:
-				old_pitch = self.make_scale_pitch(old_pitch)
-				new_pitch = self.make_scale_pitch(new_pitch)
-				old_pitch_degree = self.make_scale_degree(old_pitch)
-				new_pitch_degree = self.make_scale_degree(new_pitch)
+		# try:
+		leap = new_pitch - old_pitch
+		if not 0 <= leap <= 11:
+			leap %= 12 
+		if self.chromatics[self.note_index]:
+			if self.chromatics[self.note_index] == "2Dom":
+				chord_shift = 4
+				convert_func = self.convert_sec_dom
+			elif self.chromatics[self.note_index] == "2Dim":
+				chord_shift = 6 
+				convert_func = self.convert_sec_dim
+			elif self.chromatics[self.note_index] in idms.modes.keys():
+				chord_shift = 0
+				convert_func = self.convert_mode
+			old_pitch_degree = self.revert_pitch_to_degree(
+				old_pitch, chord_shift, convert_func)
+			new_pitch_degree = self.revert_pitch_to_degree(
+				new_pitch, chord_shift, convert_func)
+		elif self.chromatics[self.note_index] is None:
+			old_pitch = self.make_scale_pitch(old_pitch)
+			new_pitch = self.make_scale_pitch(new_pitch)
+			old_pitch_degree = self.make_scale_degree(old_pitch)
+			new_pitch_degree = self.make_scale_degree(new_pitch)
 
-			generic_interval = new_pitch_degree - old_pitch_degree
-			if generic_interval < 0:
-				generic_interval += 7
-			return idms.interval_names[(leap, generic_interval)]
-		except:
-			print(self.mode)
-			print(self.chromatics[self.note_index])
-			print(self.get_chord())
-			print(old_pitch, new_pitch)
-			print(self.make_scale_pitch(old_pitch), 
-				self.make_scale_pitch(new_pitch))
-			with pysnooper.snoop(depth=3):
-				leap = new_pitch - old_pitch
-				if not 0 <= leap <= 11:
-					leap %= 12 
-				if self.chromatics[self.note_index]:
-					if self.chromatics[self.note_index] == "2Dom":
-						chord_shift = 4
-						convert_func = self.convert_sec_dom
-					elif self.chromatics[self.note_index] == "2Dim":
-						chord_shift = 6 
-						convert_func = self.convert_sec_dim
-					elif self.chromatics[self.note_index] in idms.modes.keys():
-						chord_shift = 0
-						convert_func = self.convert_mode
-					old_pitch_degree = self.revert_pitch_to_degree(
-						old_pitch, chord_shift, convert_func)
-					new_pitch_degree = self.revert_pitch_to_degree(
-						new_pitch, chord_shift, convert_func)
-				elif self.chromatics[self.note_index] is None:
-					old_pitch = self.make_scale_pitch(old_pitch)
-					new_pitch = self.make_scale_pitch(new_pitch)
-					old_pitch_degree = self.make_scale_degree(old_pitch)
-					new_pitch_degree = self.make_scale_degree(new_pitch)
-
-				generic_interval = new_pitch_degree - old_pitch_degree
-				if generic_interval < 0:
-					generic_interval += 7
-				return idms.interval_names[(leap, generic_interval)]
-
+		generic_interval = new_pitch_degree - old_pitch_degree
+		if generic_interval < 0:
+			generic_interval += 7
+		return idms.interval_names[(leap, generic_interval)]
+		# except:
+		# 	print(self.mode)
+		# 	print(self.chromatics[self.note_index])
+		# 	print(self.get_chord())
+		# 	print(old_pitch, new_pitch)
+		# 	print(self.make_scale_pitch(old_pitch), 
+		# 		self.make_scale_pitch(new_pitch))
+		# 	with pysnooper.snoop(depth=3):
 
 	def revert_pitch_to_degree(self, pitch, chord_shift, convert_func, scale_pitch=False):
 		chord = self.get_chord()

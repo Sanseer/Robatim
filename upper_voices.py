@@ -1,6 +1,5 @@
 import itertools
 from tqdm import tqdm
-import pysnooper
 
 from voice import Voice
 import idioms as idms

@@ -1,5 +1,4 @@
 import random
-import pysnooper
 
 from voice import Voice
 import idioms as idms
@@ -50,10 +49,8 @@ class Soprano(Voice):
 		self.note_index += len(self.measure_notes[3])
 		self.add_notes(4,7)
 
-		print(self.measure_notes)
-		print(self.final_notes)
-		print(self.fig_options)
 		print(self.fig_choices)
+		print(self.measure_notes)
 
 		self.create_rhythm(0,3)
 		self.create_rhythm(4,7)
@@ -64,9 +61,8 @@ class Soprano(Voice):
 
 		self.finalize_part()
 
-		print(self.fig_choices)
-		print(self.final_notes, len(self.final_notes))
-		print(self.final_rhythm, len(self.final_rhythm))
+		print(self.final_notes)
+		print(self.final_rhythm)
 
 
 	def find_figures(self, current_note, next_note):
@@ -98,22 +94,20 @@ class Soprano(Voice):
 		for m_index, chosen_measure in enumerate(
 				self.measure_notes[start:stop]):
 			for n_index, current_note in enumerate(chosen_measure):
-				if self.fig_options[m_index + start][n_index] != [None]:
-					nct = random.choice(
-						self.fig_options[m_index + start][n_index])
-					next_note = self.real_notes[self.note_index + 1]
-					increment = self.move_direction(next_note - current_note)
-					if nct == "CPT":
-						mid_note = current_note + increment
-						self.final_notes[m_index + start].extend(
-							(current_note, mid_note))
-					elif nct == "Double CPT":
-						mid_note1 = current_note + increment
-						mid_note2 = mid_note1 + increment
-						self.final_notes[m_index + start].extend(
-							(current_note, mid_note1, mid_note2))
-				else:
-					nct = None
+				nct = random.choice(
+					self.fig_options[m_index + start][n_index])
+				next_note = self.real_notes[self.note_index + 1]
+				increment = self.move_direction(next_note - current_note)
+				if nct == "CPT":
+					mid_note = current_note + increment
+					self.final_notes[m_index + start].extend(
+						(current_note, mid_note))
+				elif nct == "Double CPT":
+					mid_note1 = current_note + increment
+					mid_note2 = mid_note1 + increment
+					self.final_notes[m_index + start].extend(
+						(current_note, mid_note1, mid_note2))
+				elif nct is None:
 					self.final_notes[m_index + start].append(current_note)
 				self.fig_choices[m_index + start].append(nct)
 				self.note_index += 1

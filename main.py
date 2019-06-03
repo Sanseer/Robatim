@@ -1,9 +1,3 @@
-"""This program creates a short four-part tune using period form 
-from the classical style. It creates a chord progression (bass),
-picks a rhythm, and then adds the remaining voices using 
-the conventions of counterpoint and voice leading. 
-The rhythm is embellished, the sheet music created, and the MIDI file exported."""
-
 import random
 
 from midiutil import MIDIFile
