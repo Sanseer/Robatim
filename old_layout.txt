@@ -2,7 +2,7 @@
 
 \header {
   title = "Symphony"
-  composer = "Aniebiet James"
+  composer = "Robatim"
 }
 
 bass = { \voiceFour PART_SLOT }

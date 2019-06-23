@@ -6,7 +6,9 @@ from voice import Voice
 from bass import Bass
 from upper_voices import UpperVoices, Tenor, Alto
 from soprano import Soprano
-import idioms as idms
+import idioms.basics as idms_b
+
+# write tests in keyboard and chorale style to try custom chord progressions
 
 def random_settings(time_sig="", tonic="", mode=""):
 	"""Selects a random, but practical key and time sig unless one is provided"""
@@ -14,36 +16,34 @@ def random_settings(time_sig="", tonic="", mode=""):
 	if not mode:
 		mode = random.choice(("ionian", "aeolian"))
 	if mode == "ionian" and not tonic:
-		tonic =  random.choice(tuple(idms.major_accidentals.keys()))
+		tonic =  random.choice(tuple(idms_b.major_accidentals.keys()))
 	elif mode == "aeolian" and not tonic:
-		tonic = random.choice(tuple(idms.minor_accidentals.keys()))
+		tonic = random.choice(tuple(idms_b.minor_accidentals.keys()))
 	if not time_sig:
-		time_sig = random.choice(idms.time_sigs)
+		time_sig = random.choice(idms_b.time_sigs)
 
 	return time_sig, tonic, mode
 
-def create_song(parts=4):
-	"""Creates a tune in keyboard style"""
-	song_notes = []
+def create_song():
+	"""Creates a tune with chorale style and period form"""
 	voice_list = []
-	if parts >= 1:
-		voice_list.append(Bass(*random_settings()))
-		voice_list[0].create_part()
-	if parts >= 4: 
-		UpperVoices().create_parts()
-		voice_list.append(Tenor())
-		voice_list[-1].create_part()
-		voice_list.append(Alto())
-		voice_list[-1].create_part()
+	voice_list.append(Bass(*random_settings()))
+	voice_list[0].create_part()
 
-		voice_list.append(Soprano())
-		voice_list[-1].do_stuff()
-		voice_list[-1].create_part()
-		make_lily_file()
+	UpperVoices().create_parts()
+	voice_list.append(Tenor())
+	voice_list[-1].create_part()
+	voice_list.append(Alto())
+	voice_list[-1].create_part()
+
+	voice_list.append(Soprano())
+	voice_list[-1].do_stuff()
+	voice_list[-1].create_part()
+	make_lily_file()
 	return voice_list
 
 def make_lily_file():
-	"""Creates a lilyPond file using a pre-defined layout"""
+	"""Creates a LilyPond sheet music file"""
 	if Voice.mode == "ionian":
 		mode = "major "
 	elif Voice.mode == "aeolian":
@@ -52,7 +52,8 @@ def make_lily_file():
 		time_sig = "/".join([str(Voice.measure_length * 3),"8"])
 	elif Voice.beat_division == 2:
 		time_sig = "/".join([str(Voice.measure_length),"4"])
-	title = " ".join(("Cantus in", Voice.tonic, mode.replace(" ","")))
+	# Append chord symbols
+	title = " ".join(("Chorale in", Voice.tonic, mode.replace(" ","")))
 	with open("old_layout.txt", 'r') as f:
 		new_file = f.read()
 
@@ -67,18 +68,16 @@ def make_lily_file():
 
 
 if __name__ ==  "__main__":
-	voice_list = create_song(4)
-	program = 14 # 73, 48, 4
+	voice_list = create_song()
 	track    = 0
 	channel  = 0
 	time     = 0   # In beats
 	volume   = 100 # 0-127, as per the MIDI standard
 
-	MyMIDI = MIDIFile(5) # One track, defaults to format 1 (tempo track
-	                     # automatically created)
+	MyMIDI = MIDIFile(4) 
 
-	[MyMIDI.addProgramChange(track,ch,time,73) for ch in range(4)]
-
+	[MyMIDI.addProgramChange(track,ch,time,52) for ch in range(4)] 
+ 
 	if Voice.mode == "aeolian":
 		tempo = 110
 	elif Voice.mode == "ionian":
@@ -86,7 +85,7 @@ if __name__ ==  "__main__":
 	MyMIDI.addTempo(0,0,tempo)
 
 	# optional slow ending except whole note on measure 7
-	if not set(Voice.measure_rhythms[-2]) & {3,4}:
+	if Voice.measure_rhythms[-2][-1] not in {3,4}:
 		if Voice.measure_length == 4:
 			MyMIDI.addTempo(track, 26, tempo * .9)
 		elif Voice.measure_length == 3:
@@ -103,5 +102,5 @@ if __name__ ==  "__main__":
 				time = time + rest
 		channel += 1
 
-	with open("my_song0.mid", "wb") as output_file:
+	with open("chorale0.mid", "wb") as output_file:
 	    MyMIDI.writeFile(output_file)

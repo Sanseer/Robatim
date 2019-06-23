@@ -1,6 +1,10 @@
 # Chords expressed as numbers to allow negative numbers 
 # that represent descending motion.
 # Add secondary diminished inversions 6/5 moves by half step
+# VI_UP_CHRMED_X2 chromatic mediants
+# III_DOWN_CHRMED_X1
+# I_UP_CHRMED_X0
+
 I, I6, I64 = 10_530_1, 10_630_1, 10_640_1
 I_LYDIAN, I_MAJOR, I_MIXO = 21_530_1, 22_530_1, 23_530_1
 I_DORIAN, I_MINOR, I_PHRYG = 24_530_1, 25_530_1, 26_530_1
@@ -47,6 +51,41 @@ VII_LYDIAN, VII_MAJOR, VII_MIXO = 21_530_7, 22_530_7, 23_530_7
 VII_DORIAN, VII_MINOR, VII_PHRYG = 24_530_7, 25_530_7, 26_530_7
 V65_OF_III, V43_OF_III = 50_653_3, 50_643_3
 
+major_consonant_triads = (I, II, III, IV, V, VI)
+
+#chord_members
+chord_tones = { 
+	I: (0,2,4), I6: (0,2,4), I64: (0,2,4), I_MAJOR: (0,2,4), V7_OF_IV:(0,2,4,6), 
+	V65_OF_IV: (0,2,4,6), V43_OF_IV: (0,2,4,6), II: (1,3,5),  II6: (1,3,5), 
+	II7: (1,3,5,0), II65: (1,3,5,0), II43: (1,3,5,0), II42: (1,3,5,0), 
+	V7_OF_V: (1,3,5,0), V65_OF_V: (1,3,5,0), V43_OF_V: (1,3,5,0), III: (2,4,6), 
+	V65_OF_VI: (2,4,6,1), V43_OF_VI: (2,4,6,1), IV: (3,5,0), IV6: (3,5,0), 
+	IV7: (3,5,0,2), V: (4,6,1), V6: (4,6,1), V7: (4,6,1,3), V65: (4,6,1,3), 
+	V43: (4,6,1,3), V42: (4,6,1,3), VI: (5,0,2), V7_OF_II: (5,0,2,4), 
+	V65_OF_II: (5,0,2,4), V43_OF_II: (5,0,2,4), VII6: (6,1,3), 
+	V65_OF_III: (6,1,3,5), V43_OF_III: (6,1,3,5), VII7: (6,1,3,5), 
+	DIM7_DOWN_OF_I:(0,2,4,6),
+	VII7_OF_II: (0,2,4,6), DIM7_DOWN_OF_II: (1,3,5,0),
+	VII7_OF_III: (1,3,5,0), DIM7_DOWN_OF_III: (2,4,6,1),
+	VII7_OF_IV: (2,4,6,1), DIM7_DOWN_OF_IV: (3,5,0,2),
+	VII7_OF_V: (3,5,0,2), DIM7_DOWN_OF_V: (4,6,1,3), 
+	VII7_OF_VI: (4,6,1,3), DIM7_DOWN_OF_VI: (5,0,2,4)
+}
+
+bass_notes = {}
+for chord, degrees in chord_tones.items():
+	inversion = chord // 10 % 1000
+	if inversion in (530, 753):
+		bass_notes[chord] = degrees[0]
+	elif inversion in (630, 653):
+		bass_notes[chord] = degrees[1]
+	elif inversion in (640, 643):
+		bass_notes[chord] = degrees[2]
+	elif inversion == 642:
+		bass_notes[chord] = degrees[3]
+
+assert(len(bass_notes.keys()) == len(chord_tones.keys()))
+
 modes = {
 	"lydian": (0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24),
 	"ionian": (0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24),
@@ -55,6 +94,7 @@ modes = {
 	"aeolian": (0, 2, 3, 5, 7, 8, 10, 12, 14, 15, 17, 19, 20, 22, 24),
 	"phryg": (0, 1, 3, 5, 7, 8, 10, 12, 13, 15, 17, 19, 20, 22, 24) 
 }
+# only use practical key signatures
 major_accidentals = {"C":"#", "G":"#", "D":"#", "A":"#", "E":"#", "B":"#", 
 	"F#":"#", "Db":"b", "Ab":"b", "Eb":"b", "Bb":"b", "F":"b"
 }
@@ -64,10 +104,17 @@ minor_accidentals = {"A":"#", "E":"#", "B":"#", "F#":"#", "C#":"#", "G#":"#",
 """Do you need pedantic accidental designations based on key signature 
 such as Cb or E#. If so, use all_notes instead of tonics variable, 
 the latter of which has dependencies"""
+# use scale pitch to find possible pitch names. 
+# Assign pitch based on corresponding letter (revert pitch to scale degree?).
+# use chromaticism based on original scale degree. 
+# Leading tone should always be raised seventh scale degree in minor not flat 8th.
 all_notes = (
-	"A", ("A#","Bb"), ("B","Cb"), ("B#","C"), ("C#", "Db"), "D",
-	("E","Fb"), ("E#","F"), ("F#", "Gb"), "G", ("G#", "Ab")
+	("B#","C","Dbb"), ("B##","C#", "Db"), ("C##", "D", "Ebb"), ("D##","E","Fb"), 
+	("E#","F","Gbb"), ("E##","F#", "Gb"), ("F##","G","Abb"), ("G#", "Ab"), 
+	("G##","A","Bbb"), ("A#","Bb","Cbb"), ("A##","B","Cb"), 
 )
+scale_sequence = ("C","D","E","F","G","A","B")
+
 tonics = {
 	"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4,"F": 5, "F#": 6, 
 	"Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B":11
@@ -175,37 +222,6 @@ auth_cadence = {
 	IV: (V, V7), IV7: (V, V7)
 }
 
-chord_tones = { 
-	I: (0,2,4), I6: (0,2,4), I64: (0,2,4), I_MAJOR: (0,2,4), V7_OF_IV:(0,2,4,6), 
-	V65_OF_IV: (0,2,4,6), V43_OF_IV: (0,2,4,6), II: (1,3,5),  II6: (1,3,5), 
-	II7: (1,3,5,0), II65: (1,3,5,0), II43: (1,3,5,0), II42: (1,3,5,0), 
-	V7_OF_V: (1,3,5,0), V65_OF_V: (1,3,5,0), V43_OF_V: (1,3,5,0), III: (2,4,6), 
-	V65_OF_VI: (2,4,6,1), V43_OF_VI: (2,4,6,1), IV: (3,5,0), IV6: (3,5,0), 
-	IV7: (3,5,0,2), V: (4,6,1), V6: (4,6,1), V7: (4,6,1,3), V65: (4,6,1,3), 
-	V43: (4,6,1,3), V42: (4,6,1,3), VI: (5,0,2), V7_OF_II: (5,0,2,4), 
-	V65_OF_II: (5,0,2,4), V43_OF_II: (5,0,2,4), VII6: (6,1,3), 
-	V65_OF_III: (6,1,3,5), V43_OF_III: (6,1,3,5), VII7: (6,1,3,5), 
-	DIM7_DOWN_OF_I:(0,2,4,6),
-	VII7_OF_II: (0,2,4,6), DIM7_DOWN_OF_II: (1,3,5,0),
-	VII7_OF_III: (1,3,5,0), DIM7_DOWN_OF_III: (2,4,6,1),
-	VII7_OF_IV: (2,4,6,1), DIM7_DOWN_OF_IV: (3,5,0,2),
-	VII7_OF_V: (3,5,0,2), DIM7_DOWN_OF_V: (4,6,1,3), 
-	VII7_OF_VI: (4,6,1,3), DIM7_DOWN_OF_VI: (5,0,2,4)
-}
-
-bass_notes = {}
-for chord, degrees in chord_tones.items():
-	inversion = chord // 10 % 1000
-	if inversion in (530, 753):
-		bass_notes[chord] = degrees[0]
-	elif inversion in (630, 653):
-		bass_notes[chord] = degrees[1]
-	elif inversion in (640, 643):
-		bass_notes[chord] = degrees[2]
-	elif inversion == 642:
-		bass_notes[chord] = degrees[3]
-
-assert(len(bass_notes.keys()) == len(chord_tones.keys()))
 
 """Accent chord sequence = attach one chord to progression
 Passing chord sequence = attach two chords to progression
@@ -232,6 +248,12 @@ BI = Basic idea. CI = Contrasting idea"""
 # Explicitly add second chord
 # Passing chords, IAC, Extend w/ tonic accent(remove?)
 # SAU DAU means PDA ITA etc.  TA only for 4 consecutive 1s
+
+# asterisk prevents duplicate keys
+# SA1 ultimate
+# *SA2 penultimate
+# less subsidiary progressions, no/less quarter note rhythms (for now)
+# quarter note rhythms near end of idea
 ci1_from_tonic_with_rest = {
 	(2,2,2,2):(("TAS","DAU"),),
 	(2,1,1,2,2):(("TAS","SAU","DAU"), ("TAS","PDA","ITA"), ("TAS","IDA","PTA"), 
@@ -391,10 +413,14 @@ bi1_rhythms_of_4 = {
 	("TA", "TPS-I"):(4,2,2), ("TAS", "DAU"): (4,2,2),
 	("TAS", "DAU"): (2,2,4),
 	# (3,1,3,1)
+	# (3,1,2,2)
 	# (4,3,1):
 }
 
 # Nested dicts to prevent excessive if statements
+# make multiple sequence types based on chromaticism
+# store as tuple of dictionaries
+# d_ diatonic s_ secondary m_ modal
 chord_sequences = {
 	"TA": accent_tonic, "TP": expand_tonic1, "TDP": expand_tonic2, 
 	"0TP": expand_tonic3, "TPS-I": tonic_to_subdom2, "TPS-C": tonic_to_subdom3, 
@@ -422,12 +448,12 @@ interval_names = {
 }
 harmonic_dissonance = ("d2", "A1", "m2", "M2", "d3", "A2", "d4", "A3", "P4", 
 	"A4", "d5", "d6", "A5", "d7", "A6", "m7", "M7", "d8")
-# I haven't learned the proper way to resolve these intervals, 
-# if such a technique exists
+# [melodically approach and] resolve custom dissonance by step. contract in or expand out.
 unresolved_dissonance = ("d2", "A1", "m2", "M2", "d3", "d4", "A3", "P4", 
 	"d6", "A5", "A6", "m7", "M7", "d8")
 
 # Use root notes of chords
+# TODO: secondary subdoms
 sec_doms_in_major = {
 	0: (0,0,0,-1), 1: (0,1,0,0), 2: (0,1,0,0), 5: (0,1,0,0), 6: (0,1,1,0)
 }
