@@ -16,9 +16,9 @@ def random_settings(time_sig="", tonic="", mode=""):
 	if not mode:
 		mode = random.choice(("ionian", "aeolian"))
 	if mode == "ionian" and not tonic:
-		tonic =  random.choice(tuple(idms_b.major_accidentals.keys()))
+		tonic =  random.choice(idms_b.major_keys)
 	elif mode == "aeolian" and not tonic:
-		tonic = random.choice(tuple(idms_b.minor_accidentals.keys()))
+		tonic = random.choice(idms_b.minor_keys)
 	if not time_sig:
 		time_sig = random.choice(idms_b.time_sigs)
 

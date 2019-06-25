@@ -1,5 +1,8 @@
 import random
 
+# import os, sys
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from voice import Voice
 import idioms.basics as idms_b
 
@@ -67,6 +70,8 @@ class Soprano(Voice):
 
 	def find_figures(self, current_note, next_note):
 		# remove chromatics and add diatonic figures
+		# ascertain proper voice leading 
+		# (e.g., melodic minor, dissonant 7th resolves down)
 		possible_figs = []
 		# if (Voice.bass_soprano_intervals[self.note_index + 1] 
 		#   not in idms_b.harmonic_dissonance):

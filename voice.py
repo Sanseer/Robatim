@@ -1,3 +1,6 @@
+# import os, sys
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 import idioms.basics as idms_b
 import pysnooper
 
@@ -72,10 +75,16 @@ class Voice(object):
 		chord = self.get_chord(index_shift) 
 		return len(idms_b.chord_members[chord]) == 4
 
+	def is_chord_inversion(self, chord1, chord2):
+		if (chord1 // 10000 == chord2 // 10000 and
+		  chord1 % 10 == chord2 % 10):
+			return True
+		return False
+
 	def make_scale_pitch(self, pitch):
 		return (pitch - idms_b.tonics[Voice.tonic]) % 12
 
-	def make_scale_degree(self, pitch):
+	def get_diatonic_scale_degree(self, pitch):
 		if not 0 <= pitch <= 11:
 			pitch = self.make_scale_pitch(pitch)
 		if self.mode == "ionian":
@@ -120,8 +129,8 @@ class Voice(object):
 		elif self.chromatics[self.note_index] is None:
 			old_pitch = self.make_scale_pitch(old_pitch)
 			new_pitch = self.make_scale_pitch(new_pitch)
-			old_pitch_degree = self.make_scale_degree(old_pitch)
-			new_pitch_degree = self.make_scale_degree(new_pitch)
+			old_pitch_degree = self.get_diatonic_scale_degree(old_pitch)
+			new_pitch_degree = self.get_diatonic_scale_degree(new_pitch)
 
 		generic_interval = new_pitch_degree - old_pitch_degree
 		if generic_interval < 0:
@@ -143,7 +152,6 @@ class Voice(object):
 		chord_pitches = []
 		for degree in chord_degrees:
 			chord_pitches.append(idms_b.modes[Voice.mode][degree])
-		# if not scale_pitch:
 		if not 0 <= pitch <= 11:
 			pitch = self.make_scale_pitch(pitch)
 		if (10 in chord_pitches and root_degree in (4, 6) 
@@ -169,7 +177,7 @@ class Voice(object):
 	def convert_sec_dom(self, chord, main_note):
 		if not 0 <= main_note <= 11:
 			main_note = self.make_scale_pitch(main_note)
-		scale_degree = self.make_scale_degree(main_note)
+		scale_degree = self.get_diatonic_scale_degree(main_note)
 
 		position = idms_b.chord_members[chord].index(scale_degree)
 		root_degree = idms_b.chord_members[chord][0]
@@ -183,7 +191,7 @@ class Voice(object):
 	def convert_sec_dim(self, chord, main_note):
 		if not 0 <= main_note <= 11:
 			main_note = self.make_scale_pitch(main_note)
-		scale_degree = self.make_scale_degree(main_note)
+		scale_degree = self.get_diatonic_scale_degree(main_note)
 
 		position = idms_b.chord_members[chord].index(scale_degree)
 		root_degree = idms_b.chord_members[chord][0]
@@ -200,7 +208,7 @@ class Voice(object):
 	def convert_mode(self, chord, main_note):
 		if not 0 <= main_note <= 11:
 			main_note = self.make_scale_pitch(main_note)
-		scale_degree = self.make_scale_degree(main_note)
+		scale_degree = self.get_diatonic_scale_degree(main_note)
 
 		new_mode = Voice.chromatics[self.note_index]
 		new_note = idms_b.modes[new_mode][scale_degree]
@@ -257,7 +265,7 @@ class Voice(object):
 			scale_degree = self.revert_pitch_to_degree(
 				scale_note, chord_shift, convert_func)
 		else:
-			scale_degree = self.make_scale_degree(scale_note)
+			scale_degree = self.get_diatonic_scale_degree(scale_note)
 
 		pitch_index = (self.tonic_index + scale_degree) % 7
 		pitch_letter = idms_b.scale_sequence[pitch_index]
@@ -272,8 +280,6 @@ class Voice(object):
 
 
 	def make_letters(self):
-		# indicate raised and lowered notes (single/double flat/sharp) 
-		# chromaticism and leading tone in minor
 		# if self.voice_type = "soprano"
 		self.note_index = 0
 		tonic_letter = Voice.tonic.replace("#","").replace("b","")
@@ -338,21 +344,17 @@ class Voice(object):
 					new_symbol = "is"
 				elif old_symbol == "b":
 					new_symbol = "es"
-			# lily_note = (letter + new_symbol + octave_mark + 
-			# 	str(self.rhythm[index]))
 			current_rhythm = self.rhythm[index]
 			if "C" not in current_rhythm:
-				lily_note = "".join([letter, new_symbol, octave_mark, 
-					self.rhythm[index]])
+				lily_note = "".join((letter, new_symbol, octave_mark, 
+					self.rhythm[index]))
 			elif current_rhythm == "3C":
-				lily_note = "".join([letter, new_symbol, octave_mark, "2.~ ", 
-					letter, new_symbol, octave_mark, "4."])
+				lily_note = "".join((letter, new_symbol, octave_mark, "2.~ ", 
+					letter, new_symbol, octave_mark, "4."))
 			self.lily_notes.append(lily_note)
 
 		lily_string = " ".join(note for note in self.lily_notes)
 		Voice.lily_parts.append(lily_string)
-
-		# raise Exception("Stop")
 
 	def invert_note_values(self):
 		if Voice.beat_division == 2:
@@ -374,13 +376,14 @@ class Voice(object):
 		return fixed_durations
 
 	def create_rests(self, sequence):
-		rest_indices = []
+		# rest_indices = []
 		for lily_index, item in enumerate(self.final_rhythm):
 			if type(item) == str:
-				rest_indices.append(lily_index)
+				sequence[lily_index] = self.rhythm[lily_index]
+				# rest_indices.append(lily_index)
 		# reverse insertion to prevent moving target
-		for lily_index in rest_indices:
-			sequence[lily_index] = self.rhythm[lily_index]
+		# for lily_index in rest_indices:
+		# 	sequence[lily_index] = self.rhythm[lily_index]
 		return sequence
 
 	def chord_degree_to_pitch(self, chord_position, index_shift=0):

@@ -1,5 +1,8 @@
 import random
 
+# import os, sys
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from voice import Voice
 import idioms.basics as idms_b
 
@@ -18,10 +21,10 @@ class Bass(Voice):
 		# Voice.consequent_rhythm_change = random.choice((True, False))
 		if mode == "ionian":
 			import idioms.major
-			self.idms_mode = idioms.major
+			Voice.idms_mode = idioms.major
 		elif mode == "aeolian":
 			import idioms.minor
-			self.idms_mode = idioms.minor
+			Voice.idms_mode = idioms.minor
 
 		self.note_index = 0
 		self.chord_style1 = None
@@ -47,7 +50,7 @@ class Bass(Voice):
 
 	def create_part(self):
 		"""Creates the bass portion of the tune"""
-		print(f"Song in {Voice.tonic} {Voice.mode} with {Voice.accidental}'s")
+		print(f"Song in {Voice.tonic} {Voice.mode}")
 		print(f"{Voice.measure_length} beats divided in {Voice.beat_division}")
 		self.create_chord_progression()
 		self.add_notes()
@@ -72,7 +75,6 @@ class Bass(Voice):
 		# rhythm to the actual notes
 		if Voice.half_rest_ending:
 			Voice.idea2_length -= 1
-			# Voice.idea4_length -= 1
 
 	def create_antecedent(self):
 		"""Creates the antecedent of the period using basic/contrast ideas"""
@@ -90,13 +92,10 @@ class Bass(Voice):
 		self.declare_transition(self.chord_style1)
 		if random.choice((True,False)):
 			contrast_idea1_rhythm = self.basic_idea1_rhythm
-			print("Same rhythm")
 		else:
 			contrast_idea1_rhythm = random.choice(
 				idms_b.ci1_response_rhythms[self.basic_idea1_rhythm])
-			print("Different rhythm", contrast_idea1_rhythm)
 		if contrast_idea1_rhythm in {(2,2,2,2), (2,1,2,1)}:
-			print("Adding rest!")
 			Voice.half_rest_ending = True
 
 		print("Half rest?", Voice.half_rest_ending)
@@ -133,7 +132,6 @@ class Bass(Voice):
 		for chord_type in chord_types:
 			print("Chord type:", chord_type)
 			chord_type = chord_type.replace("*","")
-		# explicit if statements prevent redundant dict keys with same values 
 			chord_options = self.idms_mode.chord_sequences[chord_type][self.old_chord]
 			chords_chosen = random.choice(chord_options)
 			if type(chords_chosen) == int:
@@ -141,7 +139,6 @@ class Bass(Voice):
 			[Voice.chord_path.append(chord) for chord in chords_chosen]
 			for chord in chords_chosen:
 				self.add_chromatic(chord)
-		print(Voice.chord_path, len(Voice.chord_path))
 
 	def add_single_chord(self, progression_type):
 		"""Add single chord to progression"""
@@ -149,7 +146,6 @@ class Bass(Voice):
 		chord_choice = random.choice(chord_options)
 		self.add_chromatic(chord_choice)
 		Voice.chord_path.append(chord_choice)
-		print(Voice.chord_path, len(Voice.chord_path))
 
 	def add_chromatic(self, chord):
 		"""Marks chords for mode mixture and modulation"""
@@ -181,10 +177,11 @@ class Bass(Voice):
 			Voice.chromatics.append(None)
 
 	def declare_transition(self, chord_types):
-		"""Transitions from basic idea to contrasting idea of period form"""
+		"""Decides transition type from basic idea to contrasting idea"""
 		print("-"*20)
-		if (chord_types[-1] == "TA" and random.choice((True, False, False)) 
-		  and not self.basic_idea2_rhythm):
+		if (chord_types[-1] == "TA" and random.choice((True, True, False)) 
+		  and not self.basic_idea2_rhythm and self.basic_idea1_rhythm[-1] in {3,4} 
+		  and self.old_chord != idms_b.VI):
 			print("Restart tonic. Adding first CI note")
 			self.contrast_idea_start = "tonic"
 		elif chord_types[-1] == "TA" and not self.basic_idea2_rhythm:
@@ -198,6 +195,7 @@ class Bass(Voice):
 			print("Dominant contrast. Adding first CI note")
 
 	def add_transition_chord(self, next_chord_style):
+		"""Adds transition chord for the next 2 measures"""
 		if self.contrast_idea_start == "tonic":
 			self.add_single_chord(idms_b.restart_tonic)
 		elif self.contrast_idea_start == "subdominant":
@@ -208,8 +206,19 @@ class Bass(Voice):
 		elif self.contrast_idea_start == "dominant":
 			self.add_single_chord(idms_b.restart_dom)
 
+	def add_rest_rhythm(self, rhythm):
+		"""Modifies end of rhythm to include rest"""
+		if rhythm[-1] == 2:
+			rhythm[-1] = "2"
+		elif rhythm[-1] == 1:
+			rhythm[-1] = "1"
+		elif rhythm[-1] == 3:
+			rhythm[-1:] = [2,"1"]
+		elif rhythm[-1] == 4:
+			rhythm[-1:] = [2,"2"]
+
 	def create_consequent(self):
-		"""Create the consequent section of the tune"""
+		"""Creates the consequent of the period using basic/contrast ideas"""
 		# Replicate melody?
 		self.add_single_chord(idms_b.restart_tonic)
 		if Voice.measure_length == 3:
@@ -225,7 +234,10 @@ class Bass(Voice):
 		self.add_chord_sequence(self.chord_style3)
 		self.declare_transition(self.chord_style3)
 		if self.contrast_idea_start == "dominant":
-			contrast_idea2_rhythm = (4,4)
+			if Voice.measure_length == 4:
+				contrast_idea2_rhythm = (4,4)
+			elif Voice.measure_length == 3:
+				contrast_idea2_rhythm = (3,3)
 		else:
 			contrast_idea2_rhythm = random.choice(
 				idms_b.ci2_response_rhythms[self.basic_idea2_rhythm])
@@ -257,17 +269,6 @@ class Bass(Voice):
 		self.add_transition_chord(self.chord_style4)
 		self.add_chord_sequence(self.chord_style4)
 
-	def add_rest_rhythm(self, rhythm):
-		"""Modifies end of rhythm to include rest"""
-		if rhythm[-1] == 2:
-			rhythm[-1] = "2"
-		elif rhythm[-1] == 1:
-			rhythm[-1] = "1"
-		elif rhythm[-1] == 3:
-			rhythm[-1:] = [2,"1"]
-		elif rhythm[-1] == 4:
-			rhythm[-1:] = [2,"2"]
-
 	def add_notes(self):
 		"""Add notes to bass based on chords. First chord must be tonic"""
 		old_pitch = 0
@@ -275,7 +276,6 @@ class Bass(Voice):
 		tonic_indices = {Voice.idea1_length + Voice.idea2_length, 
 			Voice.idea1_length + Voice.idea2_length + Voice.idea3_length + 
 			Voice.idea4_length - 1}
-		print(tonic_indices)
 		for n_index, chord in enumerate(Voice.chord_path[1:]):
 			new_scale_degree = idms_b.bass_notes[abs(chord)]
 			new_pitch = idms_b.modes[self.mode][new_scale_degree]
@@ -300,7 +300,6 @@ class Bass(Voice):
 				pass
 
 			if (n_index + 1) in tonic_indices and new_pitch < 0:
-				print("Changing direction!")
 				shift = 1
 				new_pitch += 12
 			else:
@@ -308,8 +307,6 @@ class Bass(Voice):
 			self.pitch_amounts.append(new_pitch)
 			old_pitch = new_pitch
 			old_scale_degree = new_scale_degree
-
-
 			Voice.bass_motion.append(shift)
 
 		Voice.chord_symbols = self.create_chord_names()
@@ -319,26 +316,27 @@ class Bass(Voice):
 			Voice.bass_motion[index] = self.move_direction(move)
 
 	def convert_notes(self):
-		"""Converts notes from diatonic scale degrees to pitch magnitudes"""
-		# tie notes optionally if bass is stationary
+		"""Converts notes from reference scale pitches to pitch magnitudes"""
+		# tie notes optionally if bass is stationary within a measure
 		self.real_notes = [note + 48 + idms_b.tonics[Voice.tonic] 
-		for note in self.pitch_amounts]
+			for note in self.pitch_amounts]
 		print(self.chromatics, end="\n\n")
 		if max(self.real_notes) > 62:
-			for index in range(len(self.real_notes)):
-				self.real_notes[index] -= 12
+			self.real_notes = [note - 12 for note in self.real_notes]
 
-		for nc_index in range(len(Voice.chromatics)):
-			if Voice.chromatics[nc_index]:
+		for nc_index, chrom in enumerate(Voice.chromatics):
+			if chrom:
 				self.note_index = nc_index
 				nc_chord = abs(Voice.chord_path[nc_index])
-				if Voice.chromatics[nc_index] == "2Dom":
+				# make a method for this (create_chromatic_pitch)?
+				# used in chord_degree_to_pitch
+				if chrom == "2Dom":
 					self.real_notes[nc_index] += self.convert_sec_dom(
 						nc_chord, self.real_notes[nc_index])
-				elif Voice.chromatics[nc_index] == "2Dim":
+				elif chrom == "2Dim":
 					self.real_notes[nc_index] += self.convert_sec_dim(
 						nc_chord, self.real_notes[nc_index])
-				elif Voice.chromatics[nc_index] in idms_b.modes.keys():
+				elif chrom in idms_b.modes.keys():
 					self.real_notes[nc_index] += self.convert_mode(
 						nc_chord, self.real_notes[nc_index])
 				old_note = self.real_notes[nc_index - 1]

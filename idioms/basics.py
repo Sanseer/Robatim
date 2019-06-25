@@ -1,11 +1,15 @@
 I, I6, I64 = 10_530_1, 10_630_1, 10_640_1
 I_MAJOR = 22_530_1
 II, II6 = 20_530_1, 20_630_1
+III = 30_530_1
 IV, IV6 = 40_530_1, 40_630_1
 V, V6  = 50_530_1, 50_630_1
 V7, V65, V43, V42 = 50_753_1, 50_653_1, 50_643_1, 50_642_1
 VI = 60_530_1
 VII6 = 70_630_1
+
+major_consonant_triads = (I, II, III, IV, V, VI)
+minor_consonant_triads = (I, III, IV, V, VI)
 
 chord_members = {
 	I: (0,2,4), I6: (0,2,4), I64: (0,2,4), I_MAJOR: (0,2,4), II: (1,3,5), 
@@ -54,12 +58,16 @@ minor_scale_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 10:6, 11:6}
 
 # only use practical key signatures
 # do you still need the dict values or can this be tuple?
-major_accidentals = {"C":"#", "G":"#", "D":"#", "A":"#", "E":"#", "B":"#", 
-	"F#":"#", "Db":"b", "Ab":"b", "Eb":"b", "Bb":"b", "F":"b"
-}
-minor_accidentals = {"A":"#", "E":"#", "B":"#", "F#":"#", "C#":"#", "G#":"#", 
-	"D#":"#", "Bb":"b", "F":"b", "C":"b", "G":"b", "D":"b"
-}
+# major_accidentals = {"C":"#", "G":"#", "D":"#", "A":"#", "E":"#", "B":"#", 
+# 	"F#":"#", "Db":"b", "Ab":"b", "Eb":"b", "Bb":"b", "F":"b"
+# }
+major_keys = ("C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F")
+# minor_accidentals = {"A":"#", "E":"#", "B":"#", "F#":"#", "C#":"#", "G#":"#", 
+# 	"D#":"#", "Bb":"b", "F":"b", "C":"b", "G":"b", "D":"b"
+# }
+minor_keys = ("A", "E", "B", "F#", "C#", "G#", "D#", "Bb", "F", "C", "G", "D")
+# 3/4, 4/4, 9/8, 12/8
+time_sigs = ((3,2), (4,2), (3,3), (4,3))
 expand_tonic1 = {
 	I: ((-V6, I), (-V65, I), (VII6, I6), (V43, I6), (VII6, -I), (V43, -I)),
 	I6: ((-V6, I), (-V65, I), (-VII6, -I), (-V43, -I), (-VII6, I6), (-V43, I6))
@@ -73,13 +81,14 @@ to_subdom2_strong = {
 	I6: (IV, II6),
 	VI: (-IV, -II6)
 }
+# sometimes leads to IAC, which would not be valid for I64
 to_subdom1_strong = {
 	I: (IV, II6),
 	I6: (IV, II6),
 	VI: (-IV, -II6),
-	IV: (-II, -II6),
-	II6: (-II,),
-	II: (II6,)
+	IV: (-II, -II6, I64),
+	II6: (-II, I64),
+	II: (II6, I64)
 }
 to_subdom1_weak = {
 	I: (IV, II6, II),
@@ -94,14 +103,15 @@ half_cadence1 = {
 	I6: (V,),
 	II: (V,),
 	II6: (V,),
-	IV: (V,)
+	IV: (V,),
+	I64: (V,)
 }
 imperfect_auth_cadence2 = {
 	I: (-V6, -V65, V43),
 	I6: (-VII6, -V43, V42),
 	II: (V6, V65),
 	II6: (-VII6, -V43, V42,),
-	IV: (-VII6, -V43, V42,)
+	IV: (-VII6, -V43, V42,),
 }
 imperfect_auth_cadence1 = {
 	V6: (I,),
@@ -115,7 +125,8 @@ perfect_auth_cadence2 = {
 	I6: (V, V7),
 	II: (V, V7),
 	II6: (V, V7),
-	IV: (V, V7)
+	IV: (V, V7),
+	I64: (V, V7)
 }
 perfect_auth_cadence1 = {
 	V: (-I,),
@@ -124,7 +135,6 @@ perfect_auth_cadence1 = {
 restart_tonic = {
 	I: (I6,),
 	I6: (-I,),
-	VI: (I,),
 	V: (-I,),
 	V6: (I,),
 	V65: (I,),
@@ -135,30 +145,27 @@ restart_tonic = {
 restart_dom = {
 	II: (V, V7),
 	II6: (V, V7),
-	IV: (V, V7)
+	IV: (V, V7),
+	I64: (V, V7)
 }
 
-# 3/4, 4/4, 9/8, 12/8
-time_sigs = ((3,2), (4,2), (3,3), (4,3))
 ci1_response_rhythms = {
+	# double neighbor IAC: 2 1 14
 	(3,2,1): ((2,1,2,1), (2,1,3)), 
-	(4,2,2): ((2,2,2,2), (2,2,4)),
-	(4,4): ((2,2,4), (4,2,2), (2,2,2,2)),
+	(4,2,2): ((2,2,2,2), (2,2,4)), # 2 1 1 4 
+	(4,4): ((2,2,4), (4,2,2), (2,2,2,2)), # 2 1 1 4
 	(3,3): ((2,1,2,1), (2,1,3)),
 	(2,1,2,1): ((2,1,3),),
 	(2,2,2,2): ((2,2,4),) # 2 1 1 4 
 }
 ci2_response_rhythms = {
-	(4,4): ((2,2,4),),
+	(4,4): ((2,2,4),), # 2 1 1 4
 	(3,3): ((2,1,3),),
 	(2,1,2,1): ((2,1,3),),
 	(2,2,2,2): ((2,2,4),) #2 1 1 4
 }
-# 2 1 2 1 becomes 2 1 3 for c1 and c2 if no rest
-# IAC = imperfect authentic cadence
-# DA1 = ultimate dominant accent
-# SA2 = penultimate subdom accent
-# TAS1-M = final subdom accent transitioned from tonic with cadential 6/4
+# SA1-M ultimate subdominant accent metrically weak
+# SA2+M penultimate subdominant accent metrically strong
 ci1_tonic_with_rest = {
 	(4,4): (("HC1",),), 
 	(2,2,4): (("SA1-M","HC1"), ("IAC2","IAC1")),
@@ -205,6 +212,8 @@ ci2_subdom_no_rest = {
 	(2,2,4): (("PAC2","PAC1"),),
 	(2,1,3): (("PAC2","PAC1"),),
 }
+# add incomplete passing chord to restart tonic
+# weak measure 2
 bi1_rhythms_of_3 = {
 	("TP","TA"): (2,1,2,1), ("TA",): (3,3)
 }
@@ -212,7 +221,7 @@ bi1_rhythms_of_4 = {
 	("TP","TA"): (2,2,2,2), ("TA",): (4,4)
 }
 ci1_rhythms_of_3 = {
-	("TP","TA"): (2,1,2,1), ("TA",):(3,3), # add incomplete passing chord 
+	("TP","TA"): (2,1,2,1), ("TA",):(3,3), 
 	("SA1+M",): (3,3), ("SA2+M",):(3,3)
 }
 ci1_rhythms_of_4 = {
@@ -233,6 +242,9 @@ interval_names = {
 	(9,5): "M6", (9,6): "d7", (10,5): "A6", (10,6): "m7", (11,6): "M7", 
 	(11,7): "d8", (0,6): "A7"
 }
+# save P4
+harmonic_dissonance = {"d2", "A1", "m2", "M2", "d3", "A2", "d4", "A3", 
+	"A4", "d5", "d6", "A5", "d7", "A6", "m7", "M7", "d8"}
 # Use root notes of chords
 # TODO: secondary subdoms
 sec_doms_in_major = {

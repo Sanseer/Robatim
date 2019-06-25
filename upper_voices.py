@@ -1,6 +1,9 @@
 import itertools
 from tqdm import tqdm
 
+# import os, sys
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from voice import Voice
 import idioms.basics as idms_b
 from voicelead import VoiceLeadMixin
@@ -116,9 +119,9 @@ class VoiceCombiner():
 
 		return all_pitches
 
-	def add_chromatics(self, all_pitches, func):
+	def add_chromatics(self, all_pitches, convert_func):
 		for index, pitch in enumerate(all_pitches[:]):
-			all_pitches[index] += func(self.get_chord(), pitch) 
+			all_pitches[index] += convert_func(self.get_chord(), pitch) 
 		return all_pitches
 
 	def create_pitch_combos(self, all_pitches):

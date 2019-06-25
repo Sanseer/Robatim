@@ -1,5 +1,7 @@
 import idioms.basics as bsc
 
+consonant_triads = (bsc.I, bsc.II, bsc.III, bsc.IV, bsc.V, bsc.VI)
+
 expand_tonic1 = bsc.expand_tonic1
 accent_tonic = bsc.accent_tonic
 
