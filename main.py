@@ -2,11 +2,11 @@ import random
 
 from midiutil import MIDIFile
 
-from voice import Voice
-from bass import Bass
-from upper_voices import UpperVoices, Tenor, Alto
-from soprano import Soprano
-import idioms.basics as idms_b
+from generate.voices.voice import Voice
+from generate.voices.bass import Bass
+from generate.voices.upper_voices import UpperVoices, Tenor, Alto
+from generate.voices.soprano import Soprano
+import generate.idioms.basics as idms_b
 
 # write tests in keyboard and chorale style to try custom chord progressions
 

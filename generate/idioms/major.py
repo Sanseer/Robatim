@@ -1,4 +1,4 @@
-import idioms.basics as bsc
+import generate.idioms.basics as bsc
 
 consonant_triads = {bsc.I, bsc.II, bsc.III, bsc.IV, bsc.V, bsc.VI}
 

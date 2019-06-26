@@ -1,12 +1,9 @@
 import itertools
 from tqdm import tqdm
 
-# import os, sys
-# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-from voice import Voice
-import idioms.basics as idms_b
-from voicelead import VoiceLeadMixin
+from generate.voices.voice import Voice
+from generate.idioms import basics as idms_b
+from generate.voices.voicelead import VoiceLeadMixin
 
 
 class VoiceCombiner():

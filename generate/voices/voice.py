@@ -1,8 +1,9 @@
 # import os, sys
-# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..idioms/'))
 
-import idioms.basics as idms_b
-import pysnooper
+from generate.idioms import basics as idms_b
+# import idioms.basics as idms_b
+# import pysnooper
 
 class Voice(object):
 

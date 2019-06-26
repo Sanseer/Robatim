@@ -1,5 +1,5 @@
-from voice import Voice
-import idioms.basics as idms_b
+from generate.voices.voice import Voice
+from generate.idioms import basics as idms_b
 
 class VoiceLeadMixin():
 
