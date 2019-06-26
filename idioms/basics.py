@@ -3,18 +3,17 @@ I_MAJOR = 22_530_1
 II, II6 = 20_530_1, 20_630_1
 III = 30_530_1
 IV, IV6 = 40_530_1, 40_630_1
+IV_MAJOR = 22_530_4
 V, V6  = 50_530_1, 50_630_1
 V7, V65, V43, V42 = 50_753_1, 50_653_1, 50_643_1, 50_642_1
 VI = 60_530_1
 VII6 = 70_630_1
 
-major_consonant_triads = (I, II, III, IV, V, VI)
-minor_consonant_triads = (I, III, IV, V, VI)
 
 chord_members = {
 	I: (0,2,4), I6: (0,2,4), I64: (0,2,4), I_MAJOR: (0,2,4), II: (1,3,5), 
-	II6: (1,3,5), IV: (3,5,0), IV6: (3,5,0), V: (4,6,1), V6: (4,6,1), 
-	V7: (4,6,1,3), V65: (4,6,1,3), V43: (4,6,1,3), V42: (4,6,1,3),
+	II6: (1,3,5), IV: (3,5,0), IV6: (3,5,0), IV_MAJOR: (3,5,0), V: (4,6,1), 
+	V6: (4,6,1), V7: (4,6,1,3), V65: (4,6,1,3), V43: (4,6,1,3), V42: (4,6,1,3),
 	VI: (5,0,2), VII6: (6,1,3)
 }
 
@@ -69,11 +68,14 @@ minor_keys = ("A", "E", "B", "F#", "C#", "G#", "D#", "Bb", "F", "C", "G", "D")
 # 3/4, 4/4, 9/8, 12/8
 time_sigs = ((3,2), (4,2), (3,3), (4,3))
 expand_tonic1 = {
-	I: ((-V6, I), (-V65, I), (VII6, I6), (V43, I6), (VII6, -I), (V43, -I)),
-	I6: ((-V6, I), (-V65, I), (-VII6, -I), (-V43, -I), (-VII6, I6), (-V43, I6))
+	I: ((-V6, I), (-V65, I), (VII6, I6), (V43, I6), (VII6, -I), (V43, -I), 
+		(V42, -I6)),
+	I6: ((-V6, I), (-V65, I), (-VII6, -I), (-V43, -I), (-VII6, I6), (-V43, I6),
+		(V42, -I6))
 }
+
 accent_tonic = {
-	I: (I6,-VI), 
+	I: (I6,-VI,), 
 	I6: (-I,)
 }
 to_subdom2_strong = {
@@ -82,36 +84,42 @@ to_subdom2_strong = {
 	VI: (-IV, -II6)
 }
 # sometimes leads to IAC, which would not be valid for I64
+# need to add VI and IV6 but only if previous chord whole note. 
 to_subdom1_strong = {
 	I: (IV, II6),
 	I6: (IV, II6),
-	VI: (-IV, -II6),
+	VI: (-IV, -II6, -I64),
 	IV: (-II, -II6, I64),
 	II6: (-II, I64),
 	II: (II6, I64)
 }
 to_subdom1_weak = {
-	I: (IV, II6, II),
-	I6: (IV, II6, -II),
-	VI: (-IV, -II6, -II),
+	I: (IV, II6, -VI, -IV6),
+	I6: (IV, II6),
+	VI: (-IV, -II6, IV6),
+	VI: (IV6,),
 	IV: (II6, -II),
 	II: (II6,),
 	II6: (-II,)
 }
+# if bass already descended below tonic, V6 descent is problematic
 half_cadence1 = {
 	I: (V,),
 	I6: (V,),
-	II: (V,),
-	II6: (V,),
-	IV: (V,),
-	I64: (V,)
+	II: (V, -V6, -V65, VII6, V43, V42),
+	II6: (V, -V6, -V65, -VII6, -V43, V42),
+	IV: (V, -V6, -V65, -VII6, -V43, V42),
+	I64: (V, -V42),
+	VI: (-V,),
+	IV6: (-V,)
 }
 imperfect_auth_cadence2 = {
 	I: (-V6, -V65, V43),
 	I6: (-VII6, -V43, V42),
-	II: (V6, V65),
-	II6: (-VII6, -V43, V42,),
-	IV: (-VII6, -V43, V42,),
+	II: (-V6, -V65, VII6, V43, V42),
+	II6: (-V6, -V65, -VII6, -V43, V42,),
+	IV: (-V6, -V65, -VII6, -V43, V42,),
+
 }
 imperfect_auth_cadence1 = {
 	V6: (I,),
@@ -126,7 +134,9 @@ perfect_auth_cadence2 = {
 	II: (V, V7),
 	II6: (V, V7),
 	IV: (V, V7),
-	I64: (V, V7)
+	I64: (V, V7),
+	VI: (-V,),
+	IV6: (-V,)
 }
 perfect_auth_cadence1 = {
 	V: (-I,),
@@ -146,7 +156,13 @@ restart_dom = {
 	II: (V, V7),
 	II6: (V, V7),
 	IV: (V, V7),
-	I64: (V, V7)
+	I64: (V, V7),
+	IV_MAJOR: (V, V7)
+}
+
+expand_dom = {
+	V: (V6,),
+	V6: (V,)
 }
 
 ci1_response_rhythms = {
@@ -191,10 +207,15 @@ ci1_subdom_with_rest = {
 	(2,1,2,1): (("SA1-M","HC1"), ("IAC2","IAC1")),
 	(2,1,3): (("SA1-M","HC1"), ("IAC2","IAC1"))
 }
+# SA1_W+S weak beat to strong beat accent
+# SA1_S+W strong beat to weak beat accent
+# SA1_S+S strong to strong beat accent
+#HVL 06
 ci1_subdom_no_rest = {
 	(4,4): (("HC1",),), 
 	(2,2,4): (("SA1-M","HC1"), ("IAC2","IAC1")),
-	(4,2,2): (("SA1+M","HC1"),),
+	(4,2,2): (("SA1+M","HC1"),), # can contradict meter with subdom/tonic repeat
+	# use double expand dom
 	(3,3): (("HC1",),),
 	(2,1,3): (("SA1-M","HC1"), ("IAC2","IAC1"))
 }

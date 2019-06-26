@@ -36,8 +36,6 @@ class VoiceLeadMixin():
 
 		bass_soprano_intervals = self.bass_soprano_intervals[:]
 		bass_soprano_intervals.append(self.get_interval(b_pitch, s_pitch))
-		# if bass_soprano_intervals[-1] == "P4":
-		# 	return False
 		if (self.note_index == 0 and 
 		  bass_soprano_intervals[-1] not in ("P5", "P8", "M3", "m3")):
 			return False
@@ -49,6 +47,8 @@ class VoiceLeadMixin():
 			return False
 		if self.note_index == 0:
 			return True
+		elif current_chord == idms_b.I64 and full_scale_combo.count(2) >= 2:
+			return False
 
 		tenor_motion = Voice.tenor_motion[:]
 		alto_motion = Voice.alto_motion[:]
@@ -91,10 +91,24 @@ class VoiceLeadMixin():
 				return False
 			if (self.is_seventh_chord(-1) and 
 			  old_scale_pitch == self.chord_degree_to_pitch(3, -1)):
-				normal_resolve = -2 <= (new_pitch - old_pitch) < 0
 				inversion = self.is_chord_inversion(current_chord, previous_chord)
-				if not normal_resolve and not inversion:
+				# the chordal 7th is always included by earlier rules
+				# make variables of repeated conditionals
+				pitch_change = new_pitch - old_pitch
+				if (not -2 <= pitch_change < 0 and not inversion and
+				  (current_chord != idms_b.VII6 or not 
+				  self.is_chord_inversion(idms_b.V7, previous_chord)) and
+				  (previous_chord != idms_b.V43 or current_chord != idms_b.I6)):
 					return False
+				elif (0 < pitch_change <= 2 and not inversion and
+				  (current_chord != idms_b.VII6 or not
+				  self.is_chord_inversion(idms_b.V7, previous_chord)) and
+				  (previous_chord != idms_b.V43 or current_chord != idms_b.I6)):
+					return False
+			if (previous_chord == idms_b.I64 and old_scale_pitch == 0 
+			  and new_scale_pitch != 11):
+				return False 
+
 
 
 		# remove get_root_degree method 
@@ -119,6 +133,11 @@ class VoiceLeadMixin():
 		  "P" in bass_soprano_intervals[-2]):
 			# print("Double perfects")
 			return False
+		elif (bass_soprano_motion[-1] == "Similar" and 
+		  "P8" in bass_soprano_intervals[-1] and 
+		  abs(s_pitch - old_soprano_note) > 2):
+			# print("No hidden octaves except soprano moving by step")
+			return False
 		elif (self.note_index == Voice.idea1_length + Voice.idea2_length - 1 and
 		  abs(s_pitch - old_soprano_note) > 4):
 			return False 
@@ -131,8 +150,6 @@ class VoiceLeadMixin():
 
 		bass_tenor_intervals = self.bass_tenor_intervals[:]
 		bass_alto_intervals = self.bass_alto_intervals[:]
-		# if "P4" in {bass_tenor_intervals[-1], bass_alto_intervals[-1]}:
-		# 	return False 
 		tenor_alto_intervals = self.tenor_alto_intervals[:]
 		tenor_soprano_intervals = self.tenor_soprano_intervals[:]
 		alto_soprano_intervals = self.alto_soprano_intervals[:]
@@ -166,23 +183,43 @@ class VoiceLeadMixin():
 			if (interval_list[-1] in {"P5","P8"} and 
 			  motion_list[-1] == "Parallel"):
 				return False
+			# seventh chord inversions can delay resolution. double neighbor
 			elif (interval_list[-2] == "A4" and 
 			  interval_list[-1] not in {"M6", "m6"}):
-				return False
-			elif (interval_list[-2] == "d5" and 
-			  interval_list[-1] not in {"M3", "m3"}):
-				if previous_chord not in {idms_b.VII6, idms_b.V43}:
+				if (previous_chord not in 
+				  {idms_b.VII6, idms_b.V43, idms_b.II, idms_b.II6}):
 					return False
-				elif (self.get_chord(-2) != idms_b.I6 or
-				  interval_list[-1] != "P5"):
+				elif (previous_chord in {idms_b.VII6, idms_b.V43} and 
+				  (current_chord not in {idms_b.I, idms_b.I6} or 
+				  interval_list[-1] != "P4")):
+					return False
+				elif (previous_chord in {idms_b.II, idms_b.II6} and 
+				  (current_chord not in {idms_b.V, idms_b.V7} or 
+				  interval_list[-1] != "P5" or self.mode == "ionian")):
+					return False
+			if (interval_list[-2] == "d5" and 
+			  interval_list[-1] not in {"M3", "m3"}):
+				if (previous_chord not in 
+				  {idms_b.VII6, idms_b.V43, idms_b.II, idms_b.II6}):
+					return False
+				elif (previous_chord in {idms_b.VII6, idms_b.V43} and 
+				  (current_chord != idms_b.I6 or interval_list[-1] != "P5")):
+					return False
+				elif (previous_chord in {idms_b.II, idms_b.II6} and
+				  (current_chord not in {idms_b.V, idms_b.V7} or
+				  interval_list[-1] != "P4" or self.mode == "ionian")):
 					return False
 			if interval_list[-2] == "d7" and interval_list[-1] != "P5":
 				return False
-			if interval_list[-2] == "A2" and interval_list[-1] != "P4":
+			elif interval_list[-2] == "A2" and interval_list[-1] != "P4":
 				return False
 			elif (interval_list[-2] in idms_b.harmonic_dissonance and
 			  interval_list[-1] in idms_b.harmonic_dissonance):
 				return False
+			elif (interval_list[-1] == "P8" and motion_list[-1] == "Similar"
+			and current_chord in {idms_b.I, idms_b.I6} 
+			and self.is_chord_inversion(idms_b.V7, previous_chord)):
+				return False 
 
 		return True
 	# 	old_tenor_note = self.pitch_amounts[self.note_index - 1][0]

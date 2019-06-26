@@ -1,6 +1,6 @@
 import idioms.basics as bsc
 
-consonant_triads = (bsc.I, bsc.II, bsc.III, bsc.IV, bsc.V, bsc.VI)
+consonant_triads = {bsc.I, bsc.II, bsc.III, bsc.IV, bsc.V, bsc.VI}
 
 expand_tonic1 = bsc.expand_tonic1
 accent_tonic = bsc.accent_tonic
@@ -16,6 +16,10 @@ to_subdom1_strong[bsc.I6] = (bsc.IV, bsc.II6, -bsc.II)
 to_subdom1_strong[bsc.VI] = (-bsc.IV, -bsc.II6, -bsc.II)
 
 to_subdom1_weak = bsc.to_subdom1_weak
+to_subdom1_weak[bsc.I] = (bsc.IV, bsc.II6, bsc.II, -bsc.VI, -bsc.IV6)
+to_subdom1_weak[bsc.I6] = (bsc.IV, bsc.II6, -bsc.II)
+to_subdom1_weak[bsc.VI] = (-bsc.IV, -bsc.II6, bsc.IV6, -bsc.II, bsc.IV6)
+
 half_cadence1 = bsc.half_cadence1
 imperfect_auth_cadence2 = bsc.imperfect_auth_cadence2
 imperfect_auth_cadence1 = bsc.imperfect_auth_cadence1

@@ -76,8 +76,10 @@ class Voice(object):
 		return len(idms_b.chord_members[chord]) == 4
 
 	def is_chord_inversion(self, chord1, chord2):
-		if (chord1 // 10000 == chord2 // 10000 and
-		  chord1 % 10 == chord2 % 10):
+		# check for triad versus seventh
+		if (chord1 // 10000 == chord2 // 10000 and chord1 % 10 == chord2 % 10 
+		  and len(idms_b.chord_members[chord1]) == 
+		  len(idms_b.chord_members[chord2])):
 			return True
 		return False
 
@@ -97,9 +99,9 @@ class Voice(object):
 			scale_degree %= 7
 		return scale_degree
 
-	def get_root_degree(self, index_shift=0):
-		chord = self.get_chord(index_shift)
-		return idms_b.chord_members[chord][0]
+	# def get_root_degree(self, index_shift=0):
+	# 	chord = self.get_chord(index_shift)
+	# 	return idms_b.chord_members[chord][0]
 
 	def is_diatonic(self, pitch):
 		pitch = self.make_scale_pitch(pitch)
@@ -120,7 +122,9 @@ class Voice(object):
 				chord_shift = 6 
 				convert_func = self.convert_sec_dim
 			elif self.chromatics[self.note_index] in idms_b.modes.keys():
-				chord_shift = 0
+				# chord_shift = 0
+				# make current chord a property?
+				chord_shift = self.get_chord() % 10 - 1
 				convert_func = self.convert_mode
 			old_pitch_degree = self.revert_pitch_to_degree(
 				old_pitch, chord_shift, convert_func)
@@ -154,13 +158,12 @@ class Voice(object):
 			chord_pitches.append(idms_b.modes[Voice.mode][degree])
 		if not 0 <= pitch <= 11:
 			pitch = self.make_scale_pitch(pitch)
-		if (10 in chord_pitches and root_degree in (4, 6) 
-		  and Voice.chromatics[self.note_index] not in ("2Dom", "2Dim")):
+		if (10 in chord_pitches and root_degree in {4, 6} 
+		  and Voice.chromatics[self.note_index] not in {"2Dom", "2Dim"}):
 			chord_pitches[chord_pitches.index(10)] += 1
 
 		for index, base_pitch in enumerate(chord_pitches[:]):
-			chord_pitches[index] += convert_func(
-				self.get_chord(), base_pitch)
+			chord_pitches[index] += convert_func(chord, base_pitch)
 			if not 0 <= chord_pitches[index] <= 11:
 				chord_pitches[index] %= 12
 		for index in range(len(chord_pitches)):
@@ -260,7 +263,7 @@ class Voice(object):
 				chord_shift = 6 
 				convert_func = self.convert_sec_dim
 			elif self.chromatics[self.note_index] in idms_b.modes.keys():
-				chord_shift = 0
+				chord_shift = self.get_chord() % 10 - 1
 				convert_func = self.convert_mode
 			scale_degree = self.revert_pitch_to_degree(
 				scale_note, chord_shift, convert_func)
@@ -324,6 +327,9 @@ class Voice(object):
 
 		assert(len(self.rhythm) == len(self.sheet_notes))
 
+		# C is where octave starts
+		# try {a' b' bis' c'' d''} in Lilypond
+
 		for index, sheet_note in enumerate(self.sheet_notes):
 			if "r" in sheet_note:
 				self.lily_notes.append(sheet_note) 
@@ -331,19 +337,29 @@ class Voice(object):
 			new_symbol = ""
 			octave_mark = ""
 			letter = sheet_note[0].lower()
-			octave = int(sheet_note[-1])
+			register_shift = 0
+			# edge case that realigns pitch magnitude with register
+			# B# is technically in the octave above (starting from C).
+			# Cb is technically below the current octave (starting from C). 
+			if sheet_note.startswith(("B#","B##")):
+				register_shift = -1
+			elif sheet_note.startswith(("Cb","Cbb")):
+				register_shift = 1
+			octave = int(sheet_note[-1]) + register_shift
 			if octave < 3:
 				shift = 3 - octave
 				octave_mark =  str(shift * ",")
 			elif octave > 3:
-				shift = octave - 3
+				shift = octave - 3 
 				octave_mark = str(shift * "'")
 			if "#" in sheet_note or "b" in sheet_note:
+				level = sheet_note.count("#")
+				level += sheet_note.count("b")
 				old_symbol = sheet_note[1]
 				if old_symbol == "#":
-					new_symbol = "is"
+					new_symbol = "is" * level
 				elif old_symbol == "b":
-					new_symbol = "es"
+					new_symbol = "es" * level
 			current_rhythm = self.rhythm[index]
 			if "C" not in current_rhythm:
 				lily_note = "".join((letter, new_symbol, octave_mark, 
@@ -355,6 +371,7 @@ class Voice(object):
 
 		lily_string = " ".join(note for note in self.lily_notes)
 		Voice.lily_parts.append(lily_string)
+
 
 	def invert_note_values(self):
 		if Voice.beat_division == 2:
