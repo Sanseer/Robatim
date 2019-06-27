@@ -62,7 +62,7 @@ def make_lily_file():
 			Voice.tonic.replace("#","is").replace("b","es").lower() 
 			+ " \\" + mode + "\\time " + time_sig + " " + part, 1)
 	new_file = new_file.replace("PART_SLOT", "")
-	new_file = new_file.replace("Symphony", title)
+	new_file = new_file.replace("Chorale", title)
 	with open("new_layout.txt", 'w') as f:
 		f.write(new_file)	
 
@@ -90,6 +90,7 @@ if __name__ ==  "__main__":
 			MyMIDI.addTempo(track, 26, tempo * .9)
 		elif Voice.measure_length == 3:
 			MyMIDI.addTempo(track, 20, tempo * .9)
+
 
 	for part in voice_list:
 		time = 0

@@ -229,7 +229,7 @@ class VoiceCombiner():
 						pbar.update(1)
 					assert(self.note_index != 0), "The chord progression has failed"
 					self.erase_last_note()
-					# store failed progressions in txt file up to point for impasse
+					# store failed progressions in txt file up to point of impasse
 					self.note_index -= 1
 					self.possible_pitches[self.note_index].remove(last_combo)
 					self.pitch_amounts[self.note_index] = None

@@ -19,7 +19,7 @@ class VoiceLeadMixin():
 		if len(set(full_scale_combo)) == 1:
 			return False
 		elif (full_scale_combo.count(11) >= 2 and 
-		  Voice.chromatics[self.note_index] not in ("2Dom", "2Dim")):
+		  Voice.chromatics[self.note_index] not in {"2Dom", "2Dim"}):
 			# print("Don't repeat leading tone except modulation", end=" ")
 			return False
 		elif (self.is_seventh_chord() and 
@@ -37,7 +37,7 @@ class VoiceLeadMixin():
 		bass_soprano_intervals = self.bass_soprano_intervals[:]
 		bass_soprano_intervals.append(self.get_interval(b_pitch, s_pitch))
 		if (self.note_index == 0 and 
-		  bass_soprano_intervals[-1] not in ("P5", "P8", "M3", "m3")):
+		  bass_soprano_intervals[-1] not in {"P5", "P8", "M3", "m3"}):
 			return False
 
 		current_chord = self.get_chord()
@@ -69,13 +69,13 @@ class VoiceLeadMixin():
 				return False
 			elif (old_scale_pitch == 11 and 
 			  new_scale_pitch not in {11, 0} and
-			  not Voice.chromatics[self.note_index] and 
-			  not Voice.chromatics[self.note_index - 1]):
+			  not Voice.chromatics[self.note_index] not in {"2Dom", "2Dim"} and 
+			  not Voice.chromatics[self.note_index - 1] not in {"2Dom", "2Dim"}):
 				if previous_chord not in {idms_b.V, idms_b.V7}:
 					return False
 				elif previous_chord == idms_b.V and new_scale_pitch not in {7,3,4}:
 					return False
-				elif previous_chord == idms_b.V7 and new_scale_pitch == 7:
+				elif previous_chord == idms_b.V7 and new_scale_pitch != 7:
 					return False
 			if (self.note_index > 1 and
 			  abs(old_pitch - self.pitch_amounts[self.note_index - 2][voice_index]) > 5 
@@ -88,6 +88,7 @@ class VoiceLeadMixin():
 			and new_pitch != old_pitch and self.mode == "aeolian" 
 			and not Voice.chromatics[self.note_index]
 			and not Voice.chromatics[self.note_index - 1]):
+			# No melodic augmented 2nd
 				return False
 			if (self.is_seventh_chord(-1) and 
 			  old_scale_pitch == self.chord_degree_to_pitch(3, -1)):
@@ -108,10 +109,6 @@ class VoiceLeadMixin():
 			if (previous_chord == idms_b.I64 and old_scale_pitch == 0 
 			  and new_scale_pitch != 11):
 				return False 
-
-
-
-		# remove get_root_degree method 
 
 		bass_soprano_motion = self.bass_soprano_motion[:]
 		self.add_motion_type(Voice.bass_motion, soprano_motion, 
@@ -222,46 +219,3 @@ class VoiceLeadMixin():
 				return False 
 
 		return True
-	# 	old_tenor_note = self.pitch_amounts[self.note_index - 1][0]
-	# 	old_alto_note = self.pitch_amounts[self.note_index - 1][1]
-	# 	old_t_degree = self.get_relative_scale_degree(old_tenor_note)
-	# 	old_a_degree = self.get_relative_scale_degree(old_alto_note)
-	# 	old_s_degree = self.get_relative_scale_degree(old_soprano_note)
-
-	# 	if Voice.chromatics:
-	# 		shift = -1
-	# 	else:
-	# 		shift = 0	
-	# 	new_t_degree = self.get_relative_scale_degree(t_pitch, shift)
-	# 	new_a_degree = self.get_relative_scale_degree(a_pitch, shift)
-	# 	new_s_degree = self.get_relative_scale_degree(s_pitch, shift)
-
-	# 	if (self.get_melodic_interval(
-	# 		old_t_degree, new_t_degree, old_tenor_note, t_pitch) in "A2"):
-	# 		print("WTF", end=" ")
-	# 		return False
-	# 	elif (self.get_melodic_interval(
-	# 		old_a_degree, new_a_degree, old_alto_note, a_pitch) in "A2"):
-	# 		print("WTF", end=" ")
-	# 		return False
-	# 	elif (self.get_melodic_interval(
-	# 		old_s_degree, new_s_degree, old_soprano_note, s_pitch) in "A2"):
-	# 		print("WTF", end=" ")
-	# 		return False
-
-	# def get_melodic_interval(self, old_degree, new_degree, old_pitch, new_pitch):
-	# 	pitch_change = new_pitch - old_pitch
-
-	# 	if pitch_change > 0 and new_degree > old_degree:
-	# 		interval = new_degree - old_degree
-	# 	elif pitch_change < 0 and new_degree < old_degree:
-	# 		interval = old_degree - new_degree
-	# 	elif pitch_change > 0 and new_degree < old_degree:
-	# 		interval = (new_degree - old_degree) + 7
-	# 	elif pitch_change < 0 and new_degree > old_degree:
-	# 		interval = (old_degree - new_degree) + 7
-	# 	else:
-	# 		pitch_change = 0
-	# 		interval = 0
-
-	# 	return idms_b.interval_names[(abs(pitch_change), interval)]

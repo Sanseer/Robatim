@@ -1,9 +1,4 @@
-# import os, sys
-# sys.path.append(os.path.join(os.path.dirname(__file__), '..idioms/'))
-
 from generate.idioms import basics as idms_b
-# import idioms.basics as idms_b
-# import pysnooper
 
 class Voice(object):
 
@@ -39,6 +34,7 @@ class Voice(object):
 	lily_parts = []
 	chord_symbols = []
 	chromatics = []
+
 
 	def __init__(self):
 		self.note_index = 0
@@ -99,10 +95,6 @@ class Voice(object):
 		if not 0 <= scale_degree <= 6:
 			scale_degree %= 7
 		return scale_degree
-
-	# def get_root_degree(self, index_shift=0):
-	# 	chord = self.get_chord(index_shift)
-	# 	return idms_b.chord_members[chord][0]
 
 	def is_diatonic(self, pitch):
 		pitch = self.make_scale_pitch(pitch)
@@ -331,6 +323,7 @@ class Voice(object):
 		# C is where octave starts
 		# try {a' b' bis' c'' d''} in Lilypond
 
+
 		for index, sheet_note in enumerate(self.sheet_notes):
 			if "r" in sheet_note:
 				self.lily_notes.append(sheet_note) 
@@ -362,31 +355,92 @@ class Voice(object):
 				elif old_symbol == "b":
 					new_symbol = "es" * level
 			current_rhythm = self.rhythm[index]
-			if "C" not in current_rhythm:
+			if "FIX" not in current_rhythm:
 				lily_note = "".join((letter, new_symbol, octave_mark, 
 					self.rhythm[index]))
-			elif current_rhythm == "3C":
-				lily_note = "".join((letter, new_symbol, octave_mark, "2.~ ", 
-					letter, new_symbol, octave_mark, "4."))
+			# elif current_rhythm == "3C":
+			# 	lily_note = "".join((letter, new_symbol, octave_mark, "2.~ ", 
+			# 		letter, new_symbol, octave_mark, "4."))
+			elif current_rhythm == "FIX":
+				# deals with weird rhythms in compound time 
+				# that need ties and irregular beams
+				beat_partitions = []
+				remaining_beat = self.final_rhythm[index]
+				for current_beat in self.triple_beat_durations.keys():
+					if self.truncate_float(current_beat, 2) <= remaining_beat:
+						beat_partitions.append(current_beat)
+						remaining_beat -= current_beat
+				lily_note = ""
+				for valid_beat in beat_partitions[:-1]:
+					lily_note = "".join((
+						lily_note, " ", letter, new_symbol, octave_mark, 
+						self.triple_beat_durations[valid_beat], "~"))
+				lily_note = "".join((
+					lily_note, " ", letter, new_symbol, octave_mark,
+					self.triple_beat_durations[beat_partitions[-1]]))
+
+
 			self.lily_notes.append(lily_note)
 
 		lily_string = " ".join(note for note in self.lily_notes)
 		Voice.lily_parts.append(lily_string)
+
+	def truncate_float(self, number, precision):
+		"""Converts float to another float with less precision"""
+		if number % 1 == 0:
+			return number
+		result = 0
+		str_number = str(number)
+		decimal_index = str_number.index(".")
+		magnitude = 1
+		current_index = decimal_index - 1
+		if (str_number[current_index] != "0" or 
+		  len(str_number[0:decimal_index]) >= 2):
+			for _ in range(0, decimal_index):
+				digit_multiplier = int(str_number[current_index])
+				result += digit_multiplier * magnitude
+				current_index -= 1
+				magnitude *= 10
+
+		magnitudes = [(1 / 10 ** multiplier) for multiplier in range(1,5)]
+		current_index = decimal_index + 1
+		counter = 0
+		magnitude = magnitudes[counter]
+		for _ in range(decimal_index + 1, len(str_number)):
+			digit_multiplier = int(str_number[current_index])
+			result += digit_multiplier * magnitude
+			current_index += 1
+			counter += 1
+			if counter == precision:
+				break
+			magnitude = magnitudes[counter]
+
+		return result
+
 
 
 	def invert_note_values(self):
 		if Voice.beat_division == 2:
 			correct_durations = {
 				1:"4", 4:"1", 2:"2", 3:"2.", "2":"r2", "1":"r4",
-				0.5:"8", 1.5:"4.", .75:"8."}
+				0.5:"8", 1.5:"4.", 0.75:"8.", 0.25: "16", 0.125: "32", 
+				0.375: "16.",}
 		# create tie in lily_convert for compound time
 		elif Voice.beat_division == 3:
 			correct_durations = {
-				1:"4.", 3 * idms_b.THIRD: "4.", 4:"1.", 2:"2.", 
-				3 * idms_b.THIRD * 2:"2.", 3:"3C", "2":"r2.", "1":"r4.", 
-				1 * idms_b.THIRD:"8", 2 * idms_b.THIRD:"4", 5 * idms_b.THIRD:"1.FIX", 
-				4 * idms_b.THIRD:"2", 4 * 2 * idms_b.THIRD:"Fix"
-				}
+				0.5: "8.", 1:"4.", 2:"2.", 3:"FIX", 4:"1.", "2":"r2.", "1":"r4.",
+				1.5: "FIX", 0.5 *  idms_b.THIRD: "16", 1 * idms_b.THIRD: "8", 
+				1.5 * idms_b.THIRD: "FIX", 2 * idms_b.THIRD:"4", 
+				2.5 * idms_b.THIRD: "FIX", 3 * idms_b.THIRD:"4.", 
+				4 * idms_b.THIRD:"2", 5 * idms_b.THIRD: "FIX", 
+				6 * idms_b.THIRD:"2.", 7.5 * idms_b.THIRD: "FIX", 
+				8 * idms_b.THIRD:"1", 10 * idms_b.THIRD: "FIX" 
+			}
+			self.triple_beat_durations = {
+				4:"1.", 2:"2.", 4 * idms_b.THIRD:"2", 1:"4.",   
+				2 * idms_b.THIRD:"4", 0.5: "8.", 1 * idms_b.THIRD: "8", 
+				0.5 * idms_b.THIRD: "16"  
+			}
 		fixed_durations = []
 		for index in range(len(self.final_rhythm)):
 			time = self.final_rhythm[index]

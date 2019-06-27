@@ -20,17 +20,18 @@ chord_members = {
 bass_notes = {}
 for chord, degrees in chord_members.items():
 	inversion = chord // 10 % 1000
-	if inversion in (530, 753):
+	if inversion in {530, 753}:
 		bass_notes[chord] = degrees[0]
-	elif inversion in (630, 653):
+	elif inversion in {630, 653}:
 		bass_notes[chord] = degrees[1]
-	elif inversion in (640, 643):
+	elif inversion in {640, 643}:
 		bass_notes[chord] = degrees[2]
 	elif inversion == 642:
 		bass_notes[chord] = degrees[3]
 
 assert(len(bass_notes.keys()) == len(chord_members.keys()))
 
+#mode_notes
 modes = {
 	"lydian": (0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24),
 	"ionian": (0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24),
@@ -52,18 +53,13 @@ tonics = {
 	"Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B":11
 }
 # Converting pitch to scale degree
+# diverge to separate modules
 major_scale_degrees = { 0:0, 2:1, 4:2, 5:3, 7:4, 9:5, 11:6}
-minor_scale_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 10:6, 11:6}
+minor_scale_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 9:5, 10:6, 11:6}
+# includes melodic minor
 
 # only use practical key signatures
-# do you still need the dict values or can this be tuple?
-# major_accidentals = {"C":"#", "G":"#", "D":"#", "A":"#", "E":"#", "B":"#", 
-# 	"F#":"#", "Db":"b", "Ab":"b", "Eb":"b", "Bb":"b", "F":"b"
-# }
 major_keys = ("C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F")
-# minor_accidentals = {"A":"#", "E":"#", "B":"#", "F#":"#", "C#":"#", "G#":"#", 
-# 	"D#":"#", "Bb":"b", "F":"b", "C":"b", "G":"b", "D":"b"
-# }
 minor_keys = ("A", "E", "B", "F#", "C#", "G#", "D#", "Bb", "F", "C", "G", "D")
 # 3/4, 4/4, 9/8, 12/8
 time_sigs = ((3,2), (4,2), (3,3), (4,3))
@@ -88,8 +84,8 @@ to_subdom2_strong = {
 to_subdom1_strong = {
 	I: (IV, II6),
 	I6: (IV, II6),
-	VI: (-IV, -II6, -I64),
-	IV: (-II, -II6, I64),
+	VI: (-IV, -II6),
+	IV: (-II, -II6),
 	II6: (-II, I64),
 	II: (II6, I64)
 }
@@ -166,7 +162,7 @@ expand_dom = {
 }
 
 ci1_response_rhythms = {
-	# double neighbor IAC: 2 1 14
+	# double neighbor IAC: 2 1 1 4
 	(3,2,1): ((2,1,2,1), (2,1,3)), 
 	(4,2,2): ((2,2,2,2), (2,2,4)), # 2 1 1 4 
 	(4,4): ((2,2,4), (4,2,2), (2,2,2,2)), # 2 1 1 4
