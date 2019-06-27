@@ -1,6 +1,6 @@
 import random
 
-from midiutil import MIDIFile
+from generate.midi_export import MIDIFile
 
 from generate.voices.voice import Voice
 from generate.voices.bass import Bass
