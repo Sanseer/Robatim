@@ -16,19 +16,18 @@ class Soprano(Voice):
 		self.final_rhythm = [ [] for _ in range(8)]
 		self.diatonic_neighbors = [ [] for _ in range(8)]
 		self.simple_time_rhythms = {
-			"1": ((0.5, 0.5), (0.75, 0.25)), 
+			"1": ((0.5, 0.5), (0.75, 0.25)), # (0.375, 0.625) [3-5] 
 			"2": ((0.75, 0.125, 0.125), (0.375, 0.375, 0.25)), 
-			"3": ((0.25, 0.25, 0.25, 0.25),)
+			"3": ((0.25, 0.25, 0.25, 0.25), (0.375, 0.125, 0.25, 0.25))
 		}
 		self.compound_time_rhythms = {
-			"1": ((2 * idms_b.THIRD, idms_b.THIRD), (2.5 * idms_b.THIRD, 0.5 * idms_b.THIRD),),
+			"1": ((2 * idms_b.THIRD, idms_b.THIRD), (2.5 * idms_b.THIRD, 0.5 * idms_b.THIRD)),
 			"2": ((idms_b.THIRD, idms_b.THIRD, idms_b.THIRD), 
 				(2 * idms_b.THIRD, 0.5 * idms_b.THIRD, 0.5 * idms_b.THIRD), 
 				(0.5, 0.5 * idms_b.THIRD, idms_b.THIRD)),
 			"3": ((idms_b.THIRD, idms_b.THIRD, 0.5 * idms_b.THIRD, 
-				0.5 * idms_b.THIRD),)
+				0.5 * idms_b.THIRD),) # 1/6 1/3 1/3 1/6
 		}
-		# self.voice_type = "soprano"
 
 	def do_stuff(self):
 		self.group_notes()
@@ -66,11 +65,9 @@ class Soprano(Voice):
 		self.note_index += len(self.measure_notes[3])
 		self.add_notes(4,7)
 
-		print("Definitive")
 		print(self.fig_choices)
 		print(self.measure_notes)
 		print(self.final_notes)
-		print(self.phantom_notes)
 
 		self.create_rhythm(0,3)
 		self.create_rhythm(4,7)
@@ -78,14 +75,12 @@ class Soprano(Voice):
 		print(Voice.measure_rhythms)
 		print(self.final_rhythm)
 
-		self.finalize_part()
+		self.finalize_flavored_part()
 		self.phantom_notes[3] = self.measure_notes[3]
 		self.phantom_notes[7] = self.measure_notes[7]
 		self.phantom_notes = self.flatten_sequence(self.phantom_notes)
 
-		print("Done!")
 		print(self.final_notes, len(self.final_notes))
-		print(self.phantom_notes, len(self.phantom_notes))
 		print(self.final_rhythm)
 
 	def create_figures(self, start, stop):
@@ -104,6 +99,7 @@ class Soprano(Voice):
 		# ascertain proper voice leading 
 		# (e.g., melodic minor, dissonant 7th resolves down)
 		diatonic_neighbors = self.find_diatonic_neighbors(current_note, next_note)
+		# outer_neighbors =
 		if diatonic_neighbors:
 			pass_length = len(diatonic_neighbors)
 			if pass_length == 1:
@@ -112,15 +108,6 @@ class Soprano(Voice):
 				possible_figs.append(f"{pass_length}D_PT")
 			if pass_length == 3:
 				possible_figs.append(f"{pass_length}D_PT")
-		# if (Voice.bass_soprano_intervals[self.note_index + 1] 
-		#   not in idms_b.harmonic_dissonance):
-		# 	if abs(next_note - current_note) == 2:
-		# 		possible_figs.append("CPT")
-		# 	if Voice.beat_division == 3 and abs(next_note - current_note) == 3:
-		# 		possible_figs.append("Double CPT")
-		# current_scale_degree = self.make_scale_degree(current_note, False)
-		# next_scale_degree = self.make_scale_degree(next_note, False)
-		# move = self.move_direction(next_note - current_note)
 		if not possible_figs:
 			possible_figs.append(None)
 
@@ -129,6 +116,7 @@ class Soprano(Voice):
 	def find_diatonic_neighbors(self, current_note, next_note):
 		difference = next_note - current_note
 		# print(current_note, next_note)
+		# maybe the next note shouldn't be modulation either
 		if (abs(difference) <= 2 or abs(difference) > 7 or 
 		  self.chromatics[self.note_index]):
 			return []
@@ -197,33 +185,6 @@ class Soprano(Voice):
 						self.final_rhythm[m_index + start].append(beat * value)
 				else:
 					self.final_rhythm[m_index + start].append(beat)
-
-			# dotted rhythm in simple time
-			# 8. 16 or 4. 8
-
-			# use 16th notes with quarter note in place of single figure passing rhythm in simple time
-			# 4. 16-16   8. 32-32 simple time
-			# 2 8-8 4 16-16 compound time
-
-			# 4. 8 4  8. 16 8 compound time
-			
-			# use 5/6 1/6 feeling good nina simone compound time
-			# 4.-tie-4 8  8.-tie-8 16 compound time
-
-			# acciaccatura
-			# anticipation and divided note (whole note becomes two half notes) further embellishment?
-			# Double pass in simple time: 4 4 becomes 8-16-16 4
-
-			# a double pass rhythm can embellish itself with a neighbor tone
-
-			# repetition of same note as single embellish
-			# 8 8 in simple time
-			# 4 8 in compound time
-
-			# super smash bros groove (8-bit music theory)
-			# 2 2 2 becomes 2 8. 8. 8 2 simple time
-			# 8. 16-tie-8 8  16. 32-tie-16 16
-			# demarcate proper beat divisions with beams
 
 	def make_letters(self):
 		# deal with raised 9 in minor not diatonic in self.make_letter?

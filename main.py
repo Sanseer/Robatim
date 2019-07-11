@@ -27,7 +27,8 @@ def random_settings(time_sig="", tonic="", mode=""):
 def create_song():
 	"""Creates a tune with chorale style and period form"""
 	voice_list = []
-	voice_list.append(Bass(*random_settings()))
+	# voice_list.append(Bass(*random_settings()))
+	voice_list.append(Bass())
 	voice_list[0].create_part()
 
 	UpperVoices().create_parts()
@@ -44,6 +45,7 @@ def create_song():
 
 def make_lily_file():
 	"""Creates a LilyPond sheet music file"""
+	# make four clefs instead of two (add alto and tenor)
 	if Voice.mode == "ionian":
 		mode = "major "
 	elif Voice.mode == "aeolian":
@@ -74,9 +76,14 @@ if __name__ ==  "__main__":
 	time     = 0   # In beats
 	volume   = 100 # 0-127, as per the MIDI standard
 
+	# make soprano louder than lower voices
 	MyMIDI = MIDIFile(4) 
 
-	[MyMIDI.addProgramChange(track,ch,time,52) for ch in range(4)] 
+	# [MyMIDI.addProgramChange(track,ch,time,52) for ch in range(4)]
+	MyMIDI.addProgramChange(track,0,time,42) #42
+	MyMIDI.addProgramChange(track,1,time,68) #40
+	MyMIDI.addProgramChange(track,2,time,40) #40
+	MyMIDI.addProgramChange(track,3,time,41) #41
  
 	if Voice.mode == "aeolian":
 		tempo = 110

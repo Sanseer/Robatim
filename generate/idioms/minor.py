@@ -1,6 +1,9 @@
 import generate.idioms.basics as bsc
 
 consonant_triads = {bsc.I, bsc.III, bsc.IV, bsc.V, bsc.VI, bsc.I_MAJOR}
+key_sigs = ("A", "E", "B", "F#", "C#", "G#", "D#", "Bb", "F", "C", "G", "D")
+pitches_to_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 9:5, 10:6, 11:6}
+# includes melodic minor
 
 expand_tonic1 = bsc.expand_tonic1
 accent_tonic = bsc.accent_tonic

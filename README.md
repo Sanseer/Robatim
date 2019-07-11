@@ -11,7 +11,6 @@ This program was made with the help of [an open-source MIDI implementation](http
 
 ## Prerequisites
 
-* Python 3.6+
 * tqdm
 
 ## License

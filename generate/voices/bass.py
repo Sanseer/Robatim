@@ -3,33 +3,41 @@ import random
 from generate.voices.voice import Voice
 from generate.idioms import basics as idms_b
 
+import pysnooper
+
 class Bass(Voice):
 	"""Creates a bass voice with an explicit chord progression. 
 	Initializes settings for the entire song."""
 
-	def __init__(self, time_sig=(4,2), tonic="C", mode="ionian"):
-		Voice.chord_path = [idms_b.I]
-		Voice.tonic = tonic
-		Voice.mode = mode
+	def __init__(self):
+		Voice.chord_path = [(idms_b.I,)]
+		self.chord_options = Voice.chord_path[:]
+
+		Voice.mode = random.choice(("ionian", "aeolian"))
 		Voice.chromatics = [None]
+		time_sig = random.choice(idms_b.time_sigs)
 		Voice.measure_length = time_sig[0]
 		Voice.beat_division = time_sig[1]
 		Voice.half_rest_ending = random.choice((True, False))
 		# Voice.consequent_rhythm_change = random.choice((True, False))
-		if mode == "ionian":
+		if Voice.mode == "ionian":
 			import generate.idioms.major
 			Voice.idms_mode = generate.idioms.major
-		elif mode == "aeolian":
+		elif Voice.mode == "aeolian":
 			import generate.idioms.minor
 			Voice.idms_mode = generate.idioms.minor
+		Voice.tonic = random.choice(self.idms_mode.key_sigs)
 
 		self.note_index = 0
+		self.idea_index = 0
 		self.chord_style1 = None
 		self.chord_style2 = None
 		self.chord_style3 = None
 		self.chord_style4 = None
 		self.basic_idea1_rhythm = None
 		self.basic_idea2_rhythm = None
+		self.contrast_idea1_rhythm = None
+		self.contrast_idea2_rhythm = None
 
 		self.measure_notes = []
 		self.pitch_amounts = [0]
@@ -43,7 +51,7 @@ class Bass(Voice):
 
 	@property
 	def old_chord(self):
-		return abs(Voice.chord_path[-1])
+		return abs(Voice.chord_path[-1][-1])
 
 	def create_part(self):
 		"""Creates the bass portion of the tune"""
@@ -72,77 +80,109 @@ class Bass(Voice):
 		# rhythm to the actual notes
 		if Voice.half_rest_ending:
 			Voice.idea2_length -= 1
+			Voice.idea4_length -= 1
 
 	def create_antecedent(self):
-		"""Creates the antecedent of the period using basic/contrast ideas"""
+		# divide into more functions
+		self.add_basic_idea1()
+		while self.idea_index < 2:
+			if self.idea_index == 0:
+				try: 
+					self.add_transition_idea1()
+					self.idea_index += 1
+				except KeyError:
+					self.display_error()
+					self.replace_bad_chords()
+					self.display_error()
+			elif self.idea_index == 1:
+				try:
+					self.add_chord_sequence(self.chord_style2)
+					Voice.note_values.append(self.contrast_idea1_rhythm)
+					self.idea_index += 1
+					print("Rhythm:",Voice.note_values, len(Voice.note_values))
+				except KeyError:
+					self.display_error()
+					self.replace_bad_chords()
+					self.display_error()
+
+	def replace_bad_chords(self):
+		self.chord_options[-1].remove(Voice.chord_path[-1])
+		Voice.chromatics = Voice.chromatics[:0 - len(Voice.chord_path[-1])]
+		Voice.chord_path.pop()
+
+		new_chords_chosen = random.choice(self.chord_options[-1])
+		if type(new_chords_chosen) == int:
+			self.add_chromatic(new_chords_chosen)
+			new_chords_chosen = (new_chords_chosen,)
+		elif type(new_chords_chosen) == tuple:
+			[self.add_chromatic(chord) for chord in new_chords_chosen]
+		Voice.chord_path.append(new_chords_chosen)
+
+	def display_error(self):
+		print("="*40)
+		print(Voice.note_values)
+		print(Voice.chord_path)
+		print(Voice.chromatics)
+		
+	def add_basic_idea1(self):
 		if Voice.measure_length == 3:
 			antecedent_rhythms = idms_b.bi1_rhythms_of_3
 		elif Voice.measure_length == 4:
 			antecedent_rhythms = idms_b.bi1_rhythms_of_4
-		self.chord_style1 = random.choice(tuple(antecedent_rhythms.keys()))
-		self.basic_idea1_rhythm = antecedent_rhythms[self.chord_style1]
-		Voice.note_values.extend(self.basic_idea1_rhythm)
-		print("Rhythm:",Voice.note_values, len(Voice.note_values))
-		self.add_chord_sequence(self.chord_style1)
 
-		Voice.idea1_length = len(Voice.note_values)
+		self.chord_style1 = random.choice(tuple(antecedent_rhythms.keys()))
+		self.add_chord_sequence(self.chord_style1)
+		self.basic_idea1_rhythm = antecedent_rhythms[self.chord_style1]
+		Voice.note_values.append(self.basic_idea1_rhythm)
+		print("Rhythm:",Voice.note_values, len(Voice.note_values))
+
+	def add_transition_idea1(self):
 		self.declare_transition(self.chord_style1)
 		if random.choice((True,False)):
-			contrast_idea1_rhythm = self.basic_idea1_rhythm
+			self.contrast_idea1_rhythm = self.basic_idea1_rhythm
 		else:
-			contrast_idea1_rhythm = random.choice(
+			self.contrast_idea1_rhythm = random.choice(
 				idms_b.ci1_response_rhythms[self.basic_idea1_rhythm])
-		if contrast_idea1_rhythm in {(2,2,2,2), (2,1,2,1)}:
+		if self.contrast_idea1_rhythm in {(2,2,2,2), (2,1,2,1)}:
 			Voice.half_rest_ending = True
 
 		print("Half rest?", Voice.half_rest_ending)
 		if Voice.half_rest_ending:
 			if self.contrast_idea_start == "tonic":
 				self.chord_style2 = random.choice(
-					idms_b.ci1_tonic_with_rest[contrast_idea1_rhythm])
+					idms_b.ci1_tonic_with_rest[self.contrast_idea1_rhythm])
 			elif self.contrast_idea_start == "subdominant":
 				self.chord_style2 = random.choice(
-					idms_b.ci1_subdom_with_rest[contrast_idea1_rhythm])
-			contrast_idea1_rhythm = list(contrast_idea1_rhythm)
-			self.add_rest_rhythm(contrast_idea1_rhythm)
+					idms_b.ci1_subdom_with_rest[self.contrast_idea1_rhythm])
 		else:
 			if self.contrast_idea_start == "tonic":
 				self.chord_style2 = random.choice(
-					idms_b.ci1_tonic_no_rest[contrast_idea1_rhythm])
+					idms_b.ci1_tonic_no_rest[self.contrast_idea1_rhythm])
 			elif self.contrast_idea_start == "subdominant":
 				self.chord_style2 = random.choice(
-					idms_b.ci1_subdom_no_rest[contrast_idea1_rhythm])
+					idms_b.ci1_subdom_no_rest[self.contrast_idea1_rhythm])
 				
-		Voice.idea2_length = len(contrast_idea1_rhythm)
-		Voice.note_values.extend(contrast_idea1_rhythm)
-		print("Rhythm:",Voice.note_values, len(Voice.note_values))
 		self.add_transition_chord(self.chord_style2)
-		self.add_chord_sequence(self.chord_style2)
-		assert(len(Voice.chord_path) == len(Voice.note_values) or 
-			Voice.half_rest_ending), "Chord error"
 
 	def add_chord_sequence(self, chord_types):
-		"""Adds chord(s) to growing chord progression. Some chord sequences 
-		will fail"""
-		# Don't repeat chord from weak to strong beat
-		print("Chord types:",chord_types)
+		print("Chord types:", chord_types)
 		for chord_type in chord_types:
 			print("Chord type:", chord_type)
-			chord_type = chord_type.replace("*","")
-			chord_options = self.idms_mode.chord_sequences[chord_type][self.old_chord]
-			chords_chosen = random.choice(chord_options)
+			chord_seq = chord_type.replace("*","")
+			possible_chords = self.idms_mode.chord_sequences[chord_type][self.old_chord]
+			self.chord_options.append(list(possible_chords))
+			chords_chosen = random.choice(possible_chords)
 			if type(chords_chosen) == int:
 				chords_chosen = (chords_chosen,)
-			[Voice.chord_path.append(chord) for chord in chords_chosen]
-			for chord in chords_chosen:
-				self.add_chromatic(chord)
+			Voice.chord_path.append(chords_chosen)
+			[self.add_chromatic(chord) for chord in chords_chosen]
 
 	def add_single_chord(self, progression_type):
 		"""Add single chord to progression"""
-		chord_options = progression_type[abs(self.old_chord)]
-		chord_choice = random.choice(chord_options)
+		self.chord_options.append(progression_type[abs(self.old_chord)])
+		chord_choice = random.choice(self.chord_options[-1])
 		self.add_chromatic(chord_choice)
-		Voice.chord_path.append(chord_choice)
+		Voice.chord_path.append((chord_choice,))
 
 	def add_chromatic(self, chord):
 		"""Marks chords for mode mixture and modulation"""
@@ -215,56 +255,96 @@ class Bass(Voice):
 			rhythm[-1:] = [2,"2"]
 
 	def create_consequent(self):
-		"""Creates the consequent of the period using basic/contrast ideas"""
-		# Replicate melody?
-		self.add_single_chord(idms_b.restart_tonic)
+		while self.idea_index < 6:
+			if self.idea_index == 2:
+				self.add_single_chord(idms_b.restart_tonic)
+				self.idea_index += 1
+			elif self.idea_index == 3:
+				try:
+					self.add_basic_idea2()
+					self.idea_index += 1
+				except KeyError:
+					self.display_error()
+					self.replace_bad_chords()
+					self.display_error()
+			elif self.idea_index == 4:
+				try:
+					self.add_transition_idea2()
+					self.idea_index += 1
+				except KeyError:
+					self.display_error()
+					self.replace_bad_chords()
+					self.display_error()
+			elif self.idea_index == 5:
+				try:
+					self.add_chord_sequence(self.chord_style4)
+					Voice.note_values.append(self.contrast_idea2_rhythm)
+					print("Rhythm:",Voice.note_values, len(Voice.note_values))
+					print(Voice.chord_path)
+					self.idea_index += 1
+
+					if Voice.half_rest_ending:
+						Voice.note_values[1] = list(Voice.note_values[1])
+						Voice.note_values[3] = list(Voice.note_values[3])
+						self.add_rest_rhythm(Voice.note_values[1])
+						self.add_rest_rhythm(Voice.note_values[3])
+					print("Rhythm:", Voice.note_values, len(Voice.note_values))
+					Voice.idea1_length = len(Voice.note_values[0])
+					Voice.idea2_length = len(Voice.note_values[1])
+					Voice.idea3_length = len(Voice.note_values[2])
+					Voice.idea4_length = len(Voice.note_values[3])
+
+					Voice.note_values = self.flatten_sequence(Voice.note_values)
+					Voice.chord_path = self.flatten_sequence(Voice.chord_path)
+				except KeyError:
+					self.display_error()
+					self.replace_bad_chords()
+					self.display_error()
+
+	def add_basic_idea2(self):
 		if Voice.measure_length == 3:
 			consequent_rhythms = idms_b.ci1_rhythms_of_3
 		elif Voice.measure_length == 4:
 			consequent_rhythms = idms_b.ci1_rhythms_of_4
 		self.chord_style3 = random.choice(tuple(consequent_rhythms.keys()))
-		self.basic_idea2_rhythm = consequent_rhythms[self.chord_style3]
-		Voice.idea3_length = len(self.basic_idea2_rhythm)
-		Voice.note_values.extend(self.basic_idea2_rhythm)
-		print("Rhythm:",Voice.note_values, len(Voice.note_values))
-		
 		self.add_chord_sequence(self.chord_style3)
+
+		self.basic_idea2_rhythm = consequent_rhythms[self.chord_style3]
+		Voice.note_values.append(self.basic_idea2_rhythm)
+		print("Rhythm:",Voice.note_values, len(Voice.note_values))
+
+	def add_transition_idea2(self):
 		self.declare_transition(self.chord_style3)
 		if self.contrast_idea_start == "dominant":
 			if Voice.measure_length == 4:
-				contrast_idea2_rhythm = (4,4)
+				self.contrast_idea2_rhythm = (4,4)
 			elif Voice.measure_length == 3:
-				contrast_idea2_rhythm = (3,3)
+				self.contrast_idea2_rhythm = (3,3)
 		else:
-			contrast_idea2_rhythm = random.choice(
+			self.contrast_idea2_rhythm = random.choice(
 				idms_b.ci2_response_rhythms[self.basic_idea2_rhythm])
-		Voice.idea4_length = len(contrast_idea2_rhythm)
 
 		if Voice.half_rest_ending:
 			if self.contrast_idea_start == "tonic":
 				self.chord_style4 = random.choice(
-					idms_b.ci2_tonic_with_rest[contrast_idea2_rhythm])
+					idms_b.ci2_tonic_with_rest[self.contrast_idea2_rhythm])
 			elif self.contrast_idea_start == "subdominant":
 				self.chord_style4 = random.choice(
-					idms_b.ci2_subdom_with_rest[contrast_idea2_rhythm])
+					idms_b.ci2_subdom_with_rest[self.contrast_idea2_rhythm])
 			elif self.contrast_idea_start == "dominant":
 				self.chord_style4 = ("PAC1",)
-			contrast_idea2_rhythm = list(contrast_idea2_rhythm)
-			self.add_rest_rhythm(contrast_idea2_rhythm)
 		else:
 			if self.contrast_idea_start == "tonic":
 				self.chord_style4 = random.choice(
-					idms_b.ci2_tonic_no_rest[contrast_idea2_rhythm])
+					idms_b.ci2_tonic_no_rest[self.contrast_idea2_rhythm])
 			elif self.contrast_idea_start == "subdominant":
 				self.chord_style4  = random.choice(
-					idms_b.ci2_subdom_no_rest[contrast_idea2_rhythm])
+					idms_b.ci2_subdom_no_rest[self.contrast_idea2_rhythm])
 			elif self.contrast_idea_start == "dominant":
 				self.chord_style4 = ("PAC1",)
-		
-		Voice.note_values.extend(contrast_idea2_rhythm)
-		print("Rhythm:",Voice.note_values, len(Voice.note_values))
+
 		self.add_transition_chord(self.chord_style4)
-		self.add_chord_sequence(self.chord_style4)
+
 
 	def add_notes(self):
 		"""Add notes to bass based on chords. First chord must be tonic"""
@@ -359,59 +439,63 @@ class Bass(Voice):
 
 		if Voice.half_rest_ending:
 			Voice.measure_rhythms[3][-1] = str(Voice.measure_rhythms[3][-1])
-			Voice.measure_rhythms[7][-1] = str(Voice.measure_rhythms[3][-1])
+			Voice.measure_rhythms[7][-1] = str(Voice.measure_rhythms[7][-1])
 		self.note_index = 0
 
 	def create_groove(self):
 		self.group_rhythm()
 		self.group_notes()
-
-		self.create_rhythm(0, 3)
-		self.create_rhythm(4,7)
+		self.finalize_unflavored_part()
 
 		print(self.final_rhythm)
-		print(Voice.rhythm_styles)
+		print(self.final_notes)
 
-		self.spread_notes(0, 3)
-		self.spread_notes(4, 7)
+		# self.create_rhythm(0, 3)
+		# self.create_rhythm(4,7)
 
-		self.finalize_part()
+		# print(self.final_rhythm)
+		# print(Voice.rhythm_styles)
+
+		# self.spread_notes(0, 3)
+		# self.spread_notes(4, 7)
+
+		# self.finalize_part()
 
 		print(self.final_rhythm, len(self.final_rhythm))
 		print(self.final_notes, len(self.final_notes))
 
 
-	def create_rhythm(self, start, stop):
-		# Don't use on secondary dominants or diminished preparation or resolution
-		for m_index, chosen_measure in enumerate(
-				Voice.measure_rhythms[start:stop]):
-			for beat in chosen_measure:
-				# if beat == 2 and chosen_measure:
-				# 	self.final_rhythm[m_index + start].extend((1,"1"))
-				# 	Voice.rhythm_styles[m_index + start].append("Waltz2")
-				# elif beat == 3:
-				# 	self.final_rhythm[m_index + start].extend((1,"1","1"))
-				# 	Voice.rhythm_styles[m_index + start].append("Waltz3")
-				# elif beat == 4:
-				# 	self.final_rhythm[m_index + start].extend((1,"1",1,"1"))
-				# 	Voice.rhythm_styles[m_index + start].append("Waltz4")
-				if True:
-					self.final_rhythm[m_index + start].append(beat)
-					Voice.rhythm_styles[m_index + start].append(None)
+	# def create_rhythm(self, start, stop):
+	# 	# Don't use on secondary dominants or diminished preparation or resolution
+	# 	for m_index, chosen_measure in enumerate(
+	# 			Voice.measure_rhythms[start:stop]):
+	# 		for beat in chosen_measure:
+	# 			# if beat == 2 and chosen_measure:
+	# 			# 	self.final_rhythm[m_index + start].extend((1,"1"))
+	# 			# 	Voice.rhythm_styles[m_index + start].append("Waltz2")
+	# 			# elif beat == 3:
+	# 			# 	self.final_rhythm[m_index + start].extend((1,"1","1"))
+	# 			# 	Voice.rhythm_styles[m_index + start].append("Waltz3")
+	# 			# elif beat == 4:
+	# 			# 	self.final_rhythm[m_index + start].extend((1,"1",1,"1"))
+	# 			# 	Voice.rhythm_styles[m_index + start].append("Waltz4")
+	# 			if True:
+	# 				self.final_rhythm[m_index + start].append(beat)
+	# 				Voice.rhythm_styles[m_index + start].append(None)
 
-	def spread_notes(self, start, stop):
-		for m_index, chosen_measure in enumerate(
-				Voice.rhythm_styles[start:stop]):
-			for r_index, rhythm_style in enumerate(chosen_measure):
-				main_note = self.measure_notes[m_index + start][r_index]
-				if rhythm_style == "Waltz2":
-					self.final_notes[m_index + start].extend(
-						(main_note, "REST"))
-				elif rhythm_style == "Waltz3":
-					self.final_notes[m_index + start].extend(
-						(main_note, "REST", "REST"))
-				elif rhythm_style == "Waltz4":
-					self.final_notes[m_index + start].extend(
-						(main_note, "REST", main_note, "REST"))
-				elif rhythm_style is None:
-					self.final_notes[m_index + start].append(main_note)
+	# def spread_notes(self, start, stop):
+	# 	for m_index, chosen_measure in enumerate(
+	# 			Voice.rhythm_styles[start:stop]):
+	# 		for r_index, rhythm_style in enumerate(chosen_measure):
+	# 			main_note = self.measure_notes[m_index + start][r_index]
+	# 			if rhythm_style == "Waltz2":
+	# 				self.final_notes[m_index + start].extend(
+	# 					(main_note, "REST"))
+	# 			elif rhythm_style == "Waltz3":
+	# 				self.final_notes[m_index + start].extend(
+	# 					(main_note, "REST", "REST"))
+	# 			elif rhythm_style == "Waltz4":
+	# 				self.final_notes[m_index + start].extend(
+	# 					(main_note, "REST", main_note, "REST"))
+	# 			elif rhythm_style is None:
+	# 				self.final_notes[m_index + start].append(main_note)

@@ -41,26 +41,21 @@ modes = {
 	"phryg": (0, 1, 3, 5, 7, 8, 10, 12, 13, 15, 17, 19, 20, 22, 24) 
 }
 
+#all_note_names
 all_notes = (
 	("B#","C","Dbb"), ("B##","C#", "Db"), ("C##", "D", "Ebb"), ("D#","Eb"),
 	("D##","E","Fb"), ("E#","F","Gbb"), ("E##","F#", "Gb"), ("F##","G","Abb"), 
 	("G#", "Ab"), ("G##","A","Bbb"), ("A#","Bb","Cbb"), ("A##","B","Cb"), 
 )
+#pitch_letters
 scale_sequence = ("C","D","E","F","G","A","B")
 
 tonics = {
 	"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4,"F": 5, "F#": 6, 
 	"Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B":11
 }
-# Converting pitch to scale degree
-# diverge to separate modules
-major_scale_degrees = { 0:0, 2:1, 4:2, 5:3, 7:4, 9:5, 11:6}
-minor_scale_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 9:5, 10:6, 11:6}
-# includes melodic minor
 
 # only use practical key signatures
-major_keys = ("C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F")
-minor_keys = ("A", "E", "B", "F#", "C#", "G#", "D#", "Bb", "F", "C", "G", "D")
 # 3/4, 4/4, 9/8, 12/8
 time_sigs = ((3,2), (4,2), (3,3), (4,3))
 expand_tonic1 = {
@@ -81,6 +76,7 @@ to_subdom2_strong = {
 }
 # sometimes leads to IAC, which would not be valid for I64
 # need to add VI and IV6 but only if previous chord whole note. 
+# decide chord after weak beat leading to strong
 to_subdom1_strong = {
 	I: (IV, II6),
 	I6: (IV, II6),
@@ -98,7 +94,7 @@ to_subdom1_weak = {
 	II: (II6,),
 	II6: (-II,)
 }
-# if bass already descended below tonic, V6 descent is problematic
+# if bass already descended below tonic, V6 descent (and similar) is problematic
 half_cadence1 = {
 	I: (V,),
 	I6: (V,),

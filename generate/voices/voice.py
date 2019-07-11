@@ -86,10 +86,7 @@ class Voice(object):
 	def get_diatonic_scale_degree(self, pitch):
 		if not 0 <= pitch <= 11:
 			pitch = self.make_scale_pitch(pitch)
-		if self.mode == "ionian":
-			return idms_b.major_scale_degrees[pitch]
-		elif self.mode == "aeolian":
-			return idms_b.minor_scale_degrees[pitch]
+		return Voice.idms_mode.pitches_to_degrees[pitch]
 
 	def center_scale_degree(self, scale_degree):
 		if not 0 <= scale_degree <= 6:
@@ -355,30 +352,25 @@ class Voice(object):
 				elif old_symbol == "b":
 					new_symbol = "es" * level
 			current_rhythm = self.rhythm[index]
-			if "FIX" not in current_rhythm:
-				lily_note = "".join((letter, new_symbol, octave_mark, 
-					self.rhythm[index]))
-			# elif current_rhythm == "3C":
-			# 	lily_note = "".join((letter, new_symbol, octave_mark, "2.~ ", 
-			# 		letter, new_symbol, octave_mark, "4."))
-			elif current_rhythm == "FIX":
-				# deals with weird rhythms in compound time 
-				# that need ties and irregular beams
+			if current_rhythm == "FIX":
+			# deals with weird rhythms that need ties and irregular beams
 				beat_partitions = []
 				remaining_beat = self.final_rhythm[index]
-				for current_beat in self.triple_beat_durations.keys():
+				for current_beat in self.beat_durations.keys():
 					if self.truncate_float(current_beat, 2) <= remaining_beat:
 						beat_partitions.append(current_beat)
 						remaining_beat -= current_beat
 				lily_note = ""
 				for valid_beat in beat_partitions[:-1]:
 					lily_note = "".join((
-						lily_note, " ", letter, new_symbol, octave_mark, 
-						self.triple_beat_durations[valid_beat], "~"))
+						lily_note, letter, new_symbol, octave_mark, 
+						self.beat_durations[valid_beat], "~ "))
 				lily_note = "".join((
-					lily_note, " ", letter, new_symbol, octave_mark,
-					self.triple_beat_durations[beat_partitions[-1]]))
-
+					lily_note, letter, new_symbol, octave_mark,
+					self.beat_durations[beat_partitions[-1]]))
+			else:
+				lily_note = "".join((letter, new_symbol, octave_mark, 
+					self.rhythm[index]))
 
 			self.lily_notes.append(lily_note)
 
@@ -387,7 +379,7 @@ class Voice(object):
 
 	def truncate_float(self, number, precision):
 		"""Converts float to another float with less precision"""
-		if number % 1 == 0:
+		if number % 1 == 0 or number % .125 == 0:
 			return number
 		result = 0
 		str_number = str(number)
@@ -417,15 +409,16 @@ class Voice(object):
 
 		return result
 
-
-
 	def invert_note_values(self):
 		if Voice.beat_division == 2:
 			correct_durations = {
 				1:"4", 4:"1", 2:"2", 3:"2.", "2":"r2", "1":"r4",
 				0.5:"8", 1.5:"4.", 0.75:"8.", 0.25: "16", 0.125: "32", 
-				0.375: "16.",}
-		# create tie in lily_convert for compound time
+				0.375: "16.", 1.125: "FIX", 2.25: "FIX"}
+			self.beat_durations = {
+				4:"1", 3:"2.", 2:"2", 1.5:"4.", 1:"4", 0.75:"8.",
+				0.5:"8", 0.375: "16.", 0.25: "16", 0.125: "32", 
+				}
 		elif Voice.beat_division == 3:
 			correct_durations = {
 				0.5: "8.", 1:"4.", 2:"2.", 3:"FIX", 4:"1.", "2":"r2.", "1":"r4.",
@@ -436,7 +429,7 @@ class Voice(object):
 				6 * idms_b.THIRD:"2.", 7.5 * idms_b.THIRD: "FIX", 
 				8 * idms_b.THIRD:"1", 10 * idms_b.THIRD: "FIX" 
 			}
-			self.triple_beat_durations = {
+			self.beat_durations = {
 				4:"1.", 2:"2.", 4 * idms_b.THIRD:"2", 1:"4.",   
 				2 * idms_b.THIRD:"4", 0.5: "8.", 1 * idms_b.THIRD: "8", 
 				0.5 * idms_b.THIRD: "16"  
@@ -504,59 +497,70 @@ class Voice(object):
 		self.note_index = 0
 
 	def flatten_sequence(self, old_sequence):
-		new_list = []
-		for nested_sequence in old_sequence:
-			for item in nested_sequence:
-				new_list.append(item)
+		# new_list = []
+		# for nested_sequence in old_sequence:
+		# 	for item in nested_sequence:
+		# 		new_list.append(item)
 
-		return new_list
+		# return new_list
+		return [subitem for item in old_sequence for subitem in item]
 
 	def create_groove(self):
 		self.group_notes()
 
-		self.final_rhythm = [ [] for _ in range(8)]
-		self.final_notes = [ [] for _ in range(8)]
+		self.finalize_unflavored_part()
 
-		self.create_rhythm(0, 3)
-		self.create_rhythm(4, 7)
+		# self.final_notes = self.measure_notes
+		# if Voice.half_rest_ending:
+		# 	self.final_notes[3].append("REST")
+		# 	self.final_notes[7].append("REST")
+		# self.final_rhythm = Voice.measure_rhythms
+		# self.final_rhythm = self.flatten_sequence(self.final_rhythm)
+		# self.final_notes = self.flatten_sequence(self.final_notes)
 
-		self.spread_notes(0, 3)
-		self.spread_notes(4, 7)
+		# self.final_rhythm = [ [] for _ in range(8)]
+		# self.final_notes = [ [] for _ in range(8)]
 
-		self.finalize_part()
+		# self.create_rhythm(0, 3)
+		# self.create_rhythm(4, 7)
 
-	def create_rhythm(self, start, stop):
-		for m_index, chosen_measure in enumerate(
-				Voice.rhythm_styles[start:stop]):
-			for r_index, rhythm_style in enumerate(chosen_measure):
-				if rhythm_style == "Waltz2":
-					self.final_rhythm[m_index + start].extend(("1",1))
-				elif rhythm_style == "Waltz3":
-					self.final_rhythm[m_index + start].extend(("1",1,1))
-				elif rhythm_style == "Waltz4":
-					self.final_rhythm[m_index + start].extend(("1",1,"1",1))
-				else:
-					self.final_rhythm[m_index + start].append(
-						Voice.measure_rhythms[m_index + start][r_index])
+		# self.spread_notes(0, 3)
+		# self.spread_notes(4, 7)
 
-	def spread_notes(self, start, stop):
-		for m_index, chosen_measure in enumerate(
-				Voice.rhythm_styles[start:stop]):
-			for r_index, rhythm_style in enumerate(chosen_measure):
-				main_note = self.measure_notes[m_index + start][r_index]
-				if rhythm_style == "Waltz2":
-					self.final_notes[m_index + start].extend(
-						("REST", main_note))
-				elif rhythm_style == "Waltz3":
-					self.final_notes[m_index + start].extend(
-						("REST", main_note, main_note))
-				elif rhythm_style == "Waltz4":
-					self.final_notes[m_index + start].extend(
-						("REST", main_note, "REST", main_note))
-				elif rhythm_style is None:
-					self.final_notes[m_index + start].append(main_note)
+		# self.finalize_part()
 
-	def finalize_part(self):
+	# def create_rhythm(self, start, stop):
+	# 	for m_index, chosen_measure in enumerate(
+	# 			Voice.rhythm_styles[start:stop]):
+	# 		for r_index, rhythm_style in enumerate(chosen_measure):
+	# 			if rhythm_style == "Waltz2":
+	# 				self.final_rhythm[m_index + start].extend(("1",1))
+	# 			elif rhythm_style == "Waltz3":
+	# 				self.final_rhythm[m_index + start].extend(("1",1,1))
+	# 			elif rhythm_style == "Waltz4":
+	# 				self.final_rhythm[m_index + start].extend(("1",1,"1",1))
+	# 			else:
+	# 				self.final_rhythm[m_index + start].append(
+	# 					Voice.measure_rhythms[m_index + start][r_index])
+
+	# def spread_notes(self, start, stop):
+	# 	for m_index, chosen_measure in enumerate(
+	# 			Voice.rhythm_styles[start:stop]):
+	# 		for r_index, rhythm_style in enumerate(chosen_measure):
+	# 			main_note = self.measure_notes[m_index + start][r_index]
+	# 			if rhythm_style == "Waltz2":
+	# 				self.final_notes[m_index + start].extend(
+	# 					("REST", main_note))
+	# 			elif rhythm_style == "Waltz3":
+	# 				self.final_notes[m_index + start].extend(
+	# 					("REST", main_note, main_note))
+	# 			elif rhythm_style == "Waltz4":
+	# 				self.final_notes[m_index + start].extend(
+	# 					("REST", main_note, "REST", main_note))
+	# 			elif rhythm_style is None:
+	# 				self.final_notes[m_index + start].append(main_note)
+
+	def finalize_flavored_part(self):
 		self.final_notes[3] = self.measure_notes[3]
 		self.final_notes[7] = self.measure_notes[7]
 		self.final_rhythm[3] = Voice.measure_rhythms[3]
@@ -566,6 +570,16 @@ class Voice(object):
 			self.final_notes[3].append("REST")
 			self.final_notes[7].append("REST")
 
+		self.final_rhythm = self.flatten_sequence(self.final_rhythm)
+		self.final_notes = self.flatten_sequence(self.final_notes)
+
+
+	def finalize_unflavored_part(self):
+		self.final_notes = self.measure_notes
+		if Voice.half_rest_ending:
+			self.final_notes[3].append("REST")
+			self.final_notes[7].append("REST")
+		self.final_rhythm = Voice.measure_rhythms
 		self.final_rhythm = self.flatten_sequence(self.final_rhythm)
 		self.final_notes = self.flatten_sequence(self.final_notes)
 

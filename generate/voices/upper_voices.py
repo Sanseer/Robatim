@@ -484,7 +484,6 @@ class VoiceCombiner():
 		  abs(s_pitch - old_soprano_note) > 4):
 			return False 
 
-
 		bass_tenor_motion = self.bass_tenor_motion[:]
 		bass_alto_motion = self.bass_alto_motion[:]
 		tenor_alto_motion = self.tenor_alto_motion[:]

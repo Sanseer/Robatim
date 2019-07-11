@@ -110,11 +110,18 @@ class VoiceLeadMixin():
 			  and new_scale_pitch != 11):
 				return False 
 
+		if (self.is_chord_inversion(current_chord, previous_chord) and 
+		  composite_motion[0][-1] == composite_motion[1][-1] == 
+		  composite_motion[2][-1] == 0 and 
+		  (not self.is_seventh_chord()  or not self.is_seventh_chord(-1))):
+			return False
+
 		bass_soprano_motion = self.bass_soprano_motion[:]
 		self.add_motion_type(Voice.bass_motion, soprano_motion, 
 			bass_soprano_motion, bass_soprano_intervals)
 		old_soprano_note = self.pitch_amounts[self.note_index - 1][2]
 
+		# third to last note of cadence should not be huge leap (greater than perfect 5th?)
 		if ((self.note_index == len(self.pitch_amounts) - 1) and 
 		  (bass_soprano_motion[-1] != "Contrary" or 
 		  bass_soprano_intervals[-1] != "P8" or
@@ -137,7 +144,7 @@ class VoiceLeadMixin():
 			return False
 		elif (self.note_index == Voice.idea1_length + Voice.idea2_length - 1 and
 		  abs(s_pitch - old_soprano_note) > 4):
-			return False 
+			return False
 
 		bass_tenor_motion = self.bass_tenor_motion[:]
 		bass_alto_motion = self.bass_alto_motion[:]
@@ -211,11 +218,14 @@ class VoiceLeadMixin():
 			elif interval_list[-2] == "A2" and interval_list[-1] != "P4":
 				return False
 			elif (interval_list[-2] in idms_b.harmonic_dissonance and
-			  interval_list[-1] in idms_b.harmonic_dissonance):
+			  interval_list[-1] in idms_b.harmonic_dissonance and 
+			  interval_list[-1] != interval_list[-2]):
 				return False
 			elif (interval_list[-1] == "P8" and motion_list[-1] == "Similar"
 			and current_chord in {idms_b.I, idms_b.I6} 
 			and self.is_chord_inversion(idms_b.V7, previous_chord)):
 				return False 
 
+			# can you sustain a dissonant interval before resolving into consonance
+			# seventh chords, perhaps?
 		return True
