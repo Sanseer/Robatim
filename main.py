@@ -81,9 +81,9 @@ if __name__ ==  "__main__":
 
 	# [MyMIDI.addProgramChange(track,ch,time,52) for ch in range(4)]
 	MyMIDI.addProgramChange(track,0,time,42) #42
-	MyMIDI.addProgramChange(track,1,time,68) #40
-	MyMIDI.addProgramChange(track,2,time,40) #40
-	MyMIDI.addProgramChange(track,3,time,41) #41
+	MyMIDI.addProgramChange(track,1,time,40) #40 #68
+	MyMIDI.addProgramChange(track,2,time,41) #40
+	MyMIDI.addProgramChange(track,3,time,22) #41
  
 	if Voice.mode == "aeolian":
 		tempo = 110

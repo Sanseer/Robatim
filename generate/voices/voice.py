@@ -283,7 +283,6 @@ class Voice(object):
 				self.note_index += 1
 			elif type(final_note) == str:
 				self.sheet_notes.append(final_note)
-		print(self.sheet_notes, len(self.sheet_notes))
 
 	def create_chord_names(self):
 		new_chords_names = []
@@ -312,13 +311,10 @@ class Voice(object):
 		# add lead-sheet symbols above chord
 		self.lily_notes = []
 		self.rhythm = self.invert_note_values()
-		index = 0
 		self.create_rests(self.sheet_notes)
 
 		assert(len(self.rhythm) == len(self.sheet_notes))
 
-		# C is where octave starts
-		# try {a' b' bis' c'' d''} in Lilypond
 
 
 		for index, sheet_note in enumerate(self.sheet_notes):
@@ -329,6 +325,7 @@ class Voice(object):
 			octave_mark = ""
 			letter = sheet_note[0].lower()
 			register_shift = 0
+			# try {a' b' bis' c'' d''} in Lilypond
 			# edge case that realigns pitch magnitude with register
 			# B# is technically in the octave above (starting from C).
 			# Cb is technically below the current octave (starting from C). 
@@ -492,7 +489,6 @@ class Voice(object):
 
 		print(self.measure_notes)
 		print(Voice.measure_rhythms)
-		print(self.note_values)
 
 		self.note_index = 0
 

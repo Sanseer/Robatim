@@ -571,6 +571,7 @@ class Tenor(Voice):
 	def __init__(self):
 		self.real_notes = Voice.tenor_pitches
 		super().__init__()
+		self.volume = 80
 
 
 class Alto(Voice):
@@ -578,5 +579,5 @@ class Alto(Voice):
 	def __init__(self):
 		self.real_notes = Voice.alto_pitches
 		super().__init__()
-
+		self.volume = 80
 

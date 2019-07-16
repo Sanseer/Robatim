@@ -28,6 +28,7 @@ class Soprano(Voice):
 			"3": ((idms_b.THIRD, idms_b.THIRD, 0.5 * idms_b.THIRD, 
 				0.5 * idms_b.THIRD),) # 1/6 1/3 1/3 1/6
 		}
+		self.volume = 100
 
 	def do_stuff(self):
 		self.group_notes()
