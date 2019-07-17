@@ -98,7 +98,9 @@ class VoiceLeadMixin():
 				pitch_change = new_pitch - old_pitch
 				if (not -2 <= pitch_change < 0 and not inversion and
 				  (current_chord != idms_b.VII6 or not 
-				  self.is_chord_inversion(idms_b.V7, previous_chord)) and
+				  self.is_chord_inversion(idms_b.V7, previous_chord)) and 
+				  (previous_chord != idms_b.VII6 or not
+				  self.is_chord_inversion(idms_b.V7, current_chord)) and
 				  (previous_chord != idms_b.V43 or current_chord != idms_b.I6)):
 					return False
 				elif (0 < pitch_change <= 2 and not inversion and

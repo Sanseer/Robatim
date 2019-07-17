@@ -67,13 +67,18 @@ expand_tonic1 = {
 }
 pass_to_tonic = {
 	I: ((-V6,), (-V65,), (VII6,), (V43,), (V42,)),
-	I6: ((-V6,), (-V65,), (-VII6,), (-V43,), (V42,))
 }
 # Some of these must return to I, others to I6
-expand_tonic2 = {
+double_neighbor1 = {
 	I: ((-V6, V43), (-V65, V43), (-V6, VII6), (-V65, VII6), (V43, -V65), 
 		(V43, V42), (VII6, V42), (-V6, V42), (-V65, V42)),
 	I6: ((V42, -V65),)
+}
+double_neighbor2 = {
+	V65: (I,),
+	VII6: (-I,),
+	V43: (-I,),
+	V42: (-I6,)
 }
 accent_tonic = {
 	I: (I6, -VI), 
@@ -190,8 +195,8 @@ expand_dom = {
 
 ci1_response_rhythms = {
 	# double neighbor IAC: 2 1 1 4
-	# (3,2,1): ((2,1,2,1), (2,1,3)), 
-	# (4,2,2): ((2,2,2,2), (2,2,4)), # 2 1 1 4 
+	(3,2,1): ((2,1,3),),
+	(4,2,2): ((2,2,4),), # 2 1 1 4 
 	(4,4): ((2,2,4), (4,2,2)), # 2 1 1 4
 	(3,3): ((2,1,3),),
 	# (2,1,2,1): ((2,1,3),),
@@ -260,10 +265,10 @@ ci2_subdom_no_rest = {
 # weak measure 2
 # double neigbor 4 2 2
 bi1_rhythms_of_3 = {
-	("TA",): (3,3)
+	("TA",): (3,3), ("TPT-I",): (3,3), ("TDN1",): (3,2,1)
 }
 bi1_rhythms_of_4 = {
-	("TA",): (4,4)
+	("TA",): (4,4), ("TPT-I",): (4,4), ("TDN1",): (4,2,2)
 }
 # 3 2 1
 ci1_rhythms_of_3 = {

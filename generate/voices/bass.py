@@ -107,7 +107,7 @@ class Bass(Voice):
 
 	def add_transition_idea1(self):
 		self.declare_transition(self.chord_style1)
-		if random.choice((True,False)):
+		if random.choice((True,False)) and self.basic_idea1_rhythm != (3,2,1):
 			self.contrast_idea1_rhythm = self.basic_idea1_rhythm
 		else:
 			self.contrast_idea1_rhythm = random.choice(
@@ -118,21 +118,13 @@ class Bass(Voice):
 		print("Half rest?", Voice.half_rest_ending)
 		if Voice.half_rest_ending:
 			if self.contrast_idea_start == "tonic":
-				# self.chord_style2 = random.choice(
-				# 	idms_b.ci1_tonic_with_rest[self.contrast_idea1_rhythm])
 				style_options = idms_b.ci1_tonic_with_rest[self.contrast_idea1_rhythm]
 			elif self.contrast_idea_start == "subdominant":
-				# self.chord_style2 = random.choice(
-				# 	idms_b.ci1_subdom_with_rest[self.contrast_idea1_rhythm])
 				style_options = idms_b.ci1_subdom_with_rest[self.contrast_idea1_rhythm]
 		else:
 			if self.contrast_idea_start == "tonic":
-				# self.chord_style2 = random.choice(
-				# 	idms_b.ci1_tonic_no_rest[self.contrast_idea1_rhythm])
 				style_options = idms_b.ci1_tonic_no_rest[self.contrast_idea1_rhythm]
 			elif self.contrast_idea_start == "subdominant":
-				# self.chord_style2 = random.choice(
-				# 	idms_b.ci1_subdom_no_rest[self.contrast_idea1_rhythm])
 				style_options = idms_b.ci1_subdom_no_rest[self.contrast_idea1_rhythm]
 
 		self.chord_style2 = self.pick_chord_style(style_options)
@@ -145,7 +137,12 @@ class Bass(Voice):
 		return random.choice(style_options) 
 
 	def replace_bad_chords(self):
-		self.chord_options[-1].remove(Voice.chord_path[-1])
+		failed_chords = Voice.chord_path[-1]
+		if len(failed_chords) > 1:
+			self.chord_options[-1].remove(failed_chords)
+		elif len(failed_chords) == 1:
+			self.chord_options[-1].remove(failed_chords[0])
+		# self.chord_options[-1].remove(Voice.chord_path[-1])
 		Voice.chromatics = Voice.chromatics[:0 - len(Voice.chord_path[-1])]
 		Voice.chord_path.pop()
 
@@ -160,13 +157,14 @@ class Bass(Voice):
 
 	def are_valid_chords(self, chords_chosen):
 		if (self.old_chord in {idms_b.II, idms_b.II6, idms_b.IV} and
-		   chords_chosen[0] in {-idms_b.V6, -idms_b.V65} and self.chord_descent):
+		  chords_chosen[0] in {-idms_b.V6, -idms_b.V65} and self.chord_descent):
 			print("Double descent")
 			return False
 		elif chords_chosen[0] in {-idms_b.I, -idms_b.I_MAJOR} and self.chord_descent:
 			print("Return to tonic double descent")
 			return False
-		elif chords_chosen[0] in {idms_b.I, idms_b.I_MAJOR} and not self.chord_descent:
+		elif (chords_chosen[0] in {idms_b.I, idms_b.I_MAJOR} and not self.chord_descent and 
+		  self.old_chord not in {idms_b.V6, idms_b.V65}):
 			print("Return to tonic double ascent")
 			return False
 		return True
@@ -282,9 +280,11 @@ class Bass(Voice):
 		"""Decides transition type from basic idea to contrasting idea"""
 		print("-"*20)
 		if (chord_types[-1] == "TA" and random.choice((True, True, False)) 
-		  and not self.basic_idea2_rhythm and self.basic_idea1_rhythm[-1] in {3,4} 
+		  and not self.chord_style2 and self.basic_idea1_rhythm[-1] in {3,4} 
 		  and self.old_chord not in {idms_b.VI, idms_b.IV6, idms_b.IV6_MAJOR}):
 			print("Restart tonic. Adding first CI note")
+			self.contrast_idea_start = "tonic"
+		elif chord_types[-1] in {"TPT-I", "TDN1"}:
 			self.contrast_idea_start = "tonic"
 		elif chord_types[-1] == "TA" and not self.basic_idea2_rhythm:
 			print("Subdominant contrast. Adding first CI note")
@@ -300,7 +300,12 @@ class Bass(Voice):
 		"""Adds transition chord for the next 2 measures"""
 		print(next_chord_style)
 		if self.contrast_idea_start == "tonic":
-			self.add_single_chord(idms_b.restart_tonic)
+			if self.chord_style1[-1] == "TDN1" and not self.chord_style3:
+				print("double_neighbor2")
+				self.add_single_chord(idms_b.double_neighbor2)
+			else:
+				print("restart_tonic")
+				self.add_single_chord(idms_b.restart_tonic)
 		elif self.contrast_idea_start == "subdominant":
 			if (next_chord_style[0] in {"M+SA1-M","M+SA1+M"} and 
 			  Voice.note_values[-1][-1] in {3,4}):
@@ -385,23 +390,15 @@ class Bass(Voice):
 		print("Half rest?", Voice.half_rest_ending)
 		if Voice.half_rest_ending:
 			if self.contrast_idea_start == "tonic":
-				# self.chord_style4 = random.choice(
-				# 	idms_b.ci2_tonic_with_rest[self.contrast_idea2_rhythm])
 				style_options = idms_b.ci2_tonic_with_rest[self.contrast_idea2_rhythm]
 			elif self.contrast_idea_start == "subdominant":
-				# self.chord_style4 = random.choice(
-				# 	idms_b.ci2_subdom_with_rest[self.contrast_idea2_rhythm])
 				style_options = idms_b.ci2_subdom_with_rest[self.contrast_idea2_rhythm]
 			elif self.contrast_idea_start == "dominant":
 				self.chord_style4 = ("PAC1",)
 		else:
 			if self.contrast_idea_start == "tonic":
-				# self.chord_style4 = random.choice(
-				# 	idms_b.ci2_tonic_no_rest[self.contrast_idea2_rhythm])
 				style_options = idms_b.ci2_tonic_no_rest[self.contrast_idea2_rhythm]
 			elif self.contrast_idea_start == "subdominant":
-				# self.chord_style4  = random.choice(
-				# 	idms_b.ci2_subdom_no_rest[self.contrast_idea2_rhythm])
 				style_options = idms_b.ci2_subdom_no_rest[self.contrast_idea2_rhythm]
 			elif self.contrast_idea_start == "dominant":
 				self.chord_style4 = ("PAC1",)

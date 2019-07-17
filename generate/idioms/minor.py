@@ -6,7 +6,7 @@ pitches_to_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 9:5, 10:6, 11:6}
 # includes melodic minor
 
 expand_tonic1 = bsc.expand_tonic1
-expand_tonic2 = bsc.expand_tonic2
+double_neighbor1 = bsc.double_neighbor1
 accent_tonic = bsc.accent_tonic
 
 pass_to_tonic = bsc.pass_to_tonic
@@ -72,7 +72,7 @@ perfect_auth_cadence1[bsc.V] = (-bsc.I, bsc.I, -bsc.I_MAJOR, bsc.I_MAJOR)
 perfect_auth_cadence1[bsc.V7] = (-bsc.I, bsc.I,-bsc.I_MAJOR, bsc.I_MAJOR)
 
 chord_sequences = {
-	"TP": expand_tonic1, "TA":accent_tonic, "TDN": expand_tonic2, 
+	"TP": expand_tonic1, "TA":accent_tonic, "TDN1": double_neighbor1, 
 	"TPT-I": pass_to_tonic, "TPS-I": pass_to_subdom, 
 	"M+SA1-M": strong_to_subdom1_weak, "M-SA2+M": weak_to_subdom2_strong, 
 	"M+SA1+M": strong_to_subdom1_strong, "M-SA1+M": weak_to_subdom1_strong,  
