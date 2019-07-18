@@ -47,7 +47,7 @@ class VoiceLeadMixin():
 			return False
 		if self.note_index == 0:
 			return True
-		elif current_chord == idms_b.I64 and full_scale_combo.count(2) >= 2:
+		elif current_chord == idms_b.I64 and full_scale_combo.count(0) >= 2:
 			return False
 
 		tenor_motion = Voice.tenor_motion[:]
@@ -67,16 +67,18 @@ class VoiceLeadMixin():
 			if abs(new_pitch - old_pitch) > 12:
 				# print("Leap too wide", end=" ")
 				return False
+			# leading tone of "2Dom" must also resolve properly
 			elif (old_scale_pitch == 11 and 
 			  new_scale_pitch not in {11, 0} and
 			  not Voice.chromatics[self.note_index] not in {"2Dom", "2Dim"} and 
 			  not Voice.chromatics[self.note_index - 1] not in {"2Dom", "2Dim"}):
-				if previous_chord not in {idms_b.V, idms_b.V7}:
+				if previous_chord not in {idms_b.V, idms_b.V7} and new_scale_pitch != 9:
 					return False
 				elif previous_chord == idms_b.V and new_scale_pitch not in {7,3,4}:
 					return False
 				elif previous_chord == idms_b.V7 and new_scale_pitch != 7:
 					return False
+			# a leap can delay its eventual opposite motion by keeping the same pitch.
 			if (self.note_index > 1 and
 			  abs(old_pitch - self.pitch_amounts[self.note_index - 2][voice_index]) > 5 
 			  and (abs(new_pitch - old_pitch) > 2 or 
@@ -85,11 +87,13 @@ class VoiceLeadMixin():
 				# print("Leaps must be followed by contrary steps")
 				return False
 			elif (new_scale_pitch in {8,11} and old_scale_pitch in {8,11}
-			and new_pitch != old_pitch and self.mode == "aeolian" 
+			and new_scale_pitch != old_scale_pitch and self.mode == "aeolian" 
 			and not Voice.chromatics[self.note_index]
 			and not Voice.chromatics[self.note_index - 1]):
 			# No melodic augmented 2nd
 				return False
+			# exclusion for diminished seventh chord?
+			# detect a dissonant transfer to bass note
 			if (self.is_seventh_chord(-1) and 
 			  old_scale_pitch == self.chord_degree_to_pitch(3, -1)):
 				inversion = self.is_chord_inversion(current_chord, previous_chord)

@@ -19,7 +19,7 @@ class Bass(Voice):
 		Voice.measure_length = time_sig[0]
 		Voice.beat_division = time_sig[1]
 		Voice.half_rest_ending = random.choice((True, False))
-		Voice.consequent_rhythm_change = random.choice((True, False))
+		# Voice.consequent_rhythm_change = random.choice((True, False))
 
 		if Voice.mode == "ionian":
 			import generate.idioms.major
@@ -354,6 +354,9 @@ class Bass(Voice):
 			Voice.note_values[3] = list(Voice.note_values[3])
 			self.add_rest_rhythm(Voice.note_values[1])
 			self.add_rest_rhythm(Voice.note_values[3])
+			if Voice.measure_length == 4 and random.choice((True, False)):
+				Voice.note_values[1][-2:] = [3, "1"]
+				Voice.note_values[3][-2:] = [3, "1"]
 
 		print("Rhythm:", Voice.note_values, len(Voice.note_values))
 		Voice.idea1_length = len(Voice.note_values[0])
@@ -411,12 +414,9 @@ class Bass(Voice):
 		"""Add notes to bass based on chords. First chord must be tonic"""
 		old_pitch = 0
 		old_scale_degree = 0
-		tonic_indices = {Voice.idea1_length + Voice.idea2_length, 
-			Voice.idea1_length + Voice.idea2_length + Voice.idea3_length + 
-			Voice.idea4_length - 1}
 		for n_index, chord in enumerate(Voice.chord_path[1:]):
 			new_scale_degree = idms_b.bass_notes[abs(chord)]
-			new_pitch = idms_b.modes[self.mode][new_scale_degree]
+			new_pitch = idms_b.mode_notes[self.mode][new_scale_degree]
 			# You don't need to raise diatonic leading tone if modulation
 			if (Voice.chromatics[n_index + 1] not in {"2Dom", "2Dim"} and 
 			  self.mode == "aeolian" and idms_b.bass_notes[abs(chord)] == 6 
@@ -437,10 +437,6 @@ class Bass(Voice):
 			elif chord > 0 and old_pitch < 0 and (new_pitch - 12) < old_pitch:
 				pass
 
-			# if (n_index + 1) in tonic_indices and new_pitch < 0:
-			# 	shift = 1
-			# 	new_pitch += 12
-			# else:
 			shift = new_pitch - old_pitch
 			self.pitch_amounts.append(new_pitch)
 			old_pitch = new_pitch
@@ -473,7 +469,7 @@ class Bass(Voice):
 				elif chrom == "2Dim":
 					self.real_notes[nc_index] += self.convert_sec_dim(
 						nc_chord, self.real_notes[nc_index])
-				elif chrom in idms_b.modes.keys():
+				elif chrom in idms_b.mode_notes.keys():
 					self.real_notes[nc_index] += self.convert_mode(
 						nc_chord, self.real_notes[nc_index])
 				old_note = self.real_notes[nc_index - 1]
@@ -488,7 +484,6 @@ class Bass(Voice):
 		Voice.bass_pitches = self.real_notes
 
 	def group_rhythm(self):
-
 		self.note_index = 0
 		for _ in range(8):
 			array = []

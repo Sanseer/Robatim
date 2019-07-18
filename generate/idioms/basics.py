@@ -32,8 +32,7 @@ for chord, degrees in chord_members.items():
 
 assert(len(bass_notes.keys()) == len(chord_members.keys()))
 
-#mode_notes
-modes = {
+mode_notes = {
 	"lydian": (0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24),
 	"ionian": (0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24),
 	"mixo": (0, 2, 4, 5, 7, 9, 10, 12, 14, 16, 17, 19, 21, 22, 24),
@@ -42,14 +41,12 @@ modes = {
 	"phryg": (0, 1, 3, 5, 7, 8, 10, 12, 13, 15, 17, 19, 20, 22, 24) 
 }
 
-#all_note_names
-all_notes = (
+note_names = (
 	("B#","C","Dbb"), ("B##","C#", "Db"), ("C##", "D", "Ebb"), ("D#","Eb"),
 	("D##","E","Fb"), ("E#","F","Gbb"), ("E##","F#", "Gb"), ("F##","G","Abb"), 
 	("G#", "Ab"), ("G##","A","Bbb"), ("A#","Bb","Cbb"), ("A##","B","Cb"), 
 )
-#pitch_letters
-scale_sequence = ("C","D","E","F","G","A","B")
+pitch_letters = ("C","D","E","F","G","A","B")
 
 tonics = {
 	"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4,"F": 5, "F#": 6, 

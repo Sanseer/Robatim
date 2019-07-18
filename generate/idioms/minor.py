@@ -1,6 +1,8 @@
 import generate.idioms.basics as bsc
 
-consonant_triads = {bsc.I, bsc.III, bsc.IV, bsc.V, bsc.VI, bsc.I_MAJOR}
+consonant_triads = {bsc.I, bsc.III, bsc.IV, bsc.V, bsc.VI, bsc.I_MAJOR, 
+	bsc.II6_MAJOR, bsc.IV_MAJOR, bsc.IV6_MAJOR
+}
 key_sigs = ("A", "E", "B", "F#", "C#", "G#", "D#", "Bb", "F", "C", "G", "D")
 pitches_to_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 9:5, 10:6, 11:6}
 # includes melodic minor
@@ -20,7 +22,8 @@ strong_to_subdom2_strong[bsc.VI] = (-bsc.II6, -bsc.IV, -bsc.IV_MAJOR, bsc.IV6, b
 
 strong_to_subdom1_strong = bsc.strong_to_subdom1_strong
 strong_to_subdom1_strong[bsc.I] = (bsc.II6, bsc.IV, bsc.IV_MAJOR, bsc.I64, 
-	-bsc.IV6, -bsc.IV6_MAJOR, -bsc.VI)
+	-bsc.IV6, -bsc.IV6_MAJOR, -bsc.VI
+)
 strong_to_subdom1_strong[bsc.I6] = (bsc.II6, bsc.IV, bsc.IV_MAJOR, bsc.I64)
 strong_to_subdom1_strong[bsc.IV_MAJOR] = (-bsc.II_MAJOR, -bsc.II6_MAJOR, bsc.I64,)
 strong_to_subdom1_strong[bsc.IV6_MAJOR] = (-bsc.IV_MAJOR, -bsc.I64,)
@@ -48,11 +51,14 @@ half_cadence1[bsc.IV6_MAJOR] = (-bsc.V,)
 
 half_cadence2 = bsc.half_cadence2
 half_cadence2[bsc.II_MAJOR] = (
-	bsc.V, -bsc.V6, -bsc.V65, bsc.VII6, bsc.V43, bsc.V42)
+	bsc.V, -bsc.V6, -bsc.V65, bsc.VII6, bsc.V43, bsc.V42
+)
 half_cadence2[bsc.II6_MAJOR] = (
-	bsc.V, -bsc.V6, -bsc.V65, -bsc.VII6, -bsc.V43, bsc.V42)
+	bsc.V, -bsc.V6, -bsc.V65, -bsc.VII6, -bsc.V43, bsc.V42
+)
 half_cadence2[bsc.IV_MAJOR] = (
-	bsc.V, -bsc.V6, -bsc.V65, -bsc.VII6, -bsc.V43, bsc.V42)
+	bsc.V, -bsc.V6, -bsc.V65, -bsc.VII6, -bsc.V43, bsc.V42
+)
 half_cadence1[bsc.IV6_MAJOR] = (-bsc.V, -bsc.V6, -bsc.V65)
 
 imperfect_auth_cadence2 = bsc.imperfect_auth_cadence2

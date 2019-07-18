@@ -65,7 +65,7 @@ class VoiceCombiner():
 		elif Voice.chromatics[self.note_index] == "2Dim":
 			all_pitches = self.add_chromatics(
 				all_pitches, self.convert_sec_dim)
-		elif Voice.chromatics[self.note_index] in idms_b.modes.keys():
+		elif Voice.chromatics[self.note_index] in idms_b.mode_notes.keys():
 			all_pitches = self.add_chromatics(
 				all_pitches, self.convert_mode)
 
@@ -79,13 +79,13 @@ class VoiceCombiner():
 		high_point = 81
 		low_point = Voice.bass_pitches[self.note_index]
 
-		root_pitch = (idms_b.modes[Voice.mode][chord_root_degree] + 
+		root_pitch = (idms_b.mode_notes[Voice.mode][chord_root_degree] + 
 			idms_b.tonics[Voice.tonic])
 		chord_increments = [0]
 		new_position = chord_root_degree + 2
 		for _ in range(chord_length - 1):
-			chord_increments.append((idms_b.modes[Voice.mode][new_position] - 
-				idms_b.modes[Voice.mode][chord_root_degree]))
+			chord_increments.append((idms_b.mode_notes[Voice.mode][new_position] - 
+				idms_b.mode_notes[Voice.mode][chord_root_degree]))
 			new_position += 2
 
 		if Voice.chromatics[self.note_index] not in ("2Dom", "2Dim"):
@@ -125,6 +125,7 @@ class VoiceCombiner():
 
 		triple_pitch_combos = list(itertools.combinations_with_replacement(
 			all_pitches,3))
+		# not 48 < a_pitch and not 48 < t_pitch 
 		for (t_pitch, a_pitch, s_pitch) in triple_pitch_combos[:]:
 			if (not 48 <= t_pitch <= 69 or not 55 <= a_pitch <= 74 or 
 			not 59 <= s_pitch <= 81 or 
@@ -288,266 +289,6 @@ class VoiceCombiner():
 			self.tenor_soprano_motion, self.tenor_soprano_intervals),
 		self.add_motion_type(Voice.alto_motion, Voice.soprano_motion,
 			self.alto_soprano_motion, self.alto_soprano_intervals)
-
-	def preprocess_combo(self, t_pitch, a_pitch, s_pitch):
-		"""Remove bad pitch combos based on counterpoint and voice leading"""
-
-		# USE MIXINS to separate methods!!!!
-		b_pitch = Voice.bass_pitches[self.note_index]
-		full_scale_combo = ((self.make_scale_pitch(b_pitch), 
-		self.make_scale_pitch(t_pitch),
-		self.make_scale_pitch(a_pitch), self.make_scale_pitch(s_pitch)))
-
-		bass_soprano_intervals = self.bass_soprano_intervals[:]
-		bass_soprano_intervals.append(self.get_interval(b_pitch, s_pitch))
-
-		if len(set(full_scale_combo)) == 1:
-			return False
-		elif (a_pitch - t_pitch) > 12 or (s_pitch - a_pitch) > 12:
-			# print("Keep adjacent upper voices within an octave")
-			return False
-		elif (full_scale_combo.count(11) >= 2 and 
-		  Voice.chromatics[self.note_index] not in ("2Dom", "2Dim")):
-			# print("Don't repeat leading tone except modulation", end=" ")
-			return False
-		elif (self.is_seventh_chord() and 
-		  full_scale_combo.count(self.chord_degree_to_pitch(3, 0)) >= 2):
-			# print("Don't repeat chordal 7th", end=" ")
-			return False
-		elif self.chord_degree_to_pitch(0) not in full_scale_combo:
-			return False
-		elif self.chord_degree_to_pitch(1) not in full_scale_combo:
-			return False
-		elif self.is_seventh_chord() and (len(set(full_scale_combo)) < 3 or
-		  self.chord_degree_to_pitch(3) not in full_scale_combo):
-			return False
-		elif (self.note_index == 0 and 
-		  bass_soprano_intervals[-1] not in ("P5", "P8", "M3", "m3")):
-			return False
-		if self.note_index == 0:
-			return True
-
-		tenor_motion = Voice.tenor_motion[:]
-		alto_motion = Voice.alto_motion[:]
-		soprano_motion = Voice.soprano_motion[:]
-
-		self.add_voice_motion(soprano_motion, 2, s_pitch)
-		self.add_voice_motion(alto_motion, 1, a_pitch)
-		self.add_voice_motion(tenor_motion, 0, t_pitch)
-
-		composite_motion = [tenor_motion, alto_motion, soprano_motion]
-
-		pitch_combo = (t_pitch, a_pitch, s_pitch)
-		for voice_index, new_pitch in enumerate(pitch_combo):
-			old_pitch = self.pitch_amounts[self.note_index - 1][voice_index]
-			if abs(new_pitch - old_pitch) > 12:
-				# print("Leap too wide", end=" ")
-				return False
-			elif (voice_index == 2 and 
-			  self.make_scale_pitch(old_pitch) == 11 and 
-			  self.make_scale_pitch(new_pitch) != 11 and
-			  self.make_scale_pitch(new_pitch) != 0 and 
-			  not Voice.chromatics[self.note_index] and 
-			  not Voice.chromatics[self.note_index - 1]):
-				# print("Leading tone must progress to tonic", end=" ")
-				return False
-			# elif (voice_index != 2 and 
-			#   self.make_scale_pitch(old_pitch) == 11 and 
-			#   self.make_scale_pitch(new_pitch) != 0 and 
-			#   not Voice.chromatics[self.note_index] and 
-			#   not Voice.chromatics[self.note_index - 1] and
-			#   (self.get_chord(-1) // 10 != 50_753 or 
-			#   self.make_scale_pitch(new_pitch) != 
-			#   self.chord_degree_to_pitch(2))):
-			# 	# print("Leading tone must progress to tonic", end=" ")
-			# 	return False
-			# except when held over for the next chord
-			elif (voice_index != 2 and 
-			  self.make_scale_pitch(old_pitch) == 11 and 
-			  self.make_scale_pitch(new_pitch) != 11 and 
-			  self.make_scale_pitch(new_pitch) != 0 and 
-			  not Voice.chromatics[self.note_index] and 
-			  not Voice.chromatics[self.note_index - 1] and
-			  self.make_scale_pitch(new_pitch) != 7 and
-			  self.make_scale_pitch(new_pitch) != 9):
-				# print("Leading tone must progress to tonic", end=" ")
-				return False
-			elif (Voice.chromatics[self.note_index - 1] == "2Dom" and 
-			  self.make_scale_pitch(old_pitch) == 
-			  self.chord_degree_to_pitch(1, -1) and 
-			  abs(new_pitch - old_pitch) != 1 
-			  and (self.get_chord(-1) // 10 != 50_753 or 
-			  self.make_scale_pitch(new_pitch) != 
-			  self.chord_degree_to_pitch(2))):
-				# print("Leading tone of 2D must resolve to tonic", end=" ")
-				return False
-			# a leap can delay its eventual opposite motion by keeping the same pitch.
-			elif (self.note_index > 1 and
-			  abs(self.pitch_amounts[self.note_index - 1][voice_index] - 
-				  self.pitch_amounts[self.note_index - 2][voice_index]) > 5 
-			  and (abs(new_pitch - old_pitch) > 2 or 
-			  abs(new_pitch - old_pitch) == 0 or 
-			  composite_motion[voice_index][-1] == 
-			  composite_motion[voice_index][-2])):
-				# print("Leaps must be followed by contrary steps")
-				return False
-			# Nested conditional simplifies expressions
-			# last item prevent chain skips
-			# exclusion for diminished seventh chord?
-			# detect a dissonant transfer to bass note
-			elif (self.is_seventh_chord(-1) and 
-			  abs(new_pitch - old_pitch) > 2):
-				dissonant_pitch = self.chord_degree_to_pitch(3, -1)
-				if (self.make_scale_pitch(old_pitch) == dissonant_pitch and 
-				not self.is_seventh_chord()):
-					return False
-				elif (self.make_scale_pitch(old_pitch) == dissonant_pitch and
-				self.is_seventh_chord() and
-				self.get_root_degree(-1) != self.get_root_degree()):
-					return False
-				elif (self.make_scale_pitch(old_pitch) == dissonant_pitch and
-				self.is_seventh_chord() and 
-				self.get_root_degree(-1) == self.get_root_degree() and 
-				dissonant_pitch != self.make_scale_pitch(self.combo_choice[0]) and 
-				dissonant_pitch != self.make_scale_pitch(self.combo_choice[1]) and
-				dissonant_pitch != self.make_scale_pitch(self.combo_choice[2])):
-					return False
-			# elif abs(new_pitch - old_pitch) <= 2 and new_pitch - old_pitch >= 0:
-				# if (self.is_seventh_chord(-1) 
-				#   and self.make_scale_pitch(old_pitch) == 
-				#   self.chord_degree_to_pitch(3, -1)
-				#   and not self.is_seventh_chord()
-				#   and (self.get_chord(-1) != idms_b.V43 or 
-				#   self.get_chord() != idms_b.I6)):
-				# 	return False
-				# if (self.get_chord(-1) == idms_b.VII6 or 
-				#   self.get_chord() == idms_b.I and 
-				#   self.make_scale_pitch(old_pitch) == self.chord_degree_to_pitch(2, -1) and
-				#   self.make_scale_pitch(new_pitch) != self.chord_degree_to_pitch(1)):
-				# 	return False
-				# elif (self.get_chord(-1) == idms_b.VII6 or 
-				#   self.get_chord() == idms_b.I6 and 
-				#   self.make_scale_pitch(old_pitch) == self.chord_degree_to_pitch(2, -1) and
-				#   self.make_scale_pitch(new_pitch) != self.chord_degree_to_pitch(2)):
-				# 	return False
-
-		# No voice overlap; one voice leaps past previous note of other voice
-		# No dissonant leaps
-
-		bass_soprano_motion = self.bass_soprano_motion[:]
-		self.add_motion_type(Voice.bass_motion, soprano_motion, 
-			bass_soprano_motion, bass_soprano_intervals)
-		old_soprano_note = self.pitch_amounts[self.note_index - 1][2]
-
-		if ((self.note_index == len(self.pitch_amounts) - 1) and 
-		  (bass_soprano_motion[-1] != "Contrary" or 
-		  bass_soprano_intervals[-1] != "P8" or
-		  abs(s_pitch - old_soprano_note) > 2)):
-			# print("Must end with contrary motion and tonic by step")
-			return False
-		elif (self.note_index != len(self.pitch_amounts) - 1 and
-		  self.note_index != Voice.idea1_length + Voice.idea2_length and  
-		  bass_soprano_intervals[-1] == "P8"):
-			# print("Avoiding premature unison")
-			return False
-		# elif bass_soprano_intervals[-1] in idms_b.harmonic_dissonance:
-		# 	return False
-		elif ("P" in bass_soprano_intervals[-1] and 
-		  "P" in bass_soprano_intervals[-2]):
-			# print("Double perfects")
-			return False
-		# exception for 5-6 technique IV-II6 complex suspension or VI-IV6
-		elif bass_soprano_motion[-1] == "No motion":
-			return False
-		elif (bass_soprano_motion[-1] == "Similar" and 
-		  "P8" in bass_soprano_intervals[-1] and 
-		  abs(s_pitch - old_soprano_note) > 2):
-			# print("No hidden octaves except soprano moving by step")
-			return False
-		elif (self.note_index > 1 and Voice.soprano_motion[-1] == 0 and 
-		  soprano_motion[-2] == 0):
-			# print("Triple repeat")
-			return False
-		elif (self.note_index > 3 and 
-		  bass_soprano_motion[-1] in ("Parallel", "Similar") and
-		  bass_soprano_motion[-2] in ("Parallel", "Similar") and
-		  bass_soprano_motion[-3] in ("Parallel", "Similar") and
-		  bass_soprano_motion[-4] in ("Parallel", "Similar")):
-			# print("Quadruple consecutive parallels. Delete!")
-			return False
-		elif (self.note_index > 3 and 
-		  bass_soprano_intervals[-1] == bass_soprano_intervals[-2] ==
-		  bass_soprano_intervals[-3] == bass_soprano_intervals[-4]):
-			# print("Quadruple identical imperfects.")
-			return False
-		elif (self.note_index == Voice.idea1_length + Voice.idea2_length - 1 and
-		  abs(s_pitch - old_soprano_note) > 4):
-			return False 
-
-		bass_tenor_motion = self.bass_tenor_motion[:]
-		bass_alto_motion = self.bass_alto_motion[:]
-		tenor_alto_motion = self.tenor_alto_motion[:]
-		tenor_soprano_motion = self.tenor_soprano_motion[:]
-		alto_soprano_motion = self.alto_soprano_motion[:]
-
-		bass_tenor_intervals = self.bass_tenor_intervals[:]
-		bass_alto_intervals = self.bass_alto_intervals[:]
-		tenor_alto_intervals = self.tenor_alto_intervals[:]
-		tenor_soprano_intervals = self.tenor_soprano_intervals[:]
-		alto_soprano_intervals = self.alto_soprano_intervals[:]
-
-		tenor_alto_intervals.append(self.get_interval(t_pitch, a_pitch))
-		tenor_soprano_intervals.append(self.get_interval(t_pitch, s_pitch))
-		alto_soprano_intervals.append(self.get_interval(a_pitch, s_pitch))
-		bass_tenor_intervals.append(self.get_interval(b_pitch, t_pitch))
-		bass_alto_intervals.append(self.get_interval(b_pitch, a_pitch))
-
-		self.add_motion_type(Voice.bass_motion, tenor_motion, 
-			bass_tenor_motion, bass_tenor_intervals)
-		self.add_motion_type(Voice.bass_motion, alto_motion, 
-			bass_alto_motion, bass_alto_intervals)
-		self.add_motion_type(tenor_motion, alto_motion,
-			tenor_alto_motion, tenor_alto_intervals)
-		self.add_motion_type(tenor_motion, soprano_motion,
-			tenor_soprano_motion, tenor_soprano_intervals),
-		self.add_motion_type(alto_motion, soprano_motion,
-			alto_soprano_motion, alto_soprano_intervals)
-
-		composite_intervals = [bass_tenor_intervals, bass_alto_intervals, 
-			bass_soprano_intervals, tenor_alto_intervals, 
-			tenor_soprano_intervals,alto_soprano_intervals]
-		composite_movements = [bass_tenor_motion, bass_alto_motion, 
-			bass_soprano_motion, tenor_alto_motion, tenor_soprano_motion,
-			alto_soprano_motion]
-
-		for interval_list, motion_list in zip(
-		composite_intervals, composite_movements):
-			if (interval_list[-1] in ("P5","P8") and 
-			  motion_list[-1] == "Parallel"):
-				return False
-			elif (interval_list[-2] == "A4" and 
-			  interval_list[-1] not in ("M6", "m6")):
-				return False
-			elif (interval_list[-2] == "d5" 
-			  and self.get_chord(-1) != idms_b.VII6
-			  and interval_list[-1] not in ("M3", "m3")):
-				return False
-			elif (interval_list[-2] == "d5"
-			  and self.get_chord(-1) == idms_b.VII6 
-			  and self.get_chord() == idms_b.I6 
-			  and interval_list[-1] not in ("P5", "M3", "m3")):
-				return False
-			elif interval_list[-2] == "d7" and interval_list[-1] != "P5":
-				return False
-			elif interval_list[-2] == "A2" and interval_list[-1] != "P4":
-				return False
-			# elif (interval_list[-2] in idms_b.unresolved_dissonance and 
-			#   interval_list[-1] in idms_b.harmonic_dissonance):
-			# 	# print("Dissonant interval resolves to consonance")
-			# 	return False
-
-			# Check melodic intervals and exclude melodic augmented 2nd 
-		return True
 
 	def erase_last_note(self):
 		if Voice.tenor_motion: 

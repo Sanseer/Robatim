@@ -16,7 +16,7 @@ class Soprano(Voice):
 		self.final_rhythm = [ [] for _ in range(8)]
 		self.diatonic_neighbors = [ [] for _ in range(8)]
 		self.simple_time_rhythms = {
-			"1": ((0.5, 0.5), (0.75, 0.25)), # (0.375, 0.625) [3-5] 
+			"1": ((0.5, 0.5), (0.75, 0.25)),
 			"2": ((0.75, 0.125, 0.125), (0.375, 0.375, 0.25)), 
 			"3": ((0.25, 0.25, 0.25, 0.25), (0.375, 0.125, 0.25, 0.25))
 		}
@@ -26,7 +26,7 @@ class Soprano(Voice):
 				(2 * idms_b.THIRD, 0.5 * idms_b.THIRD, 0.5 * idms_b.THIRD), 
 				(0.5, 0.5 * idms_b.THIRD, idms_b.THIRD)),
 			"3": ((idms_b.THIRD, idms_b.THIRD, 0.5 * idms_b.THIRD, 
-				0.5 * idms_b.THIRD),) # 1/6 1/3 1/3 1/6
+				0.5 * idms_b.THIRD),)
 		}
 		self.volume = 100
 
@@ -192,7 +192,7 @@ class Soprano(Voice):
 		# if self.voice_type = "soprano"
 		self.note_index = -1
 		tonic_letter = Voice.tonic.replace("#","").replace("b","")
-		self.tonic_index = idms_b.scale_sequence.index(tonic_letter)
+		self.tonic_index = idms_b.pitch_letters.index(tonic_letter)
 		for final_note, phantom_note in zip(self.final_notes, self.phantom_notes):
 			if type(phantom_note) == int:
 				self.note_index += 1 

@@ -35,7 +35,8 @@ strong_to_subdom1_weak[bsc.VI] = (-bsc.II, -bsc.II6, -bsc.IV, bsc.IV6)
 weak_to_subdom2_strong = bsc.weak_to_subdom2_strong
 weak_to_subdom1_strong = bsc.weak_to_subdom1_strong
 weak_to_subdom1_strong[bsc.I] = (
-	bsc.II, bsc.II6, bsc.IV, bsc.I64, -bsc.IV6, -bsc.VI)
+	bsc.II, bsc.II6, bsc.IV, bsc.I64, -bsc.IV6, -bsc.VI
+)
 weak_to_subdom1_strong[bsc.I6] = (-bsc.II, bsc.II6, bsc.IV, bsc.I64)
 weak_to_subdom1_strong[bsc.VI] = (-bsc.II, -bsc.II6, -bsc.IV, -bsc.I64)
 weak_to_subdom1_strong[bsc.IV6] = (-bsc.II, -bsc.II6, -bsc.IV, -bsc.I64)
