@@ -213,7 +213,7 @@ class VoiceCombiner():
 		# an invalid combo at a note index is often context-sensitive
 		with tqdm(total=len(self.possible_pitches[0])) as pbar:
 			while None in self.pitch_amounts:
-				attempts += 1
+				# attempts += 1
 				# Prevent CPU overload/encourage optimization
 				# assert(attempts < 32000), f"You ran out of tries"
 				if self.possible_pitches[self.note_index]:

@@ -104,8 +104,8 @@ strong_to_subdom1_strong = {
 	II: (II6, I64),
 	II6: (I64,),
 	IV: (II6, I64),
-	VI: (-II6, -IV, I64, IV6),
-	IV6: (-II6, -IV, I64)
+	VI: (-II6, -IV, -I64, IV6),
+	IV6: (-II6, -IV, -I64)
 }
 strong_to_subdom1_weak = {
 	I: (II6, IV, -IV6, -VI),

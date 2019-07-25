@@ -228,7 +228,8 @@ class Voice(object):
 		  (old_move != 0 or new_move != 0)):
 			movements.append("Oblique")
 		else:
-			movements.append("Blank")
+			# movements.append("Blank")
+			raise ValueError("Invalid motion")
 
 		# use "Blank" to assert proper assignment
 

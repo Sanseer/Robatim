@@ -51,7 +51,7 @@ class Bass(Voice):
 		self.final_rhythm = [ [] for _ in range(8)]
 		self.final_notes = [ [] for _ in range(8)]
 
-		self.volume = 100
+		# self.volume = 100
 
 	@property
 	def old_chord(self):
@@ -181,13 +181,13 @@ class Bass(Voice):
 				try:
 					possible_chords = self.idms_mode.chord_sequences[chord_seq][self.old_chord]
 				except KeyError:
-					print("Before")
-					self.display_error()
+					# print("Before")
+					# self.display_error()
 					self.replace_bad_chords()
-					print("After")
-					self.display_error()
+					# print("After")
+					# self.display_error()
 			self.chord_options.append(list(possible_chords))
-			print("Full chord options:", self.chord_options)
+			# print("Full chord options:", self.chord_options)
 			while chords_chosen is None:
 				chords_chosen = random.choice(self.chord_options[-1])
 				print("Chords chosen:", chords_chosen)
@@ -196,12 +196,12 @@ class Bass(Voice):
 				elif type(chords_chosen) == tuple:
 					chord_pack = chords_chosen
 				if not self.are_valid_chords(chord_pack):
-					self.display_error()
+					# self.display_error()
 					self.chord_options[-1].remove(chords_chosen)
 					chords_chosen = None
-					self.display_error()
+					# self.display_error()
 			Voice.chord_path.append(chord_pack)
-			print("New chord sequence:", Voice.chord_path)
+			# print("New chord sequence:", Voice.chord_path)
 			self.check_descent()
 			[self.add_chromatic(chord) for chord in chord_pack]
 
@@ -213,23 +213,23 @@ class Bass(Voice):
 			try:
 				possible_chords = progression_type[abs(self.old_chord)]
 			except KeyError:
-				print("Before")
-				self.display_error()
+				# print("Before")
+				# self.display_error()
 				self.replace_bad_chords()
-				print("After")
-				self.display_error()
+				# print("After")
+				# self.display_error()
 		self.chord_options.append(list(possible_chords))
-		print("Full chord options:", self.chord_options)
+		# print("Full chord options:", self.chord_options)
 		while chord_choice is None:
 			chord_choice = random.choice(self.chord_options[-1])
 			if not self.are_valid_chords((chord_choice,)):
-				self.display_error()
+				# self.display_error()
 				self.chord_options[-1].remove(chord_choice)
 				chord_choice = None
-				self.display_error()
+				# self.display_error()
 		self.add_chromatic(chord_choice)
 		Voice.chord_path.append((chord_choice,))
-		print("New chord sequence:", Voice.chord_path)
+		# print("New chord sequence:", Voice.chord_path)
 		self.check_descent()
 
 	def display_error(self):

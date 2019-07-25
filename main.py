@@ -1,11 +1,13 @@
+#!/usr/bin/env python3
+
 import random
 
 from generate.midi_export import MIDIFile
 
 from generate.voices.voice import Voice
 from generate.voices.bass import Bass
-from generate.voices.upper_voices import UpperVoices, Tenor, Alto
-from generate.voices.soprano import Soprano
+from generate.voices.upper_voices2 import UpperVoices, Tenor, Alto
+from generate.voices.soprano2 import Soprano
 import generate.idioms.basics as idms_b
 
 # write tests in keyboard and chorale style to try custom chord progressions
@@ -43,6 +45,25 @@ def create_song():
 	make_lily_file()
 	return voice_list
 
+def create_tune():
+	voice_list = []
+	voice_list.append(Bass())
+	voice_list[0].create_part()
+
+	UpperVoices().create_parts()
+	voice_list.append(Tenor())
+	voice_list[-1].create_part()
+	voice_list.append(Alto())
+	voice_list[-1].create_part()
+	voice_list.append(Soprano())
+	voice_list[-1].create_part()
+	make_lily_file()
+	return voice_list
+	# voice_list.append(Soprano())
+	# voice_list[-1].create_part()
+
+
+
 def make_lily_file():
 	"""Creates a LilyPond sheet music file"""
 	# make four clefs instead of two (add alto and tenor)
@@ -70,7 +91,7 @@ def make_lily_file():
 
 
 if __name__ ==  "__main__":
-	voice_list = create_song()
+	voice_list = create_tune()
 	track    = 0
 	channel  = 0
 	time     = 0   # In beats
@@ -80,10 +101,13 @@ if __name__ ==  "__main__":
 	MyMIDI = MIDIFile(4) 
 
 	# [MyMIDI.addProgramChange(track,ch,time,52) for ch in range(4)]
-	MyMIDI.addProgramChange(track,0,time,42) #42
-	MyMIDI.addProgramChange(track,1,time,40) #40 #68
-	MyMIDI.addProgramChange(track,2,time,41) #40
-	MyMIDI.addProgramChange(track,3,time,22) #41
+	MyMIDI.addProgramChange(track,0,time,42)
+	MyMIDI.addProgramChange(track,1,time,41) 
+	MyMIDI.addProgramChange(track,2,time,41) 
+	MyMIDI.addProgramChange(track,3,time,40) 
+	#42-40-41-22
+	#42-40-40-41
+	#42-41-41-40
  
 	if Voice.mode == "aeolian":
 		tempo = 110

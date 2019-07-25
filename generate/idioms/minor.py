@@ -1,6 +1,6 @@
 import generate.idioms.basics as bsc
 
-consonant_triads = {bsc.I, bsc.III, bsc.IV, bsc.V, bsc.VI, bsc.I_MAJOR, 
+consonant_triads = {bsc.I, bsc.I6, bsc.III, bsc.IV, bsc.V, bsc.V6, bsc.VI, bsc.I_MAJOR, 
 	bsc.II6_MAJOR, bsc.IV_MAJOR, bsc.IV6_MAJOR
 }
 key_sigs = ("A", "E", "B", "F#", "C#", "G#", "D#", "Bb", "F", "C", "G", "D")
