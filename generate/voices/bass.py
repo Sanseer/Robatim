@@ -24,10 +24,12 @@ class Bass(Voice):
 		if Voice.mode == "ionian":
 			import generate.idioms.major
 			Voice.idms_mode = generate.idioms.major
+			Voice.tonic = "C"
 		elif Voice.mode == "aeolian":
 			import generate.idioms.minor
 			Voice.idms_mode = generate.idioms.minor
-		Voice.tonic = random.choice(self.idms_mode.key_sigs)
+			Voice.tonic = "A"
+		# Voice.tonic = random.choice(self.idms_mode.key_sigs)
 
 		self.note_index = 0
 		self.chord_descent = False

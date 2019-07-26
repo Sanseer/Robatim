@@ -65,18 +65,27 @@ class VoiceCombiner():
 		self.combo_choice = self.possible_lower_pitches[0][0]
 		self.lower_voice_pitches[0] = self.combo_choice
 		self.possible_soprano_pitches[0] = self.create_soprano_options()
-		if not self.possible_soprano_pitches[0]:
-			print(self.lower_voice_pitches)
-			print(self.possible_soprano_pitches)
-			print(self.soprano_pitch_choices)
-			print(self.soprano_scale_choices)
-			raise ValueError
+		# if not self.possible_soprano_pitches[0]:
+		# 	print(self.lower_voice_pitches)
+		# 	print(self.possible_soprano_pitches)
+		# 	print(self.soprano_pitch_choices)
+		# 	print(self.soprano_scale_choices)
+		# 	raise ValueError
 		self.validate_lower_notes()
 		self.add_lower_notes()
 		self.split_notes()
 		self.add_melody()
 
 	def create_soprano_options(self):
+		self.all_pitches = self.create_chord_pitches()
+
+		if Voice.chromatics[self.note_index] == "2Dom":
+			self.add_chromatics(self.convert_sec_dom)
+		elif Voice.chromatics[self.note_index] == "2Dim":
+			self.add_chromatics(self.convert_sec_dim)
+		elif Voice.chromatics[self.note_index] in idms_b.mode_notes.keys():
+			self.add_chromatics(self.convert_mode)
+
 		chord_scale_combo = {
 			self.make_scale_pitch(Voice.bass_pitches[self.note_index]), 
 			self.make_scale_pitch(self.combo_choice[0]),
@@ -100,7 +109,7 @@ class VoiceCombiner():
 			self.chordal_fifth = True
 		else:
 			self.chordal_fifth = False
-		if not self.chordal_root:
+		if not self.chordal_root or self.note_index == self.sequence_length - 1:
 			return self.add_soprano_notes(0)
 		elif not self.chordal_third:
 			return self.add_soprano_notes(1)
@@ -275,7 +284,7 @@ class VoiceCombiner():
 
 	def add_lower_notes(self):
 		"""Fills up a blank template with notes for soprano, alto, and tenor"""
-		# self.note_index = 0
+		self.note_index = 0
 		while self.lower_voice_pitches[self.note_index] is not None:
 			self.note_index += 1
 		self.populate_note()
@@ -288,14 +297,17 @@ class VoiceCombiner():
 					self.possible_lower_pitches[self.note_index][0]
 					self.possible_soprano_pitches[self.note_index] = \
 					self.create_soprano_options()
-					if not self.possible_soprano_pitches[self.note_index]:
-						print(Voice.bass_pitches[self.note_index])
-						print(self.lower_voice_pitches)
-						print(self.possible_soprano_pitches)
-						print(self.soprano_pitch_choices)
-						print(self.soprano_scale_choices)
-						self.possible_lower_pitches[self.note_index].remove(self.combo_choice)
-						continue
+					# if not self.possible_soprano_pitches[self.note_index]:
+						# check reason for making mistakes
+						# print(Voice.bass_pitches[self.note_index])
+						# print(self.combo_choice)
+						# print(self.all_pitches)
+						# print(self.soprano_pitch_choices)
+						# print(self.soprano_scale_choices)
+						# print(self.chordal_root, self.chordal_third, self.chordal_fifth, self.chordal_seventh)
+						# print(self.get_chord(), self.note_index)
+						# self.possible_lower_pitches[self.note_index].remove(self.combo_choice)
+						# continue
 						# raise ValueError
 					self.validate_lower_notes()
 					self.lower_voice_pitches[self.note_index] = self.combo_choice

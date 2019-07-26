@@ -2,6 +2,8 @@ import copy
 
 class MelodyMixin():
 
+	# these should be generate during every iteration
+
 	@property
 	def current_beat(self):
 		return self.flat_restless_rhythms[self.note_index]

@@ -14,7 +14,7 @@ import generate.idioms.basics as idms_b
 
 def random_settings(time_sig="", tonic="", mode=""):
 	"""Selects a random, but practical key and time sig unless one is provided"""
-	# tonic, mode = random.choice((("C", "ionian"), ("A", "aeolian")))
+	tonic, mode = random.choice((("C", "ionian"), ("A", "aeolian")))
 	if not mode:
 		mode = random.choice(("ionian", "aeolian"))
 	if mode == "ionian" and not tonic:
