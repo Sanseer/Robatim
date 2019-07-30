@@ -16,8 +16,7 @@ class VoiceCombiner():
 			Voice.idea3_length + Voice.idea4_length)
 		self.soprano_chord_pitches = []
 		self.soprano_chord_pitches.extend((None,) * self.sequence_length)
-		self.soprano_full_pitches = []
-		self.soprano_full_pitches.extend((None,) * self.sequence_length)
+		self.soprano_full_pitches = self.soprano_chord_pitches[:]
 		self.lower_voice_pitches = self.soprano_chord_pitches[:]
 		self.possible_soprano_pitches = self.soprano_chord_pitches[:]
 		self.possible_lower_pitches = self.soprano_chord_pitches[:]
@@ -40,7 +39,7 @@ class VoiceCombiner():
 		self.composite_lower_motions = [self.bass_tenor_motion, 
 			self.bass_alto_motion, self.tenor_alto_motion]
 		self.composite_soprano_intervals = [self.bass_soprano_intervals, 
-			self.tenor_soprano_motion, self.alto_soprano_intervals]
+			self.tenor_soprano_intervals, self.alto_soprano_intervals]
 		self.composite_soprano_motions = [self.bass_soprano_motion,
 			self.tenor_soprano_motion, self.alto_soprano_motion]
 
@@ -54,7 +53,7 @@ class VoiceCombiner():
 			self.nested_restless_rhythms[3].pop()
 			self.nested_restless_rhythms[7].pop()
 
-		self.chordal_seventh = None
+		print("Sequence length", self.sequence_length)
 
 	@property
 	def inside_score(self):
@@ -65,7 +64,7 @@ class VoiceCombiner():
 		self.combo_choice = self.possible_lower_pitches[0][0]
 		self.lower_voice_pitches[0] = self.combo_choice
 		self.possible_soprano_pitches[0] = self.create_soprano_options()
-		# if not self.possible_soprano_pitches[0]:
+		# if not self.possible_soprano_pitches[0cd]:
 		# 	print(self.lower_voice_pitches)
 		# 	print(self.possible_soprano_pitches)
 		# 	print(self.soprano_pitch_choices)
@@ -86,6 +85,10 @@ class VoiceCombiner():
 		elif Voice.chromatics[self.note_index] in idms_b.mode_notes.keys():
 			self.add_chromatics(self.convert_mode)
 
+		if 82 in self.all_pitches:
+			# raise Exception("Chromaticism")
+			self.all_pitches.remove(82)
+
 		chord_scale_combo = {
 			self.make_scale_pitch(Voice.bass_pitches[self.note_index]), 
 			self.make_scale_pitch(self.combo_choice[0]),
@@ -98,32 +101,32 @@ class VoiceCombiner():
 			self.make_scale_pitch(pitch) for pitch in self.soprano_pitch_choices
 		]
 		if self.chord_degree_to_pitch(0) in chord_scale_combo:
-			self.chordal_root = True
+			chordal_root = True
 		else:
-			self.chordal_root = False
+			chordal_root = False
 		if self.chord_degree_to_pitch(1) in chord_scale_combo:
-			self.chordal_third = True
+			chordal_third = True
 		else:
-			self.chordal_third = False
+			chordal_third = False
 		if self.chord_degree_to_pitch(2) in chord_scale_combo:
-			self.chordal_fifth = True
+			chordal_fifth = True
 		else:
-			self.chordal_fifth = False
-		if not self.chordal_root or self.note_index == self.sequence_length - 1:
+			chordal_fifth = False
+		if not chordal_root or self.note_index == self.sequence_length - 1:
 			return self.add_soprano_notes(0)
-		elif not self.chordal_third:
+		elif not chordal_third:
 			return self.add_soprano_notes(1)
 		current_chord = self.get_chord()
-		if (not self.chordal_fifth and 
+		if (not chordal_fifth and 
 		  current_chord != idms_b.V7 and
 		  current_chord not in Voice.idms_mode.consonant_triads):
 			return self.add_soprano_notes(2)
 		if self.is_seventh_chord(): 
 			if self.chord_degree_to_pitch(3) in chord_scale_combo:
-				self.chordal_seventh = True
+				chordal_seventh = True
 			else:
-				self.chordal_seventh = False
-			if not self.chordal_seventh:
+				chordal_seventh = False
+			if not chordal_seventh:
 				return self.add_soprano_notes(3)
 		return self.soprano_pitch_choices
 	
@@ -290,45 +293,48 @@ class VoiceCombiner():
 		self.populate_note()
 		last_combo = self.lower_voice_pitches[self.note_index - 1]
 
-		with tqdm(total=len(self.possible_lower_pitches[0])) as pbar:
-			while None in self.lower_voice_pitches:
-				if self.possible_lower_pitches[self.note_index]:
-					self.combo_choice = \
-					self.possible_lower_pitches[self.note_index][0]
-					self.possible_soprano_pitches[self.note_index] = \
-					self.create_soprano_options()
-					# if not self.possible_soprano_pitches[self.note_index]:
-						# check reason for making mistakes
-						# print(Voice.bass_pitches[self.note_index])
-						# print(self.combo_choice)
-						# print(self.all_pitches)
-						# print(self.soprano_pitch_choices)
-						# print(self.soprano_scale_choices)
-						# print(self.chordal_root, self.chordal_third, self.chordal_fifth, self.chordal_seventh)
-						# print(self.get_chord(), self.note_index)
-						# self.possible_lower_pitches[self.note_index].remove(self.combo_choice)
-						# continue
-						# raise ValueError
-					self.validate_lower_notes()
-					self.lower_voice_pitches[self.note_index] = self.combo_choice
-					last_combo = self.combo_choice
-					self.note_index += 1
-					if self.inside_score:
-						self.populate_note()
-				else:
-					self.possible_lower_pitches[self.note_index] = None
-					if self.note_index == 1:
-						pbar.update(1)
-					elif self.note_index == 0:
-						raise IndexError("The chord progression has failed")
-					self.erase_lower_notes()
-					# store failed progressions in txt file up to point of impasse
-					self.note_index -= 1
-					self.possible_lower_pitches[self.note_index].remove(last_combo)
-					self.lower_voice_pitches[self.note_index] = None
-					last_combo = self.lower_voice_pitches[self.note_index - 1]
+		# with tqdm(total=len(self.possible_lower_pitches[0])) as pbar:
+		while None in self.lower_voice_pitches:
+			if self.possible_lower_pitches[self.note_index]:
+				self.combo_choice = \
+				self.possible_lower_pitches[self.note_index][0]
+				self.possible_soprano_pitches[self.note_index] = \
+				self.create_soprano_options()
+				# if not self.possible_soprano_pitches[self.note_index]:
+					# check reason for making mistakes
+					# print(Voice.bass_pitches[self.note_index])
+					# print(self.combo_choice)
+					# print(self.all_pitches)
+					# print(self.soprano_pitch_choices)
+					# print(self.soprano_scale_choices)
+					# print(chordal_root, chordal_third, chordal_fifth, chordal_seventh)
+					# print(self.get_chord(), self.note_index)
+					# self.possible_lower_pitches[self.note_index].remove(self.combo_choice)
+					# continue
+					# raise ValueError
+				self.validate_lower_notes()
+				self.lower_voice_pitches[self.note_index] = self.combo_choice
+				last_combo = self.combo_choice
+				self.note_index += 1
+				if self.inside_score:
+					self.populate_note()
+			else:
+				self.possible_lower_pitches[self.note_index] = None
+				# if self.note_index == 1:
+				# 	pbar.update(1)
+				if self.note_index == 0:
+					raise IndexError("The chord progression has failed")
+				self.erase_lower_notes()
+				# store failed progressions in txt file up to point of impasse
+				self.note_index -= 1
+				self.possible_lower_pitches[self.note_index].remove(last_combo)
+				self.lower_voice_pitches[self.note_index] = None
+				last_combo = self.lower_voice_pitches[self.note_index - 1]
 
-		print(self.possible_soprano_pitches)
+		# for interval_list in self.composite_lower_intervals:
+		# 	print(interval_list)
+		# for motion_list in self.composite_lower_motions:
+		# 	print(motion_list)
 
 	def erase_lower_notes(self):
 		if Voice.tenor_motion: 
@@ -382,41 +388,50 @@ class VoiceCombiner():
 		Voice.soprano_rhythm = []
 
 		print(self.possible_soprano_pitches)
-		# print(Voice.measure_rhythms)
-		# print(Voice.note_values)
-		# raise Exception("Stop")
-		with tqdm(total=len(chord_combo_options[0])) as pbar:
-			while None in self.soprano_full_pitches:
-				current_note_options = chord_combo_options[self.note_index] 
-				if current_note_options:
-					self.combo_choice = current_note_options[0]
-					melodies, new_rhythm = self.embellish_chord()
-					if melodies:
-						last_combo = self.combo_choice
-						chord_combo_choices[self.note_index] = last_combo
-						self.new_melody = random.choice(melodies)
-						self.soprano_full_pitches[self.note_index] = self.new_melody
-						Voice.soprano_rhythm.append(new_rhythm)
-						self.validate_melody()
-						self.note_index += 1
-						if self.inside_score:
-							new_combo_options = self.create_soprano_combos()
-							for new_combo in new_combo_options:
-								if new_combo[0] == last_combo[-1]:
-									chord_combo_options[self.note_index].append(new_combo)
-					else:
-						current_note_options.remove(self.combo_choice)
+		while None in self.soprano_full_pitches:
+			current_note_options = chord_combo_options[self.note_index]
+			print(f"Note index {self.note_index}", end=" ")
+			print(f"Current note options: {current_note_options}")
+			if current_note_options:
+				print(self.get_chord())
+				self.combo_choice = current_note_options[0]
+				self.set_measure_index()
+				self.set_beat_index()
+				self.set_modal_state()
+				print(f"Measure index: {self.measure_index}", end=" ")
+				print(f"Beat index: {self.beat_index}", end=" ")
+				print(f"Modal state: {self.modal_state}")
+				melodies, new_rhythm = self.embellish_chord()
+				if melodies:
+					last_combo = self.combo_choice
+					chord_combo_choices[self.note_index] = last_combo
+					self.new_melody = random.choice(melodies)
+					self.soprano_full_pitches[self.note_index] = self.new_melody
+					print(f"Added new melody: {self.soprano_full_pitches}")
+					Voice.soprano_rhythm.append(new_rhythm)
+					self.validate_melody()
+					self.note_index += 1
+					if self.inside_score:
+						new_combo_options = self.create_soprano_combos()
+						print(f"New combo options: {new_combo_options}")
+						for new_combo in new_combo_options:
+							if new_combo[0] == last_combo[-1]:
+								chord_combo_options[self.note_index].append(new_combo)
 				else:
-					self.erase_upper_voice()
-					if self.note_index == 1:
-						pbar.update(1)
-					elif self.note_index == 0:
-						raise IndexError("The melody has failed")
-					self.note_index -= 1
-					chord_combo_options[self.note_index].remove(last_combo)
-					last_combo = chord_combo_choices[self.note_index - 1]
-					chord_combo_choices[self.note_index] = []
-					self.soprano_full_pitches[self.note_index] = None	
+					print(f"Removing option: {self.combo_choice}")
+					current_note_options.remove(self.combo_choice)
+			else:
+				print("All roads lead to hell")
+				if self.note_index == 0:
+					raise IndexError("The melody has failed")
+				self.erase_upper_note()
+				# if self.note_index == 1:
+				# 	pbar.update(1)
+				self.note_index -= 1
+				chord_combo_options[self.note_index].remove(last_combo)
+				last_combo = chord_combo_choices[self.note_index - 1]
+				chord_combo_choices[self.note_index] = []
+				self.soprano_full_pitches[self.note_index] = None	
 
 		Voice.soprano_pitches = self.soprano_full_pitches 
 		print(Voice.soprano_pitches)
@@ -435,7 +450,7 @@ class VoiceCombiner():
 
 	def validate_melody(self):
 		self.add_soprano_intervals(Voice.bass_pitches, self.bass_soprano_intervals)
-		self.add_soprano_intervals(Voice.tenor_pitches, self. tenor_soprano_intervals)
+		self.add_soprano_intervals(Voice.tenor_pitches, self.tenor_soprano_intervals)
 		self.add_soprano_intervals(Voice.alto_pitches, self.alto_soprano_intervals)
 
 		self.add_soprano_motions(Voice.soprano_motion)
@@ -452,9 +467,9 @@ class VoiceCombiner():
 
 	def add_soprano_motions(self, voice_motion):
 		all_motions = []
-		parallax_melody = self.new_melody[:]
-		parallax_melody.append(self.combo_choice[1])
-		for current_note, next_note in zip(self.new_melody, parallax_melody[1:]):
+		shifted_melody = self.new_melody[:]
+		shifted_melody.append(self.combo_choice[1])
+		for current_note, next_note in zip(self.new_melody, shifted_melody[1:]):
 			if next_note < current_note:
 				all_motions.append(-1)
 			elif next_note > current_note:
@@ -471,13 +486,14 @@ class VoiceCombiner():
 		self.add_soprano_motion_type(Voice.bass_motion, Voice.soprano_motion,
 			self.bass_soprano_motion, self.bass_soprano_intervals)
 		self.add_soprano_motion_type(Voice.tenor_motion, Voice.soprano_motion,
-			self.bass_tenor_motion, self.bass_tenor_intervals)
+			self.tenor_soprano_motion, self.tenor_soprano_intervals)
 		self.add_soprano_motion_type(Voice.alto_motion, Voice.soprano_motion,
-			self.bass_alto_motion, self.bass_alto_intervals)
+			self.alto_soprano_motion, self.alto_soprano_intervals)
 
-	def add_soprano_motion_type(self, old_motion, new_motion, movements, intervals):
-		old_move = old_motion[self.note_index - 1]
-		new_move = new_motion[-2][-1]
+	def add_soprano_motion_type(
+		self, old_motion, new_motion, movements, intervals, index_shift=0):
+		old_move = old_motion[self.note_index - 1 + index_shift]
+		new_move = new_motion[-2 + index_shift][-1]
 
 		if (old_move == new_move and old_move != 0 and 
 		  intervals[-1][0] == intervals[-2][-1]):
@@ -486,7 +502,8 @@ class VoiceCombiner():
 			movements.append("No motion")
 		elif old_move == -(new_move) and old_move != 0:
 			movements.append("Contrary")
-		elif (old_move == new_move and intervals[-1][0] != intervals[-2][-1]):
+		elif (old_move == new_move and 
+		  intervals[-1][0] != intervals[-2][-1]):
 			movements.append("Similar")
 		elif ((old_move == 0 or new_move == 0) and 
 		  (old_move != 0 or new_move != 0)):

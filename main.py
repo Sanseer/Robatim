@@ -12,19 +12,19 @@ import generate.idioms.basics as idms_b
 
 # write tests in keyboard and chorale style to try custom chord progressions
 
-def random_settings(time_sig="", tonic="", mode=""):
-	"""Selects a random, but practical key and time sig unless one is provided"""
-	tonic, mode = random.choice((("C", "ionian"), ("A", "aeolian")))
-	if not mode:
-		mode = random.choice(("ionian", "aeolian"))
-	if mode == "ionian" and not tonic:
-		tonic =  random.choice(idms_b.major_keys)
-	elif mode == "aeolian" and not tonic:
-		tonic = random.choice(idms_b.minor_keys)
-	if not time_sig:
-		time_sig = random.choice(idms_b.time_sigs)
+# def random_settings(time_sig="", tonic="", mode=""):
+# 	"""Selects a random, but practical key and time sig unless one is provided"""
+# 	tonic, mode = random.choice((("C", "ionian"), ("A", "aeolian")))
+# 	if not mode:
+# 		mode = random.choice(("ionian", "aeolian"))
+# 	if mode == "ionian" and not tonic:
+# 		tonic =  random.choice(idms_b.major_keys)
+# 	elif mode == "aeolian" and not tonic:
+# 		tonic = random.choice(idms_b.minor_keys)
+# 	if not time_sig:
+# 		time_sig = random.choice(idms_b.time_sigs)
 
-	return time_sig, tonic, mode
+# 	return time_sig, tonic, mode
 
 def create_song():
 	"""Creates a tune with chorale style and period form"""

@@ -1,4 +1,5 @@
 from generate.idioms import basics as idms_b
+import pysnooper
 
 class Voice(object):
 
@@ -34,6 +35,7 @@ class Voice(object):
 	lily_parts = []
 	chord_symbols = []
 	chromatics = []
+	minor_pitches_to_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 9:5, 10:6, 11:6}
 
 
 	def __init__(self):
@@ -56,6 +58,16 @@ class Voice(object):
 	def groove(self):
 		return self.final_rhythm
 
+	def set_modal_state(self):
+		chrom = self.chromatics[self.note_index]
+		if self.mode == "ionian" and not chrom:
+			self.modal_state = "ionian"
+		elif self.mode == "aeolian" and not chrom: 
+			self.modal_state = "aeolian"
+		else:
+			self.modal_state = chrom
+
+	# make a property
 	def get_chord(self, index_shift=0):
 		return abs(Voice.chord_path[self.note_index + index_shift])
 
@@ -79,6 +91,49 @@ class Voice(object):
 			pitch = self.make_scale_pitch(pitch)
 		return Voice.idms_mode.pitches_to_degrees[pitch]
 
+	def get_scale_degree(self, pitch, index_shift=0):
+		chrom = self.chromatics[self.note_index + index_shift]
+		if not 0 <= pitch <= 11:
+			pitch = self.make_scale_pitch(pitch)
+		if not chrom:
+			return Voice.idms_mode.pitches_to_degrees[pitch]
+		elif chrom in idms_b.mode_notes.keys():
+			if chrom == "aeolian":
+				return Voice.minor_pitches_to_degrees[pitch]
+			else:
+				return idms_b.mode_notes[chrom].index(pitch)
+
+	# @pysnooper.snoop()
+	def increment_pitch(self, old_pitch, old_degree, increment):
+		new_degree = old_degree + increment
+		new_degree = self.center_scale_degree(new_degree)
+		# print(f"New_degree: {new_degree}", end=" ")
+		end_pitch = old_pitch + (increment * 3)
+		# melodic augmented second might need 3 half steps
+		# print(f"End pitch {end_pitch}")
+		if increment > 0:
+			possible_pitches = range(old_pitch, end_pitch + 1)
+		elif increment < 0:
+			possible_pitches = range(old_pitch, end_pitch - 1, -1)
+		# print(f"Possible pitches {possible_pitches}")
+		for current_true_pitch in possible_pitches:
+			# print(current_true_pitch, end=" ")
+			current_scale_pitch = self.make_scale_pitch(current_true_pitch)
+			# print(current_scale_pitch)
+			if (current_scale_pitch in {9,11} and self.modal_state == "aeolian" and
+			  increment < 0):
+				continue
+			elif (current_scale_pitch in {8,10} and self.modal_state == "aeolian" and
+			  increment > 0):
+				continue
+			try:
+				current_degree = self.get_scale_degree(current_scale_pitch)
+				if current_degree == new_degree:
+					# print("Finished!")
+					return current_true_pitch
+			except (KeyError, ValueError) as diatonic_error:
+				continue
+
 	def center_scale_degree(self, scale_degree):
 		if not 0 <= scale_degree <= 6:
 			scale_degree %= 7
@@ -90,45 +145,60 @@ class Voice(object):
 			return True
 		return False
 
-	def get_interval(self, old_pitch, new_pitch):
-		# try:
-		leap = new_pitch - old_pitch
-		if not 0 <= leap <= 11:
-			leap %= 12 
-		if self.chromatics[self.note_index]:
-			if self.chromatics[self.note_index] == "2Dom":
-				chord_shift = 4
-				convert_func = self.convert_sec_dom
-			elif self.chromatics[self.note_index] == "2Dim":
-				chord_shift = 6 
-				convert_func = self.convert_sec_dim
-			elif self.chromatics[self.note_index] in idms_b.mode_notes.keys():
-				# chord_shift = 0
-				# make current chord a property?
-				chord_shift = self.get_chord() % 10 - 1
-				convert_func = self.convert_mode
-			old_pitch_degree = self.revert_pitch_to_degree(
-				old_pitch, chord_shift, convert_func)
-			new_pitch_degree = self.revert_pitch_to_degree(
-				new_pitch, chord_shift, convert_func)
-		elif self.chromatics[self.note_index] is None:
-			old_pitch = self.make_scale_pitch(old_pitch)
-			new_pitch = self.make_scale_pitch(new_pitch)
-			old_pitch_degree = self.get_diatonic_scale_degree(old_pitch)
-			new_pitch_degree = self.get_diatonic_scale_degree(new_pitch)
+	def get_interval(self, old_pitch, new_pitch, index_shift=0):
+		try:
+			leap = new_pitch - old_pitch
+			if not 0 <= leap <= 11:
+				leap %= 12 
+		# chrom = self.chromatics[self.note_index]
+		# if self.chromatics[self.note_index]:
+		# 	if self.chromatics[self.note_index] == "2Dom":
+		# 		chord_shift = 4
+		# 		convert_func = self.convert_sec_dom
+		# 	elif self.chromatics[self.note_index] == "2Dim":
+		# 		chord_shift = 6 
+		# 		convert_func = self.convert_sec_dim
+		# 	elif self.chromatics[self.note_index] in idms_b.mode_notes.keys():
+		# 		# chord_shift = 0
+		# 		# make current chord a property?
+		# 		chord_shift = self.get_chord() % 10 - 1
+		# 		convert_func = self.convert_mode
+		# 	old_pitch_degree = self.revert_pitch_to_degree(
+		# 		old_pitch, chord_shift, convert_func)
+		# 	new_pitch_degree = self.revert_pitch_to_degree(
+		# 		new_pitch, chord_shift, convert_func)
+		# elif self.chromatics[self.note_index] is None:
+		# 	# old_pitch = self.make_scale_pitch(old_pitch)
+		# 	# new_pitch = self.make_scale_pitch(new_pitch)
+		# 	old_pitch_degree = self.get_diatonic_scale_degree(old_pitch)
+		# 	new_pitch_degree = self.get_diatonic_scale_degree(new_pitch)
 
-		generic_interval = new_pitch_degree - old_pitch_degree
-		if generic_interval < 0:
-			generic_interval += 7
-		return idms_b.interval_names[(leap, generic_interval)]
-		# except:
-		# 	print(self.mode)
-		# 	print(self.chromatics[self.note_index])
-		# 	print(self.get_chord())
-		# 	print(old_pitch, new_pitch)
-		# 	print(self.make_scale_pitch(old_pitch), 
-		# 		self.make_scale_pitch(new_pitch))
-		# 	with pysnooper.snoop(depth=3):
+			old_pitch_degree = self.get_scale_degree(old_pitch, index_shift)
+			new_pitch_degree = self.get_scale_degree(new_pitch, index_shift)
+
+			generic_interval = new_pitch_degree - old_pitch_degree
+			if generic_interval < 0:
+				generic_interval += 7
+			return idms_b.interval_names[(leap, generic_interval)]
+		except:
+			print(self.mode)
+			print(self.chromatics[self.note_index])
+			print(self.get_chord())
+			print(old_pitch, new_pitch)
+			print(self.make_scale_pitch(old_pitch), 
+				self.make_scale_pitch(new_pitch))
+			with pysnooper.snoop(depth=2):
+				leap = new_pitch - old_pitch
+				if not 0 <= leap <= 11:
+					leap %= 12 
+
+				old_pitch_degree = self.get_scale_degree(old_pitch, index_shift)
+				new_pitch_degree = self.get_scale_degree(new_pitch, index_shift)
+
+				generic_interval = new_pitch_degree - old_pitch_degree
+				if generic_interval < 0:
+					generic_interval += 7
+				return idms_b.interval_names[(leap, generic_interval)]
 
 	def revert_pitch_to_degree(self, pitch, chord_shift, convert_func):
 		chord = self.get_chord()

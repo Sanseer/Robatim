@@ -24,12 +24,12 @@ class Bass(Voice):
 		if Voice.mode == "ionian":
 			import generate.idioms.major
 			Voice.idms_mode = generate.idioms.major
-			Voice.tonic = "C"
+			# Voice.tonic = "C"
 		elif Voice.mode == "aeolian":
 			import generate.idioms.minor
 			Voice.idms_mode = generate.idioms.minor
-			Voice.tonic = "A"
-		# Voice.tonic = random.choice(self.idms_mode.key_sigs)
+			# Voice.tonic = "A"
+		Voice.tonic = random.choice(self.idms_mode.key_sigs)
 
 		self.note_index = 0
 		self.chord_descent = False
@@ -93,7 +93,7 @@ class Bass(Voice):
 		self.add_transition_idea1()
 		self.add_chord_sequence(self.chord_style2)
 		Voice.note_values.append(self.contrast_idea1_rhythm)
-		print("Rhythm:",Voice.note_values, len(Voice.note_values))
+		# print("Rhythm:",Voice.note_values, len(Voice.note_values))
 
 	def add_basic_idea1(self):
 		if Voice.measure_length == 3:
@@ -105,7 +105,7 @@ class Bass(Voice):
 		self.add_chord_sequence(self.chord_style1)
 		self.basic_idea1_rhythm = antecedent_rhythms[self.chord_style1]
 		Voice.note_values.append(self.basic_idea1_rhythm)
-		print("Rhythm:",Voice.note_values, len(Voice.note_values))
+		# print("Rhythm:",Voice.note_values, len(Voice.note_values))
 
 	def add_transition_idea1(self):
 		self.declare_transition(self.chord_style1)
@@ -160,24 +160,24 @@ class Bass(Voice):
 	def are_valid_chords(self, chords_chosen):
 		if (self.old_chord in {idms_b.II, idms_b.II6, idms_b.IV} and
 		  chords_chosen[0] in {-idms_b.V6, -idms_b.V65} and self.chord_descent):
-			print("Double descent")
+			# print("Double descent")
 			return False
 		elif chords_chosen[0] in {-idms_b.I, -idms_b.I_MAJOR} and self.chord_descent:
-			print("Return to tonic double descent")
+			# print("Return to tonic double descent")
 			return False
 		elif (chords_chosen[0] in {idms_b.I, idms_b.I_MAJOR} and not self.chord_descent and 
 		  self.old_chord not in {idms_b.V6, idms_b.V65}):
-			print("Return to tonic double ascent")
+			# print("Return to tonic double ascent")
 			return False
 		return True
 
 	def add_chord_sequence(self, chord_types):
-		print("Chord types:", chord_types)
+		# print("Chord types:", chord_types)
 		for chord_type in chord_types:
 			possible_chords = None
 			chords_chosen = None
-			print("Chord type:", chord_type)
-			print("Old chord:", self.old_chord)
+			# print("Chord type:", chord_type)
+			# print("Old chord:", self.old_chord)
 			chord_seq = chord_type.replace("*","")
 			while possible_chords is None:
 				try:
@@ -192,7 +192,7 @@ class Bass(Voice):
 			# print("Full chord options:", self.chord_options)
 			while chords_chosen is None:
 				chords_chosen = random.choice(self.chord_options[-1])
-				print("Chords chosen:", chords_chosen)
+				# print("Chords chosen:", chords_chosen)
 				if type(chords_chosen) == int:
 					chord_pack = (chords_chosen,)
 				elif type(chords_chosen) == tuple:
@@ -241,13 +241,13 @@ class Bass(Voice):
 		print(self.chord_options)
 
 	def check_descent(self):
-		print("Checking descent:", self.chord_descent)
+		# print("Checking descent:", self.chord_descent)
 		if (Voice.chord_path[-1][0] in {-idms_b.VI, -idms_b.IV6, -idms_b.IV6_MAJOR} and 
 		  abs(Voice.chord_path[-2][-1]) == idms_b.I):
 			self.chord_descent = True
 		elif self.old_chord == idms_b.I:
 			self.chord_descent = False
-		print("New descent:", self.chord_descent)
+		# print("New descent:", self.chord_descent)
 
 	def add_chromatic(self, chord):
 		"""Marks chords for mode mixture and modulation"""
@@ -300,33 +300,33 @@ class Bass(Voice):
 
 	def add_transition_chord(self, next_chord_style):
 		"""Adds transition chord for the next 2 measures"""
-		print(next_chord_style)
+		# print(next_chord_style)
 		if self.contrast_idea_start == "tonic":
 			if self.chord_style1[-1] == "TDN1" and not self.chord_style3:
-				print("double_neighbor2")
+				# print("double_neighbor2")
 				self.add_single_chord(idms_b.double_neighbor2)
 			else:
-				print("restart_tonic")
+				# print("restart_tonic")
 				self.add_single_chord(idms_b.restart_tonic)
 		elif self.contrast_idea_start == "subdominant":
 			if (next_chord_style[0] in {"M+SA1-M","M+SA1+M"} and 
 			  Voice.note_values[-1][-1] in {3,4}):
-				print("strong_to_subdom2_strong")
+				# print("strong_to_subdom2_strong")
 				self.add_single_chord(Voice.idms_mode.strong_to_subdom2_strong)
 			elif (next_chord_style[0] in {"HC1","HC2","IAC2","PAC2"} and
 			  Voice.note_values[-1][-1] in {3,4}):
-				print("strong_to_subdom1_strong")
+				# print("strong_to_subdom1_strong")
 				self.add_single_chord(Voice.idms_mode.strong_to_subdom1_strong)
 			elif next_chord_style[0] in {"M+SA1-M","M+SA1+M"}:
-				print("weak_to_subdom2_strong")
+				# print("weak_to_subdom2_strong")
 				self.add_single_chord(Voice.idms_mode.weak_to_subdom2_strong)
 			elif next_chord_style[0] in {"HC1","HC2","IAC2","PAC2"}:
-				print("weak_to_subdom1_strong")
+				# print("weak_to_subdom1_strong")
 				self.add_single_chord(Voice.idms_mode.weak_to_subdom1_strong)
 			else:
 				raise ValueError("Invalid chords")
 		elif self.contrast_idea_start == "dominant":
-			print("restart_dom")
+			# print("restart_dom")
 			self.add_single_chord(idms_b.restart_dom)
 
 	def add_rest_rhythm(self, rhythm):
@@ -348,7 +348,7 @@ class Bass(Voice):
 		self.add_chord_sequence(self.chord_style4)
 		Voice.note_values.append(self.contrast_idea2_rhythm)
 
-		print("Rhythm:",Voice.note_values, len(Voice.note_values))
+		# print("Rhythm:",Voice.note_values, len(Voice.note_values))
 		print(Voice.chord_path)
 
 		if Voice.half_rest_ending:
@@ -454,6 +454,7 @@ class Bass(Voice):
 	def convert_notes(self):
 		"""Converts notes from reference scale pitches to pitch magnitudes"""
 		# tie notes optionally if bass is stationary within a measure
+		print(self.chromatics)
 		self.real_notes = [note + 48 + idms_b.tonics[Voice.tonic] 
 			for note in self.pitch_amounts]
 		if max(self.real_notes) > 62:
