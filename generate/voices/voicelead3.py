@@ -43,6 +43,7 @@ class MelodyMixin():
 			print("Leap too wide")
 			return [], []
 
+
 		if (self.measure_index in {3,7} and self.beat_index == -1 
 		  or len(new_rhythm) == 1):
 			print("No embellishment.")
@@ -52,8 +53,19 @@ class MelodyMixin():
 			melodies = self.create_embellishments()
 			if not melodies:
 				[], []
+		if self.note_index > 0:
+			self.previous_note = self.soprano_full_pitches[self.note_index - 1][-1]
 		if self.note_index == self.sequence_length - 1:
 			# also needs validation
+			if (len(self.soprano_full_pitches[self.note_index - 1]) == 1 and
+			  abs((self.previous_note - 
+			  self.soprano_full_pitches[self.note_index - 2][-1])) > 5 and
+			  (abs(self.previous_note - self.first_note) > 2 or 
+			  Voice.soprano_motion[-2][-1] == Voice.soprano_motion[-1][-1])):
+				print("Leap followed by step within 3 chords")
+				return [], []
+			elif abs(self.previous_note - self.first_note) > 5:
+				return [], []
 			return melodies, new_rhythm
 		approved_melodies = []
 		for melody in melodies:
@@ -63,7 +75,6 @@ class MelodyMixin():
 
 		print(f"Approved melodies: {approved_melodies}")
 		return approved_melodies, new_rhythm
-		# return [[first_note, first_note]], new_rhythm
 
 	def shift_scale_degree(self, original_scale_degree, shift_amount):
 		new_scale_degree = original_scale_degree + shift_amount
@@ -98,44 +109,48 @@ class MelodyMixin():
 		else:
 			scale_difference = 0
 		print(f"Scale difference: {scale_difference}")
-		# begin_index = pitch_sequence.index(self.first_note)
-		# end_index = pitch_sequence.index(self.last_note)
 
 		if scale_difference == 1:
 			middle_note = self.increment_pitch(
 				self.last_note, end_degree, increment)
-			# middle_note = pitch_sequence[end_index + increment]
 			if low_point <= middle_note <= high_point:
 				possible_melodies.append([self.first_note, middle_note])
 		elif scale_difference == 2:
 			middle_note = self.increment_pitch(
 				self.first_note, begin_degree, increment)
-			# middle_note = pitch_sequence[begin_index + increment]
 			possible_melodies.append([self.first_note, middle_note])
 			middle_note = self.increment_pitch(
 				self.last_note, end_degree, increment)
-			# middle_note = pitch_sequence[end_index + increment]
 			if low_point <= middle_note <= high_point:
 				possible_melodies.append([self.first_note, middle_note])
 		elif scale_difference == 3:
 			middle_note = self.increment_pitch(
 				self.first_note, begin_degree, increment * 2)
-			# middle_note = pitch_sequence[begin_index + (increment * 2)]
 			possible_melodies.append([self.first_note, middle_note])
+			middle_note = self.increment_pitch(
+				self.last_note, end_degree, increment)
+			if low_point <= middle_note <= high_point:
+				possible_melodies.append([self.first_note, middle_note])
 		elif scale_difference == 4:
 			middle_note = self.increment_pitch(
 				self.first_note, begin_degree, increment * 2)
-			# middle_note = pitch_sequence[begin_index + (increment * 2)]
 			possible_melodies.append([self.first_note, middle_note])
+			middle_note = self.increment_pitch(
+				self.last_note, end_degree, increment)
+			if low_point <= middle_note <= high_point:
+				possible_melodies.append([self.first_note, middle_note])
 		elif scale_difference == 5:
 			middle_note = self.increment_pitch(
 				self.first_note, begin_degree, increment * 2)
-			# middle_note = pitch_sequence[begin_index + (increment * 2)]
 			possible_melodies.append([self.first_note, middle_note])
 			middle_note = self.increment_pitch(
 				self.first_note, begin_degree, increment * 3)
-			# middle_note = pitch_sequence[begin_index + (increment * 3)]
 			possible_melodies.append([self.first_note, middle_note])
+		elif scale_difference == 6:
+			middle_note = self.increment_pitch(
+				self.last_note, end_degree, increment)
+			if low_point <= middle_note <= high_point:
+				possible_melodies.append([self.first_note, middle_note])
 		elif scale_difference == 0:
 			middle_note = self.increment_pitch(
 				self.first_note, begin_degree, 1)
@@ -146,16 +161,22 @@ class MelodyMixin():
 			if low_point <= middle_note <= high_point:
 				possible_melodies.append([self.first_note, middle_note])
 
-
+		approved_melodies = []
 		print(f"Possible melodies: {possible_melodies}")
-		# if scale_difference == 0 and begin_index != 0:
-		# 	middle_note = pitch_sequence[begin_index - 1]
-		# 	possible_melodies.append([self.note_index, middle_note])
-		# if scale_difference == 0 and end_index != len(pitch_sequence) - 1:
-		# 	middle_note = pitch_sequence[begin_index + 1]
-		# 	possible_melodies.append([self.note_index, middle_note])
+		if (self.modal_state == "aeolian" and 
+			(begin_degree in {5,6} or end_degree in {5,6})): 
+			for melody in possible_melodies:
+				middle_note = melody[1]
+				middle_degree = self.get_scale_degree(middle_note)
+				if (middle_degree in {5,6} and 
+				  (abs(self.first_note - middle_note) == 3 or 
+				  abs(self.last_note - middle_note))):
+					continue
+				approved_melodies.append(melody)
+		else:
+			approved_melodies = possible_melodies 
 
-		return possible_melodies
+		return approved_melodies
 
 	def validate_embellishment(self):
 
@@ -193,19 +214,18 @@ class MelodyMixin():
 		bass_soprano_motion = self.bass_soprano_motion[:]
 		tenor_soprano_motion = self.tenor_soprano_motion[:]
 		alto_soprano_motion = self.alto_soprano_motion[:]
-		if self.note_index > 0:
-			previous_note = self.soprano_full_pitches[self.note_index - 1][-1]
+		print(soprano_motion)
 		if (self.note_index > 0 and len(self.new_melody) >= 2 and
-		  abs((previous_note - self.first_note)) > 5  and
+		  abs((self.previous_note - self.first_note)) > 5  and
 		  (abs(self.first_note - self.new_melody[1]) > 2 or 
 		  soprano_motion[-2][-1] == soprano_motion[-1][0])):
 			print("Leap followed by step within 2 chords")
 			return False
 		elif (self.note_index > 1 and 
 		  len(self.soprano_full_pitches[self.note_index - 1]) == 1 and
-		  abs(self.soprano_full_pitches[self.note_index - 2][-1] - previous_note) > 5 and
-		  (abs(previous_note - self.first_note) > 2 or 
-		  soprano_motion[-2][-1] == soprano_motion[-1][0])):
+		  abs(self.soprano_full_pitches[self.note_index - 2][-1] - self.previous_note) > 5 and
+		  (abs(self.previous_note - self.first_note) > 2 or 
+		  soprano_motion[-3][-1] == soprano_motion[-2][-1])):
 			print("Leap followed by step within 3 chords")
 			return False
 

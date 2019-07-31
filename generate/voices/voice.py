@@ -38,6 +38,7 @@ class Voice(object):
 	minor_pitches_to_degrees = { 0:0, 2:1, 3:2, 5:3, 7:4, 8:5, 9:5, 10:6, 11:6}
 
 
+
 	def __init__(self):
 		self.note_index = 0
 		self.measure_notes = []
@@ -98,9 +99,11 @@ class Voice(object):
 		if not chrom:
 			return Voice.idms_mode.pitches_to_degrees[pitch]
 		elif chrom in idms_b.mode_notes.keys():
+			# pitch += Voice.key_changer[(self.mode, chrom)]
 			if chrom == "aeolian":
 				return Voice.minor_pitches_to_degrees[pitch]
 			else:
+				# can't get scale degree because currently using minor tonic
 				return idms_b.mode_notes[chrom].index(pitch)
 
 	# @pysnooper.snoop()
