@@ -41,26 +41,11 @@ class Melody(Voice):
 		self.unnested_full_melody = []
 		self.midi_melody = []
 
-		# make into class method
-		# --------------------------------
-		current_pitch = -12
-		root_pitch = current_pitch + Voice.tonics[Voice.tonic]
-		scale_sequence = Voice.mode_notes[Voice.mode][:7]
-		# if len(set(scale_sequence)) != len(scale_sequence):
-		# 	raise Exception
-		all_midi_pitches = []
-		while current_pitch < 128:
-			for chromatic_shift in scale_sequence:
-				current_pitch = root_pitch + chromatic_shift
-				all_midi_pitches.append(current_pitch)
-			root_pitch += 12
-
-		Voice.all_midi_pitches = [
-			midi_pitch for midi_pitch in all_midi_pitches if 0 <= midi_pitch <= 127]
-
-		self.logger.warning(f"All midi pitches: {Voice.all_midi_pitches}")
-		self.logger.warning("")
-		#----------------------------------
+		self.all_scale_degree_options = []
+		self.melodic_direction = []
+		self.chosen_scale_degress = []
+		self.current_scale_degree_options = []
+		self.melody_figure_options = []
 
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [[current - 1], [current + 1]],
@@ -102,6 +87,7 @@ class Melody(Voice):
 		}
 
 	def set_unnested_full_melody(self):
+		"""Create a unnested sequence of the currently approved melody"""
 		self.unnested_full_melody = []
 		for melody_group in self.nested_full_melody[:self.chord_index - 1]:
 			for melody_note in melody_group:
@@ -110,12 +96,31 @@ class Melody(Voice):
 
 	def make_melody(self):
 		"""Make a random melody from a randomly selected chord progression"""
+		self.set_scale_midi_pitches()
 		self.make_chord_progression()
 		self.create_rhythm()
 		self.realize_melody()
-		# self.realize_full_melody()
 		self.plot_midi_notes()
 		return self.midi_melody
+
+	def set_scale_midi_pitches(self):
+		"""Choose all midi pitches that are diatonic to the key signature"""
+		current_pitch = -12
+		root_pitch = current_pitch + Voice.tonics[Voice.tonic]
+		scale_sequence = Voice.mode_notes[Voice.mode][:7]
+
+		all_midi_pitches = []
+		while current_pitch < 128:
+			for chromatic_shift in scale_sequence:
+				current_pitch = root_pitch + chromatic_shift
+				all_midi_pitches.append(current_pitch)
+			root_pitch += 12
+
+		Voice.all_midi_pitches = [
+			midi_pitch for midi_pitch in all_midi_pitches if 0 <= midi_pitch <= 127]
+
+		self.logger.warning(f"All midi pitches: {Voice.all_midi_pitches}")
+		self.logger.warning("")
 
 	def make_chord_progression(self):
 		"""Make a chord progression using common practice idioms"""
@@ -140,6 +145,8 @@ class Melody(Voice):
 			Voice.chord_sequence.append(Chord(current_chord_str))
 
 	def create_rhythm(self):
+		"""Choose a rhythm for the melody with basic/contrasting ideas"""
+
 		raw_rhythm_symbols = []
 		for phrase_options in idms_b.rhythm_patterns:
 			raw_rhythm_symbols.extend(random.choice(phrase_options))
@@ -183,25 +190,49 @@ class Melody(Voice):
 		self.logger.warning("")
 		self.logger.warning("")
 
-	def realize_melody(self):
-		"""Create the foundational melody structure"""
+	def create_melody_options(self):
+		"""Use chord progression to layout possible base melody combinations"""
 
-		# make into class attribute
-		all_scale_degree_options  = self.create_melody_options()
+		phrase4_start_index = 12
+		phrase2_start_index = 4
+		include_octave = random.choice((True, False))
+		if Voice.chord_sequence[0].chord_symbol == "0I":
+			self.all_scale_degree_options.append([0, 2, 4])
+		# separate first note to allow irregular starts e.g., major 2nd
+		for chord_index, chord_obj in enumerate(Voice.chord_sequence[1:-2], 1):
+			current_scale_degrees = chord_obj.scale_degrees
+			self.all_scale_degree_options.append([])
+			self.all_scale_degree_options[-1].extend(current_scale_degrees)
+			if phrase2_start_index <= chord_index < phrase4_start_index:
+				if include_octave and 0 in self.all_scale_degree_options[-1]:
+					self.all_scale_degree_options[-1].append(7)
 
-		# change into inner function
+			elif chord_index >= phrase4_start_index: 
+				for scale_degree in current_scale_degrees:
+					if scale_degree >= 4:
+						self.all_scale_degree_options[-1].append(scale_degree - 7)
+
+		for scale_degrees in self.all_scale_degree_options:
+			random.shuffle(scale_degrees)
+
+		self.all_scale_degree_options.extend([[0], [0]])
+
+	def setup_melody_parameters(self):
+		"""Create sequences to track while validating a melody"""
+
 		self.melodic_direction = [None for _ in range(16)]
 		self.chosen_scale_degress = [None for _ in range(16)]
-		# make into class attribute
-		current_scale_degree_options = [[] for _ in range(16)]
-		current_scale_degree_options[0].extend(all_scale_degree_options[0][:])
+		self.current_scale_degree_options = [[] for _ in range(16)]
+		self.current_scale_degree_options[0].extend(self.all_scale_degree_options[0][:])
 		self.melody_figure_options = [[] for _ in range(16)]
 		self.nested_full_melody = [[] for _ in range(16)]
 
+	def create_first_melody_note(self):
+		"""Setup the tonic starting note"""
 		self.chord_index = 0
 		self.logger.warning(f"Chord index: {self.chord_index}")
-		self.logger.warning(f"Current scale degree options {current_scale_degree_options}")
-		self.current_degree_choice = current_scale_degree_options[0].pop()
+		self.logger.warning(f"Current scale degree options {self.current_scale_degree_options}")
+		self.current_degree_choice = self.current_scale_degree_options[0].pop()
 
 		self.chosen_scale_degress[0] = self.current_degree_choice
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
@@ -210,80 +241,87 @@ class Melody(Voice):
 		self.logger.warning(f"Melodic direction: {self.melodic_direction}" )
 
 		self.chord_index += 1
-		current_scale_degree_options[1] = all_scale_degree_options[1][:]
+		self.current_scale_degree_options[1] = self.all_scale_degree_options[1][:]
 		self.previous_degree_choice = self.current_degree_choice
 		self.logger.warning("")
 		self.logger.warning("")
 
-		# change into inner function
+	def realize_melody(self):
+		"""Create a melody based on selected rhythm and chords"""
+		self.create_melody_options()
+		self.setup_melody_parameters()
+		self.create_first_melody_note()
 
 		while None in self.chosen_scale_degress:
 			self.logger.warning(f"Chord index: {self.chord_index}")
-			self.logger.warning(f"Current scale degree options: {current_scale_degree_options}")
+			self.logger.warning(f"Current scale degree options: {self.current_scale_degree_options}")
 			if self.melody_figure_options[self.chord_index - 1]:
-				self.logger.warning("Choosing from remaining figures")
-				self.logger.warning(f"Remaining melody figures: {self.melody_figure_options}")
-				# only occurs when backtracking
-				# make into function
-				self.current_degree_choice = self.chosen_scale_degress[self.chord_index]
-				self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
-				self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
-				if self.validate_full_melody():
-					# change into function, by making some new class attributes
-					self.logger.warning(f"Melodic direction {self.melodic_direction}")
-					self.logger.warning(f"Chosen scale degrees: {self.chosen_scale_degress}")
-					self.logger.warning("")
-					self.logger.warning("")
-					self.chord_index += 1
-					if self.chord_index < len(self.chosen_scale_degress):
-						self.previous_degree_choice = self.current_degree_choice
-						current_scale_degree_options[self.chord_index] = (
-							all_scale_degree_options[self.chord_index][:])
-				else:
-					self.melodic_direction[self.chord_index] = None
-					self.chosen_scale_degress[self.chord_index] = None
-			elif current_scale_degree_options[self.chord_index]:
-				self.logger.warning("Choosing base note")
-				# make into function
-				self.current_degree_choice = current_scale_degree_options[self.chord_index].pop()
-				self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
-				self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
-
-				if self.current_degree_choice == self.previous_degree_choice:
-					self.melodic_direction[self.chord_index] = '_'
-				elif self.current_degree_choice > self.previous_degree_choice:
-					self.melodic_direction[self.chord_index] = '>'
-				elif self.current_degree_choice < self.previous_degree_choice:
-					self.melodic_direction[self.chord_index] = '<'
-
-				self.chosen_scale_degress[self.chord_index] = self.current_degree_choice 
-				if self.validate_base_melody() and self.validate_full_melody():
-					# duplicate function
-					self.logger.warning(f"Melodic direction {self.melodic_direction}")
-					self.logger.warning(f"Chosen scale degrees: {self.chosen_scale_degress}")
-					self.logger.warning("")
-					self.logger.warning("")
-					self.chord_index += 1
-					if self.chord_index < len(self.chosen_scale_degress):
-						self.previous_degree_choice = self.current_degree_choice
-						current_scale_degree_options[self.chord_index] = (
-							all_scale_degree_options[self.chord_index][:])
-				else:
-					self.melodic_direction[self.chord_index] = None
-					self.chosen_scale_degress[self.chord_index] = None
+				self.attempt_melody_figure()
+			elif self.current_scale_degree_options[self.chord_index]:
+				self.attempt_full_melody()
 			else:
-				# make into function
-				self.melodic_direction[self.chord_index] = None
-				self.chosen_scale_degress[self.chord_index] = None
-				self.chord_index -= 1
-				if self.chord_index < 0:
-					raise IndexError
-				self.previous_degree_choice = self.chosen_scale_degress[self.chord_index - 1]
-				if not self.melody_figure_options[self.chord_index - 1]:
-					self.melodic_direction[self.chord_index] = None
-					self.chosen_scale_degress[self.chord_index] = None
+				self.backtrack_score()
 
 		self.nested_full_melody[-1] = [self.current_degree_choice]
+
+	def backtrack_score(self):
+		"""Reverse to the previous chord to fix bad notes"""
+		self.melodic_direction[self.chord_index] = None
+		self.chosen_scale_degress[self.chord_index] = None
+		self.chord_index -= 1
+		if self.chord_index < 0:
+			raise IndexError
+		self.previous_degree_choice = self.chosen_scale_degress[self.chord_index - 1]
+		if not self.melody_figure_options[self.chord_index - 1]:
+			self.melodic_direction[self.chord_index] = None
+			self.chosen_scale_degress[self.chord_index] = None
+
+	def advance_score(self):
+		"""Progress to the next chord after current melody is validated"""
+		self.logger.warning(f"Melodic direction {self.melodic_direction}")
+		self.logger.warning(f"Chosen scale degrees: {self.chosen_scale_degress}")
+		self.logger.warning("")
+		self.logger.warning("")
+		self.chord_index += 1
+		if self.chord_index < len(self.chosen_scale_degress):
+			self.previous_degree_choice = self.current_degree_choice
+			self.current_scale_degree_options[self.chord_index] = (
+				self.all_scale_degree_options[self.chord_index][:])
+
+	def attempt_melody_figure(self):
+		"""Try all remaining melody figures against current base melody"""
+		self.logger.warning("Choosing from remaining figures")
+		self.logger.warning(f"Remaining melody figures: {self.melody_figure_options}")
+		# only occurs when backtracking
+		self.current_degree_choice = self.chosen_scale_degress[self.chord_index]
+		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
+		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
+		if self.validate_melody_figure():
+			self.advance_score()
+		else:
+			self.melodic_direction[self.chord_index] = None
+			self.chosen_scale_degress[self.chord_index] = None
+
+	def attempt_full_melody(self):
+		"""Try all possible base melodies and figurations"""
+		self.logger.warning("Choosing base note")
+		self.current_degree_choice = self.current_scale_degree_options[self.chord_index].pop()
+		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
+		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
+
+		if self.current_degree_choice == self.previous_degree_choice:
+			self.melodic_direction[self.chord_index] = '_'
+		elif self.current_degree_choice > self.previous_degree_choice:
+			self.melodic_direction[self.chord_index] = '>'
+		elif self.current_degree_choice < self.previous_degree_choice:
+			self.melodic_direction[self.chord_index] = '<'
+
+		self.chosen_scale_degress[self.chord_index] = self.current_degree_choice 
+		if self.validate_base_melody() and self.validate_melody_figure():
+			self.advance_score()
+		else:
+			self.melodic_direction[self.chord_index] = None
+			self.chosen_scale_degress[self.chord_index] = None
 
 	def validate_base_melody(self):
 		melodic_mvmt = "".join([
@@ -405,37 +443,7 @@ class Melody(Voice):
 		
 		return True
 
-	def create_melody_options(self):
-		"""Use chord progression to layout possible base melody combinations"""
-
-		all_scale_degree_options = []
-		phrase4_start_index = 12
-		phrase2_start_index = 4
-		include_octave = random.choice((True, False))
-		if Voice.chord_sequence[0].chord_symbol == "0I":
-			all_scale_degree_options.append([0, 2, 4])
-		# separate first note to allow irregular starts e.g., major 2nd
-		for chord_index, chord_obj in enumerate(Voice.chord_sequence[1:-2], 1):
-			current_scale_degrees = chord_obj.scale_degrees
-			all_scale_degree_options.append([])
-			all_scale_degree_options[-1].extend(current_scale_degrees)
-			if phrase2_start_index <= chord_index < phrase4_start_index:
-				if include_octave and 0 in all_scale_degree_options[-1]:
-					all_scale_degree_options[-1].append(7)
-
-			elif chord_index >= phrase4_start_index: 
-				for scale_degree in current_scale_degrees:
-					if scale_degree >= 4:
-						all_scale_degree_options[-1].append(scale_degree - 7)
-
-		for scale_degrees in all_scale_degree_options:
-			random.shuffle(scale_degrees)
-
-		all_scale_degree_options.extend([[0], [0]])
-
-		return all_scale_degree_options
-
-	def validate_full_melody(self):
+	def validate_melody_figure(self):
 		if self.chord_index == 15:
 			self.nested_full_melody[self.chord_index - 1] = [self.previous_degree_choice]
 			return True
