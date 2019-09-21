@@ -1,3 +1,4 @@
 *.mid
 new_layout.txt
 __pycache__
+*.log
