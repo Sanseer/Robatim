@@ -573,18 +573,23 @@ class Melody(Voice):
 		elif Voice.measure_length == 3:
 			chord_quarter_length = 3
 
-		chord_index = 0
 		self.logger.warning(f"Beat division: {Voice.beat_division}")
 		self.logger.warning(f"Measure length: {Voice.measure_length}")
 		self.logger.warning(f"Unit length: {unit_length}")
 		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
-		for scale_group in self.nested_scale_degrees:
-			for embellish_index, scale_pitch in enumerate(scale_group):
+		for chord_index, scale_group in enumerate(self.nested_scale_degrees):
+
+			chord_name = Voice.chord_sequence[chord_index].chord_name
+			if Voice.mode == "ionian" and chord_name in Chord.major_mode_alterations:
+				note_alterations = Chord.major_mode_alterations[chord_name]
+			elif Voice.mode == "aeolian" and chord_name in Chord.minor_mode_alterations:
+				note_alterations = Chord.minor_mode_alterations[chord_name]
+			else: 
+				note_alterations = {}
+
+			for embellish_index, scale_degree in enumerate(scale_group):
 				embellish_duration = self.finalized_rhythms[chord_index][embellish_index]
-				if Voice.mode == "aeolian" and scale_pitch in {6, -1}:
-					offset = 1
-				else:
-					offset = 0
+				note_offset = note_alterations.get(scale_degree, 0)
 				embellish_fraction = Fraction(numerator=embellish_duration, denominator=unit_length)
 
 				raw_note_duration = 960 * chord_quarter_length * embellish_fraction
@@ -593,11 +598,10 @@ class Melody(Voice):
 					fixed_note_duration = 960
 				else:
 					fixed_note_duration = raw_note_duration
-				midi_pitch = melody_range[scale_pitch + 3]
+				midi_pitch = melody_range[scale_degree + 3]
 				self.midi_notes.append(
-					Voice.Note(midi_pitch + offset, int(current_time), int(fixed_note_duration)))
+					Voice.Note(midi_pitch + note_offset, int(current_time), int(fixed_note_duration)))
 				current_time += raw_note_duration
-			chord_index += 1
 
 		self.logger.warning(f"Midi melody: {self.midi_notes}")
 
