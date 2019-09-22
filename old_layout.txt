@@ -1,17 +1,22 @@
 \version "2.18.2"
 
 \header {
-  title = "Chorale"
+  title = "Medley"
   composer = "Robatim"
 }
 
+melody = { PART_SLOT }
 bass = { \voiceFour PART_SLOT }
 tenor = { \voiceThree PART_SLOT}
 alto = { \voiceTwo PART_SLOT}
 soprano = { \voiceOne PART_SLOT }
 
+
 \score {
     \new PianoStaff <<
+      \new Staff << 
+        \new Voice \clef "alto" { \melody}
+      >>
       \new Staff <<
         \new Voice \clef "treble" { \soprano }
         \new Voice { \alto }

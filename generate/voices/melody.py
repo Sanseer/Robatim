@@ -37,9 +37,9 @@ class Melody(Voice):
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
 		self.rhythm_symbols = [None for _ in range(16)]
 		self.finalized_rhythms = {}
-		self.nested_full_melody = []
-		self.unnested_full_melody = []
-		self.midi_melody = []
+		self.nested_scale_degrees = []
+		self.unnested_scale_degrees = []
+		self.midi_notes = []
 
 		self.all_scale_degree_options = []
 		self.melodic_direction = []
@@ -86,22 +86,19 @@ class Melody(Voice):
 				[current + slope, current + slope]]
 		}
 
-	def set_unnested_full_melody(self):
-		"""Create a unnested sequence of the currently approved melody"""
-		self.unnested_full_melody = []
-		for melody_group in self.nested_full_melody[:self.chord_index - 1]:
-			for melody_note in melody_group:
-				self.unnested_full_melody.append(melody_note)
-		self.unnested_full_melody.append(self.previous_degree_choice)
+		self.sheet_notes = []
 
 	def make_melody(self):
-		"""Make a random melody from a randomly selected chord progression"""
+		"""Make a random melody from a randomly selected chord progression and rhythm"""
 		self.set_scale_midi_pitches()
 		self.make_chord_progression()
 		self.create_rhythm()
 		self.realize_melody()
+
 		self.plot_midi_notes()
-		return self.midi_melody
+		self.set_sheet_notes()
+		self.make_lily_part()
+		Voice.midi_score.append(self.midi_notes)
 
 	def set_scale_midi_pitches(self):
 		"""Choose all midi pitches that are diatonic to the key signature"""
@@ -225,7 +222,7 @@ class Melody(Voice):
 		self.current_scale_degree_options = [[] for _ in range(16)]
 		self.current_scale_degree_options[0].extend(self.all_scale_degree_options[0][:])
 		self.melody_figure_options = [[] for _ in range(16)]
-		self.nested_full_melody = [[] for _ in range(16)]
+		self.nested_scale_degrees = [[] for _ in range(16)]
 
 	def create_first_melody_note(self):
 		"""Setup the tonic starting note"""
@@ -247,7 +244,7 @@ class Melody(Voice):
 		self.logger.warning("")
 
 	def realize_melody(self):
-		"""Create a melody based on selected rhythm and chords"""
+		"""Map out a validated melody while tracking parameters"""
 		self.create_melody_options()
 		self.setup_melody_parameters()
 		self.create_first_melody_note()
@@ -262,7 +259,9 @@ class Melody(Voice):
 			else:
 				self.backtrack_score()
 
-		self.nested_full_melody[-1] = [self.current_degree_choice]
+		self.nested_scale_degrees[-1] = [self.current_degree_choice]
+		self.set_unnested_melody()
+		self.unnested_scale_degrees.append(self.current_degree_choice)
 
 	def backtrack_score(self):
 		"""Reverse to the previous chord to fix bad notes"""
@@ -413,8 +412,8 @@ class Melody(Voice):
 			antepenultimate_degree = self.chosen_scale_degress[self.chord_index - 2]
 			previous_move_distance = self.previous_degree_choice - antepenultimate_degree
 
-			previous_move_slope =  self.calculate_slope(previous_move_distance)
-			current_move_slope = self.calculate_slope(current_move_distance)
+			previous_move_slope =  Voice.calculate_slope(previous_move_distance)
+			current_move_slope = Voice.calculate_slope(current_move_distance)
 
 			if (abs(previous_move_distance) >= 5 and 
 			  (abs_current_move_distance > 3 or previous_move_slope == current_move_slope)):
@@ -427,7 +426,7 @@ class Melody(Voice):
 					old_move_distance = scale_degree1 - scale_degree0
 					if  0 < abs(old_move_distance) < 5:
 						break
-					old_move_slope = self.calculate_slope(old_move_distance)
+					old_move_slope = Voice.calculate_slope(old_move_distance)
 
 					if old_move_slope == current_move_slope:
 						self.logger.warning("Leap should be followed by contrary motion")
@@ -445,7 +444,7 @@ class Melody(Voice):
 
 	def validate_melody_figure(self):
 		if self.chord_index == 15:
-			self.nested_full_melody[self.chord_index - 1] = [self.previous_degree_choice]
+			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
 			return True
 
 		remaining_figures = self.melody_figure_options[self.chord_index - 1]
@@ -454,11 +453,11 @@ class Melody(Voice):
 			return self.find_valid_figure()
 
 		degree_mvmt = self.current_degree_choice - self.previous_degree_choice
-		melody_slope = self.calculate_slope(degree_mvmt)
+		melody_slope = Voice.calculate_slope(degree_mvmt)
 		degree_mvmt = abs(degree_mvmt)
 
 		if self.rhythm_symbols[self.chord_index - 1] == -1:
-			self.nested_full_melody[self.chord_index - 1] = [self.previous_degree_choice]
+			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
 			return True
 
 		embellish_amount = len(self.finalized_rhythms[self.chord_index - 1])
@@ -473,9 +472,17 @@ class Melody(Voice):
 		self.melody_figure_options[self.chord_index - 1] = possible_scale_degrees
 		return self.find_valid_figure()
 
+	def set_unnested_melody(self):
+		"""Create a unnested sequence of the currently approved melody"""
+		self.unnested_scale_degrees = []
+		for melody_group in self.nested_scale_degrees[:self.chord_index - 1]:
+			for melody_note in melody_group:
+				self.unnested_scale_degrees.append(melody_note)
+		self.unnested_scale_degrees.append(self.previous_degree_choice)
+
 	def find_valid_figure(self):
 		valid_figure = None
-		self.set_unnested_full_melody()
+		self.set_unnested_melody()
 		remaining_figures = self.melody_figure_options[self.chord_index - 1]
 		# alias has side effect but allows easier referencing
 		while remaining_figures:
@@ -485,17 +492,17 @@ class Melody(Voice):
 			if self.chord_index - 1 < 11 and min(inbetween) < 0:
 				continue
 
-			unnested_full_melody = self.unnested_full_melody[:]
-			unnested_full_melody.extend(inbetween)
-			self.logger.warning(f"Unnested valid melody: {unnested_full_melody}")
-			if Voice.has_cross_duplicates(unnested_full_melody):
+			unnested_scalar_melody = self.unnested_scale_degrees[:]
+			unnested_scalar_melody.extend(inbetween)
+			self.logger.warning(f"Unnested valid melody: {unnested_scalar_melody}")
+			if Voice.has_cross_duplicates(unnested_scalar_melody):
 				self.logger.warning("Cross duplicates not allowed!")
 				self.logger.warning('*' * 30)
 				continue
 
-			highest_scale_degree = max(unnested_full_melody)
+			highest_scale_degree = max(unnested_scalar_melody)
 			if (highest_scale_degree > 4 and 
-			  unnested_full_melody.count(highest_scale_degree) > 2):
+			  unnested_scalar_melody.count(highest_scale_degree) > 2):
 				self.logger.warning("Avoid multiple climaxes")
 				self.logger.warning('*' * 30)
 				continue
@@ -504,9 +511,9 @@ class Melody(Voice):
 
 			# twist_notes = []
 			# triple_motifs_set = set()
-			# full_melody_str = "".join([str(note) for note in unnested_full_melody])
+			# full_melody_str = "".join([str(note) for note in unnested_scalar_melody])
 			# for note1, note2, note3 in zip(
-			#   unnested_full_melody, unnested_full_melody[1:], unnested_full_melody[2:]):
+			#   unnested_scalar_melody, unnested_scalar_melody[1:], unnested_scalar_melody[2:]):
 			# 	new_triple_motif = (note1, note2, note3)
 			# 	if new_triple_motif in triple_motifs_set:
 			# 		break
@@ -541,9 +548,9 @@ class Melody(Voice):
 		if valid_figure is None:
 			self.logger.warning("Melody failed")
 			return False
-		self.nested_full_melody[self.chord_index - 1] = [
+		self.nested_scale_degrees[self.chord_index - 1] = [
 				self.previous_degree_choice, *valid_figure]
-		self.logger.warning(f"Nested valid melody: {self.nested_full_melody}")
+		self.logger.warning(f"Nested valid melody: {self.nested_scale_degrees}")
 		return True
 
 	def plot_midi_notes(self):
@@ -571,7 +578,7 @@ class Melody(Voice):
 		self.logger.warning(f"Measure length: {Voice.measure_length}")
 		self.logger.warning(f"Unit length: {unit_length}")
 		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
-		for scale_group in self.nested_full_melody:
+		for scale_group in self.nested_scale_degrees:
 			for embellish_index, scale_pitch in enumerate(scale_group):
 				embellish_duration = self.finalized_rhythms[chord_index][embellish_index]
 				if Voice.mode == "aeolian" and scale_pitch in {6, -1}:
@@ -587,12 +594,12 @@ class Melody(Voice):
 				else:
 					fixed_note_duration = raw_note_duration
 				midi_pitch = melody_range[scale_pitch + 3]
-				self.midi_melody.append(
+				self.midi_notes.append(
 					Voice.Note(midi_pitch + offset, int(current_time), int(fixed_note_duration)))
 				current_time += raw_note_duration
 			chord_index += 1
 
-		self.logger.warning(f"Midi melody: {self.midi_melody}")
+		self.logger.warning(f"Midi melody: {self.midi_notes}")
 
 
 
