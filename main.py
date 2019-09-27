@@ -3,6 +3,7 @@ import random
 from generate.midi_export import MIDIFile
 from generate.voices.voice import Voice
 from generate.voices.melody import Melody
+import generate.voices.chorale as chorale
 
 
 if __name__ == "__main__":
@@ -14,26 +15,35 @@ if __name__ == "__main__":
 
 	MyMIDI = MIDIFile(5, eventtime_is_ticks=True) # One track, defaults to format 1 (tempo track
 	                     # automatically created)
-	MyMIDI.addTempo(track,time, tempo)
 	MyMIDI.addProgramChange(track, channel, time, 73)
 	# 77, 73! 72 71 70!
+	MyMIDI.addProgramChange(1, 1, time, 63)
+	MyMIDI.addProgramChange(2, 2, time, 63)
+	MyMIDI.addProgramChange(3, 3, time, 63)
 
 	Melody().make_melody()
 	for new_note in Voice.midi_score[0]:
 		MyMIDI.addNote(track, channel, *new_note, 100)
 
+	chorale.Chorale().create_parts()
+	chorale.Bass().create_part()
+	chorale.Tenor().create_part()
+	chorale.Alto().create_part()
+	chorale.Soprano().create_part()
 	for part in Voice.midi_score[1:]:
 		track += 1
 		channel += 1
 		for new_note in part:
-			MyMIDI.addNote(track, channel, *new_note, 100)
+			MyMIDI.addNote(track, channel, *new_note, 60)
 
 	if Voice.mode == "aeolian":
 		tempo = random.choice(range(70, 101))
 	elif Voice.mode == "ionian":
 		tempo = random.choice(range(80, 111))
+	MyMIDI.addTempo(track,time, tempo)
+
 	print(Voice.mode)
-	MyMIDI.addTempo(0, 0, tempo)
+	print(f"{Voice.measure_length} beats divided by {Voice.beat_division}")
 	print(tempo)
 
 	with open("song0.mid", "wb")  as output_file:

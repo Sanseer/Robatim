@@ -14,7 +14,6 @@ class Chord:
 		None: None,
 	}
 	all_pitches_to_degrees = collections.defaultdict(dict)
-	wtf = 3
 
 	def __init__(self, chord_symbol):
 		self.chord_name = chord_symbol[1:] 
@@ -44,3 +43,6 @@ class Chord:
 				current_pitch = root_pitch
 
 		self.pitches_to_degrees = Chord.all_pitches_to_degrees[self.chord_name]
+
+	def __eq__(self, other):
+		return self.chord_symbol == other.chord_symbol

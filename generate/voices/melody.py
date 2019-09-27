@@ -13,7 +13,7 @@ class Melody(Voice):
 	def __init__(self):
 
 		self.logger = logging.getLogger("melody")
-		melody_handler = logging.FileHandler("melody.log", mode='w')
+		melody_handler = logging.FileHandler("logs/melody.log", mode='w')
 		melody_handler.setLevel(logging.WARNING)
 		melody_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
 		melody_handler.setFormatter(melody_format)
@@ -32,7 +32,6 @@ class Melody(Voice):
 		self.logger.warning(f"{Voice.tonic} {Voice.mode}")
 		Voice.measure_length = time_sig[0]
 		Voice.beat_division = time_sig[1]
-		self.logger.warning(f"{Voice.measure_length} beats divided in {Voice.beat_division}")
 
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
 		self.rhythm_symbols = [None for _ in range(16)]
@@ -192,6 +191,7 @@ class Melody(Voice):
 
 		phrase4_start_index = 12
 		phrase2_start_index = 4
+		# remove?
 		include_octave = random.choice((True, False))
 		if Voice.chord_sequence[0].chord_symbol == "0I":
 			self.all_scale_degree_options.append([0, 2, 4])
@@ -348,10 +348,10 @@ class Melody(Voice):
 				return False
 
 		relevant_melodic_mvt = melodic_mvmt[1:]
-		if ">>>" in relevant_melodic_mvt:
-			self.logger.warning("Ascending cascade")
-			self.logger.warning('*' * 30)
-			return False
+		# if ">>>" in relevant_melodic_mvt:
+		# 	self.logger.warning("Ascending cascade")
+		# 	self.logger.warning('*' * 30)
+		# 	return False
 		if melodic_mvmt.count('_') > 8:
 			self.logger.warning("Too much pause")
 			self.logger.warning('*' * 30)
@@ -568,10 +568,7 @@ class Melody(Voice):
 			unit_length = 8
 		elif Voice.beat_division == 3:
 			unit_length = 12
-		if Voice.measure_length in {2, 4}:
-			chord_quarter_length = 2
-		elif Voice.measure_length == 3:
-			chord_quarter_length = 3
+		chord_quarter_length = Voice.measure_length
 
 		self.logger.warning(f"Beat division: {Voice.beat_division}")
 		self.logger.warning(f"Measure length: {Voice.measure_length}")

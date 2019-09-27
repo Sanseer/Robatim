@@ -8,12 +8,19 @@ class Voice:
 	idms_mode = None
 	tonic = None
 	all_midi_pitches = []
+
 	Note = collections.namedtuple('Note', ["pitch", "time", "duration"])
 	midi_score = []
 	lily_score = []
+	chorale_scale_degrees = []
 
 	beat_division = []
 	measure_length = []
+
+	bass_motion = []
+	tenor_motion = []
+	alto_motion = []
+	soprano_motion = []
 
 	mode_notes = {
 		"lydian": (0, 2, 4, 6, 7, 9, 11),
@@ -44,6 +51,13 @@ class Voice:
 		4:"1.", 2:"2.", 4 * Fraction("1/3"):"2", 1:"4.",   
 		2 * Fraction("1/3"):"4", 0.5: "8.", 1 * Fraction("1/3"): "8", 
 		0.5 * Fraction("1/3"): "16"  
+	}
+	interval_names = {
+		(0,0): "P8", (0,1): "d2", (1,0): "A1", (1,1): "m2", (2,1): "M2", (2,2): "d3",
+		(3,1): "A2", (3,2): "m3", (4,2): "M3", (4,3): "d4", (5,2): "A3", (5,3): "P4",
+		(6,3): "A4", (6,4): "d5", (7,4): "P5", (7,5): "d6", (8,4): "A5", (8,5): "m6",
+		(9,5): "M6", (9,6): "d7", (10,5): "A6", (10,6): "m7", (11,6): "M7", 
+		(11,7): "d8", (0,6): "A7", (11,0): "d8"
 	}
 
 	@staticmethod
@@ -192,5 +206,52 @@ class Voice:
 		lily_string = " ".join(note for note in lily_part) 
 		Voice.lily_score.append(lily_string)
 		self.logger.warning(f"Lily part: {lily_part}")
+
+	def get_interval(self, old_pitch, new_pitch):
+
+		pitch_diff = new_pitch - old_pitch
+		chromatic_diff = pitch_diff % 12
+
+		old_degree = self.current_pitches_dict[old_pitch]
+		new_degree = self.current_pitches_dict[new_pitch]
+
+		generic_interval = new_degree - old_degree
+		if generic_interval < 0:
+			generic_interval += 7
+
+		return Voice.interval_names[(chromatic_diff, generic_interval)]
+
+	def add_voice_motion(self, voice_motion, new_pitch, voice_index):
+		old_pitch = self.chosen_chord_voicings[self.chord_index - 1][voice_index]
+		if new_pitch < old_pitch:
+			voice_motion.append(-1)
+		elif new_pitch > old_pitch:
+			voice_motion.append(1)
+		else:
+			voice_motion.append(0)
+
+	def add_motion_type(self, old_motion, new_motion, movements, intervals):
+		old_move = old_motion[-1]
+		new_move = new_motion[-1]
+		if (old_move == new_move and old_move != 0 and 
+		  intervals[-1] == intervals[-2]):
+			movements.append("Parallel")
+		elif old_move == new_move and old_move == 0:
+			movements.append("No motion")
+		elif old_move == -(new_move):
+			movements.append("Contrary")
+		elif (old_move == new_move and intervals[-1] != intervals[-2]):
+			movements.append("Similar")
+		elif ((old_move == 0 or new_move == 0) and 
+		  (old_move != 0 or new_move != 0)):
+			movements.append("Oblique")
+		else:
+			raise ValueError("Invalid motion")
+
+	def create_part(self):
+		self.set_sheet_notes()
+		self.make_lily_part()
+
+
 
 
