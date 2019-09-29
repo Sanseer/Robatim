@@ -32,6 +32,7 @@ class Melody(Voice):
 		self.logger.warning(f"{Voice.tonic} {Voice.mode}")
 		Voice.measure_length = time_sig[0]
 		Voice.beat_division = time_sig[1]
+		#4/4 and 12/8 should use half the amount of measures
 
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
 		self.rhythm_symbols = [None for _ in range(16)]
@@ -62,10 +63,13 @@ class Melody(Voice):
 		self.all_double_figurations = {
 			0: lambda previous, current, slope: [
 				[current - 1, current + 1], [current + 1, current - 1],
+				[current - 1, current - 1], [current + 1, current + 1],
 				[current, current]],
 			1: lambda previous, current, slope: [
 				[previous - slope, previous], 
-				[current + slope, current + slope]],
+				[current + slope, current + slope], 
+				[current + slope * 2, current + slope],
+				[previous, previous], [previous, current]],
 			2: lambda previous, current, slope: [
 				[current + slope * 2, current + slope],
 				[previous + slope, previous + slope], 
@@ -106,7 +110,7 @@ class Melody(Voice):
 		scale_sequence = Voice.mode_notes[Voice.mode][:7]
 
 		all_midi_pitches = []
-		while current_pitch < 128:
+		while root_pitch < 128:
 			for chromatic_shift in scale_sequence:
 				current_pitch = root_pitch + chromatic_shift
 				all_midi_pitches.append(current_pitch)
@@ -192,7 +196,7 @@ class Melody(Voice):
 		phrase4_start_index = 12
 		phrase2_start_index = 4
 		# remove?
-		include_octave = random.choice((True, False))
+		include_octave = random.choice((True, True, False))
 		if Voice.chord_sequence[0].chord_symbol == "0I":
 			self.all_scale_degree_options.append([0, 2, 4])
 		# separate first note to allow irregular starts e.g., major 2nd
@@ -323,8 +327,8 @@ class Melody(Voice):
 			self.chosen_scale_degress[self.chord_index] = None
 
 	def validate_base_melody(self):
-		melodic_mvmt = "".join([
-			str(slope) for slope in self.melodic_direction[:self.chord_index + 1]])
+		melodic_mvmt = "".join(
+			str(slope) for slope in self.melodic_direction[:self.chord_index + 1])
 
 		self.logger.warning(f"Attempted melodic direction: {melodic_mvmt}")
 		self.logger.warning(f"Attempted melody: {self.chosen_scale_degress}")
@@ -352,10 +356,10 @@ class Melody(Voice):
 		# 	self.logger.warning("Ascending cascade")
 		# 	self.logger.warning('*' * 30)
 		# 	return False
-		if melodic_mvmt.count('_') > 8:
-			self.logger.warning("Too much pause")
-			self.logger.warning('*' * 30)
-			return False
+		# if melodic_mvmt.count('_') > 8:
+		# 	self.logger.warning("Too much pause")
+		# 	self.logger.warning('*' * 30)
+		# 	return False
 		if (self.chord_index == 7 and 
 		  self.previous_degree_choice != self.current_degree_choice):
 			self.logger.warning("Rest halfway through")
@@ -511,7 +515,7 @@ class Melody(Voice):
 
 			# twist_notes = []
 			# triple_motifs_set = set()
-			# full_melody_str = "".join([str(note) for note in unnested_scalar_melody])
+			# full_melody_str = "".join(str(note) for note in unnested_scalar_melody)
 			# for note1, note2, note3 in zip(
 			#   unnested_scalar_melody, unnested_scalar_melody[1:], unnested_scalar_melody[2:]):
 			# 	new_triple_motif = (note1, note2, note3)
@@ -529,8 +533,8 @@ class Melody(Voice):
 			# 				self.logger.warning(f"Multiple twists not allowed")
 			# 				self.logger.warning('*' * 30)
 			# 				break
-			# 			forward_twist = "".join([*twist_group, twist_group[0]])
-			# 			backward_twist = "".join([twist_group[1], *twist_group])
+			# 			forward_twist = "".join(*twist_group, twist_group[0])
+			# 			backward_twist = "".join(twist_group[1], *twist_group])
 			# 			twist_count = full_melody_str.count(forward_twist)
 			# 			twist_count += full_melody_str.count(backward_twist)
 			# 			if twist_count >= 2:
@@ -574,7 +578,10 @@ class Melody(Voice):
 		self.logger.warning(f"Measure length: {Voice.measure_length}")
 		self.logger.warning(f"Unit length: {unit_length}")
 		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
+
+		melodic_minor = False
 		for chord_index, scale_group in enumerate(self.nested_scale_degrees):
+
 
 			chord_name = Voice.chord_sequence[chord_index].chord_name
 			if Voice.mode == "ionian" and chord_name in Chord.major_mode_alterations:
@@ -583,6 +590,16 @@ class Melody(Voice):
 				note_alterations = Chord.minor_mode_alterations[chord_name]
 			else: 
 				note_alterations = {}
+			if Voice.mode == "aeolian" and chord_name == "V":
+				if melodic_minor: 
+					note_alterations[5] == 1 
+				else:
+					scale_group_str = "".join(str(scale_degree) for scale_degree in scale_group)
+					if "56" in scale_group_str or "65" in scale_group_str:
+						melodic_minor = True
+						note_alterations[5] = 1
+						print("Melodic minor!", scale_group)
+
 
 			for embellish_index, scale_degree in enumerate(scale_group):
 				embellish_duration = self.finalized_rhythms[chord_index][embellish_index]

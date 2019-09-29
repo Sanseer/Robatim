@@ -11,15 +11,21 @@ if __name__ == "__main__":
 	time     = 0
 	channel  = 0
 	tempo    = 60  # In BPM
-	volume   = 100 # 0-127, as per the MIDI standard
+	# volume   = 100 # 0-127, as per the MIDI standard
 
 	MyMIDI = MIDIFile(5, eventtime_is_ticks=True) # One track, defaults to format 1 (tempo track
 	                     # automatically created)
 	MyMIDI.addProgramChange(track, channel, time, 73)
 	# 77, 73! 72 71 70!
-	MyMIDI.addProgramChange(1, 1, time, 63)
-	MyMIDI.addProgramChange(2, 2, time, 63)
-	MyMIDI.addProgramChange(3, 3, time, 63)
+	# choose instruments randomly?
+	# but keep adjacent voices close in midi numbers
+	MyMIDI.addProgramChange(1, 1, time, 43)
+	MyMIDI.addProgramChange(2, 2, time, 42)
+	MyMIDI.addProgramChange(3, 3, time, 41)
+	MyMIDI.addProgramChange(4, 3, time, 40)
+	# test that all selected instruments can hit the notes 
+	# of that vocal range
+	# create list of available instruments per voice
 
 	Melody().make_melody()
 	for new_note in Voice.midi_score[0]:
@@ -30,11 +36,14 @@ if __name__ == "__main__":
 	chorale.Tenor().create_part()
 	chorale.Alto().create_part()
 	chorale.Soprano().create_part()
-	for part in Voice.midi_score[1:]:
+
+	volume = 80
+	for index, part in enumerate(Voice.midi_score[1:]):
 		track += 1
 		channel += 1
 		for new_note in part:
-			MyMIDI.addNote(track, channel, *new_note, 60)
+			MyMIDI.addNote(track, channel, *new_note, volume)
+		volume = 40
 
 	if Voice.mode == "aeolian":
 		tempo = random.choice(range(70, 101))
