@@ -29,23 +29,26 @@ class Melody(Voice):
 
 		time_sig = random.choice(idms_b.time_sigs)
 		Voice.tonic = random.choice(self.idms_mode.key_sigs)
-		self.logger.warning(f"{Voice.tonic} {Voice.mode}")
+		print(f"{Voice.tonic} {Voice.mode}")
 		Voice.measure_length = time_sig[0]
 		Voice.beat_division = time_sig[1]
-		#4/4 and 12/8 should use half the amount of measures
+		print(f"{Voice.measure_length} beats divided by {Voice.beat_division}")
+		#4/4 and 12/8 should have base melody notes on half notes, if used
 
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
 		self.rhythm_symbols = [None for _ in range(16)]
 		self.finalized_rhythms = {}
-		self.nested_scale_degrees = []
+		self.nested_scale_degrees = [[] for _ in range(16)]
 		self.unnested_scale_degrees = []
 		self.midi_notes = []
 
+		self.melodic_direction = [None for _ in range(16)]
+		self.chosen_scale_degress = [None for _ in range(16)]
+		self.current_scale_degree_options = [[] for _ in range(16)]
+		self.melody_figure_options = [[] for _ in range(16)]
 		self.all_scale_degree_options = []
-		self.melodic_direction = []
-		self.chosen_scale_degress = []
-		self.current_scale_degree_options = []
-		self.melody_figure_options = []
+
+		self.chordal_voice = False
 
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [[current - 1], [current + 1]],
@@ -218,16 +221,6 @@ class Melody(Voice):
 
 		self.all_scale_degree_options.extend([[0], [0]])
 
-	def setup_melody_parameters(self):
-		"""Create sequences to track while validating a melody"""
-
-		self.melodic_direction = [None for _ in range(16)]
-		self.chosen_scale_degress = [None for _ in range(16)]
-		self.current_scale_degree_options = [[] for _ in range(16)]
-		self.current_scale_degree_options[0].extend(self.all_scale_degree_options[0][:])
-		self.melody_figure_options = [[] for _ in range(16)]
-		self.nested_scale_degrees = [[] for _ in range(16)]
-
 	def create_first_melody_note(self):
 		"""Setup the tonic starting note"""
 		self.chord_index = 0
@@ -250,7 +243,7 @@ class Melody(Voice):
 	def realize_melody(self):
 		"""Map out a validated melody while tracking parameters"""
 		self.create_melody_options()
-		self.setup_melody_parameters()
+		self.current_scale_degree_options[0].extend(self.all_scale_degree_options[0][:])
 		self.create_first_melody_note()
 
 		while None in self.chosen_scale_degress:
@@ -327,6 +320,7 @@ class Melody(Voice):
 			self.chosen_scale_degress[self.chord_index] = None
 
 	def validate_base_melody(self):
+		"""Check current base melody against structural idioms"""
 		melodic_mvmt = "".join(
 			str(slope) for slope in self.melodic_direction[:self.chord_index + 1])
 
@@ -447,6 +441,7 @@ class Melody(Voice):
 		return True
 
 	def validate_melody_figure(self):
+		"""Check specific melody against figuration options"""
 		if self.chord_index == 15:
 			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
 			return True
@@ -580,8 +575,11 @@ class Melody(Voice):
 		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
 
 		melodic_minor = False
+		dominant_harmony = {"V"}
+		# sustain on penultimate remove both figures before halftime
+		# sustain + rest (+/- pickup)
+		# ensure pickup note(s) include melodic minor
 		for chord_index, scale_group in enumerate(self.nested_scale_degrees):
-
 
 			chord_name = Voice.chord_sequence[chord_index].chord_name
 			if Voice.mode == "ionian" and chord_name in Chord.major_mode_alterations:
@@ -590,15 +588,15 @@ class Melody(Voice):
 				note_alterations = Chord.minor_mode_alterations[chord_name]
 			else: 
 				note_alterations = {}
-			if Voice.mode == "aeolian" and chord_name == "V":
+			if Voice.mode == "aeolian" and chord_name in dominant_harmony:
 				if melodic_minor: 
-					note_alterations[5] == 1 
+					note_alterations[5] = 1 
 				else:
 					scale_group_str = "".join(str(scale_degree) for scale_degree in scale_group)
 					if "56" in scale_group_str or "65" in scale_group_str:
 						melodic_minor = True
 						note_alterations[5] = 1
-						print("Melodic minor!", scale_group)
+						print("Melodic minor!")
 
 
 			for embellish_index, scale_degree in enumerate(scale_group):

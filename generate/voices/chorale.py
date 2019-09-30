@@ -271,51 +271,66 @@ class Chorale(Voice):
 
 	def make_accompanyment(self):
 
-		# variable amount of voices
-		# variable accompanyment
-		# variable amount of chords in sequence
-		# fix augmented second
-
 		for _ in range(4):
 			Voice.midi_score.append([])
 			Voice.chorale_scale_degrees.append([])
 
 		if Voice.measure_length == 2:
 			raw_chord_duration = 960 * 2
-			chord_amount = 1
+
+			all_accompaniments = {
+				(960,): ({0,1,2,3},), (960, 960): ({0}, {1,2,3}),
+				(1440,): ({0,1,2,3},),
+			}
+
 		elif Voice.measure_length == 3:
 			raw_chord_duration = 960 * 3
-			chord_amount = 1
-		elif Voice.measure_length == 4:
-			raw_chord_duration = 960 * 2 
-			chord_amount = 2
 
+			all_accompaniments = {
+				(960, 960, 960): ({0}, {1,2,3}, {1,2,3}),
+				(960 * 2,): ({0,1,2,3},)
+			}
+		# include rest for full sustain at halfway point and ending
+
+		note_durations = random.choice(tuple(all_accompaniments))
+		voices_used = all_accompaniments[note_durations]
+		if {1,2,3} in voices_used:
+			Voice.waltz = True
+			Voice.voice_volumes = (80, 60, 60, 60)
+		print(f"Waltz? {Voice.waltz}")
+		print(voices_used)
 
 		unique_chord_iter = iter(self.chosen_chord_voicings)
 		current_time = 0
+
 		for chord_index, current_chord_obj in enumerate(Voice.chord_sequence):
-			current_pitches_dict = current_chord_obj.pitches_to_degrees
+			pitches_to_degrees = current_chord_obj.pitches_to_degrees
 			if chord_index in self.unique_chord_indices:
 				current_pitch_combo = next(unique_chord_iter)
 				last_pitch_combo = []
 				for voice_index, current_pitch in enumerate(current_pitch_combo):
-					for chord_num in range(chord_amount):
-						Voice.midi_score[voice_index + 1].append(
-							Voice.Note(current_pitch, 
-							current_time + raw_chord_duration * chord_num, 960))
-						Voice.chorale_scale_degrees[voice_index].append(
-							current_pitches_dict[current_pitch])
+					note_time = current_time
+					for beat_index, note_duration in enumerate(note_durations):
+						if voice_index in voices_used[beat_index]:
+							Voice.midi_score[voice_index + 1].append(
+								Voice.Note(current_pitch, note_time, note_duration))
+							Voice.chorale_scale_degrees[voice_index].append(
+								pitches_to_degrees[current_pitch])
+						note_time += note_duration
 					last_pitch_combo.append(current_pitch)
 			else:
 				for voice_index, last_pitch in enumerate(last_pitch_combo):
-					for chord_num in range(chord_amount):
-						Voice.midi_score[voice_index + 1].append(
-							Voice.Note(last_pitch, 
-							current_time + raw_chord_duration * chord_num, 960))
-						Voice.chorale_scale_degrees[voice_index].append(
-							Voice.chorale_scale_degrees[voice_index][-1])
+					note_time = current_time
+					for beat_index, note_duration in enumerate(note_durations):
+						if voice_index in voices_used[beat_index]:
+							Voice.midi_score[voice_index + 1].append(
+								Voice.Note(last_pitch, note_time, note_duration))
+							Voice.chorale_scale_degrees[voice_index].append(
+								pitches_to_degrees[last_pitch])
+						note_time += note_duration
 
-			current_time += raw_chord_duration * chord_amount
+			current_time += raw_chord_duration
+
 
 class Bass(Voice):
 
@@ -323,6 +338,9 @@ class Bass(Voice):
 		self.sheet_notes = []
 		self.unnested_scale_degrees = Voice.chorale_scale_degrees[0]
 		self.midi_notes = Voice.midi_score[1]
+
+		self.chordal_voice = True
+		self.part_name = "bass"
 
 		self.logger = logging.getLogger("bass")
 		voice_handler = logging.FileHandler("logs/bass.log", mode='w')
@@ -339,6 +357,9 @@ class Tenor(Voice):
 		self.unnested_scale_degrees = Voice.chorale_scale_degrees[1]
 		self.midi_notes = Voice.midi_score[2]
 
+		self.chordal_voice = True
+		self.part_name = "tenor"
+
 		self.logger = logging.getLogger("tenor")
 		voice_handler = logging.FileHandler("logs/tenor.log", mode='w')
 		voice_handler.setLevel(logging.WARNING)
@@ -353,6 +374,9 @@ class Alto(Voice):
 		self.unnested_scale_degrees = Voice.chorale_scale_degrees[2]
 		self.midi_notes = Voice.midi_score[3]
 
+		self.chordal_voice = True
+		self.part_name = "alto"
+
 		self.logger = logging.getLogger("alto")
 		voice_handler = logging.FileHandler("logs/alto.log", mode='w')
 		voice_handler.setLevel(logging.WARNING)
@@ -366,6 +390,9 @@ class Soprano(Voice):
 		self.sheet_notes = []
 		self.unnested_scale_degrees = Voice.chorale_scale_degrees[3]
 		self.midi_notes = Voice.midi_score[4]
+
+		self.chordal_voice = True
+		self.part_name = "soprano"
 
 		self.logger = logging.getLogger("soprano")
 		voice_handler = logging.FileHandler("logs/soprano.log", mode='w')

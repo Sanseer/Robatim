@@ -13,14 +13,17 @@ class Voice:
 	midi_score = []
 	lily_score = []
 	chorale_scale_degrees = []
+	waltz = False
 
 	beat_division = []
 	measure_length = []
+	voice_volumes = (80, 40, 40, 40)
 
 	bass_motion = []
 	tenor_motion = []
 	alto_motion = []
 	soprano_motion = []
+
 
 	mode_notes = {
 		"lydian": (0, 2, 4, 6, 7, 9, 11),
@@ -79,20 +82,20 @@ class Voice:
 	def set_sheet_notes(self):
 		"""Convert midi pitches into sheet music note names"""
 
-		self.logger.warning('=' * 40)
-		self.logger.warning("Creating sheet notation")
+		# self.logger.warning('=' * 40)
+		# self.logger.warning("Creating sheet notation")
 
 		tonic_letter = Voice.tonic.replace('#',"").replace('b',"")
-		self.logger.warning(f"Tonic letter {tonic_letter}")
+		# self.logger.warning(f"Tonic letter {tonic_letter}")
 		tonic_index = Voice.note_letters.index(tonic_letter)
 		for midi_note, scale_degree in zip(
 		  self.midi_notes, self.unnested_scale_degrees):
 			true_midi_pitch = midi_note.pitch
-			self.logger.warning(f"True midi pitch: {true_midi_pitch}")
+			# self.logger.warning(f"True midi pitch: {true_midi_pitch}")
 			scale_midi_pitch =  true_midi_pitch % 12
 			possible_note_names = Voice.note_names[scale_midi_pitch]
 
-			self.logger.warning(f"Possible note names: {possible_note_names}")
+			# self.logger.warning(f"Possible note names: {possible_note_names}")
 			note_letter_index = (tonic_index + scale_degree) % 7
 			note_letter = Voice.note_letters[note_letter_index]
 			octave = true_midi_pitch // 12 - 1
@@ -100,20 +103,30 @@ class Voice:
 			for possible_note_name in possible_note_names:
 				if note_letter in possible_note_name:
 					self.sheet_notes.append(f"{possible_note_name}{octave}")
-					self.logger.warning(f"Chosen note designation: {possible_note_name}{octave}")
+					# self.logger.warning(f"Chosen note designation: {possible_note_name}{octave}")
 					break
 
-		self.logger.warning(f"Sheet notes: {self.sheet_notes}")
+		# self.logger.warning(f"Sheet notes: {self.sheet_notes}")
 
 
 	def make_lily_part(self):
 		"""Write sheet music text notation for voice part"""
 
 		note_index = 0
-		current_time = 0
-		lily_part = []
+		current_time = self.midi_notes[0].time
+		if Voice.waltz and self.chordal_voice and self.part_name != "bass":
+			if Voice.beat_division == 2:
+				lily_part = ["r4"]
+			elif Voice.beat_division == 3:
+				lily_part = ["r4."]
+		else:
+			lily_part = []
+
+		# add rest at end for chorale parts
 
 		for midi_note, sheet_note in zip(self.midi_notes, self.sheet_notes):
+			self.logger.warning(midi_note)
+			self.logger.warning(sheet_note)
 			accidental_mark = ""
 			octave_mark = ""
 			note_letter = sheet_note[0].lower()
@@ -133,12 +146,12 @@ class Voice:
 				octave_shift = octave - 3
 				octave_mark = str(octave_shift * "'")
 			if '#' in sheet_note or 'b' in sheet_note:
-				accidental_amount = sheet_note.count('#')
-				accidental_amount += sheet_note.count('b')
 				accidental = sheet_note[1]
 				if accidental == '#':
+					accidental_amount = sheet_note.count('#')
 					accidental_mark = "is" * accidental_amount
 				elif accidental == 'b':
+					accidental_amount = sheet_note.count('b')
 					accidental_mark = "es" * accidental_amount
 
 			if Voice.beat_division == 2:

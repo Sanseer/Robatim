@@ -1,5 +1,6 @@
 # 2/4, 3/4, 6/8, 9/8
 # exclude quadruple time b/c it behaves similarly to duple time
+# may readd later
 time_sigs = ((2,2), (3,2), (2,3), (3,3))
 
 chord_patterns_8 = []
