@@ -27,11 +27,11 @@ class Melody(Voice):
 			import generate.idioms.minor
 			Voice.idms_mode = generate.idioms.minor
 
-		time_sig = random.choice(idms_b.time_sigs)
+		Voice.time_sig = random.choice(idms_b.time_sigs)
 		Voice.tonic = random.choice(self.idms_mode.key_sigs)
 		print(f"{Voice.tonic} {Voice.mode}")
-		Voice.measure_length = time_sig[0]
-		Voice.beat_division = time_sig[1]
+		Voice.measure_length = Voice.time_sig[0]
+		Voice.beat_division = Voice.time_sig[1]
 		print(f"{Voice.measure_length} beats divided by {Voice.beat_division}")
 		#4/4 and 12/8 should have base melody notes on half notes, if used
 
@@ -161,17 +161,34 @@ class Melody(Voice):
 					self.rhythm_symbols[index] = rhythm_num
 		else:
 			self.rhythm_symbols = raw_rhythm_symbols
+		print(f"Rhythm symbols: {self.rhythm_symbols}")
 		self.logger.warning(f"Rhythm symbols: {self.rhythm_symbols}")
 
-		if Voice.beat_division == 2:
+		# if Voice.beat_division == 2:
+		# 	rhythm_mapping = {
+		# 		-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)], 
+		# 		2: [(3,3,2), (6,1,1)]
+		# 		}
+		# elif Voice.beat_division == 3:
+		# 	rhythm_mapping = {
+		# 		-1: [(12,)], 0: [(8,4), (10, 2)], 1: [(8,4), (10, 2)],
+		# 		2: [(10,2), (6,2,4), (4,2,6), (6,4,2), (8,2,2), (10, 1, 1), (6,6), (4,4,4)]
+		# 	}
+
+		if Voice.time_sig == (2,2):
 			rhythm_mapping = {
-				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)], 
+				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)],
 				2: [(3,3,2), (6,1,1)]
-				}
-		elif Voice.beat_division == 3:
+			}
+		elif Voice.time_sig == (3,2):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(8,4), (10, 2)], 1: [(8,4), (10, 2)],
-				2: [(10,2), (6,2,4), (4,2,6), (6,4,2), (8,2,2), (10, 1, 1), (6,6), (4,4,4)]
+				-1: [(12,)], 0: [(8,4), (10,2)], 1: [(8,4), (10,2)],
+				2: [(6,6), (9,3), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
+			}
+		elif Voice.time_sig == (2,3):
+			rhythm_mapping = {
+				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (10,2)],
+				2: [(9,3), (8,4), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
 			}
 
 		chosen_rhythms = {}
@@ -563,14 +580,13 @@ class Melody(Voice):
 		self.logger.warning(f"Melody range: {melody_range}")
 
 		current_time = 0
-		if Voice.beat_division == 2:
-			unit_length = 8
-		elif Voice.beat_division == 3:
-			unit_length = 12
+		# if Voice.beat_division == 2:
+		# 	unit_length = 8
+		# elif Voice.beat_division == 3:
+		# 	unit_length = 12
+		unit_length = self.finalized_rhythms[self.rhythm_symbols.index(-1)][0]
 		chord_quarter_length = Voice.measure_length
 
-		self.logger.warning(f"Beat division: {Voice.beat_division}")
-		self.logger.warning(f"Measure length: {Voice.measure_length}")
 		self.logger.warning(f"Unit length: {unit_length}")
 		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
 
@@ -579,6 +595,7 @@ class Melody(Voice):
 		# sustain on penultimate remove both figures before halftime
 		# sustain + rest (+/- pickup)
 		# ensure pickup note(s) include melodic minor
+		# use sustain on all notes if waltz
 		for chord_index, scale_group in enumerate(self.nested_scale_degrees):
 
 			chord_name = Voice.chord_sequence[chord_index].chord_name

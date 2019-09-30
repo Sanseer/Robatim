@@ -37,14 +37,12 @@ if __name__ == "__main__":
 	chorale.Alto().create_part()
 	chorale.Soprano().create_part()
 
-	# volume = 80
 	for voice_index, part in enumerate(Voice.midi_score[1:]):
 		track += 1
 		channel += 1
 		volume = Voice.voice_volumes[voice_index]
 		for new_note in part:
 			MyMIDI.addNote(track, channel, *new_note, volume)
-		# volume = 40
 
 	if Voice.mode == "aeolian":
 		tempo = random.choice(range(70, 101))
