@@ -287,7 +287,7 @@ class Chorale(Voice):
 			raw_chord_duration = 960 * 3
 
 			all_accompaniments = {
-				(960, 960, 960): ({0}, {1,2,3}, {1,2,3}),
+				(960,): ({0,1,2,3},), (960, 960, 960): ({0}, {1,2,3}, {1,2,3}),
 				(960 * 2,): ({0,1,2,3},)
 			}
 		# include rest for full sustain at halfway point and ending

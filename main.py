@@ -45,7 +45,7 @@ if __name__ == "__main__":
 			MyMIDI.addNote(track, channel, *new_note, volume)
 
 	if Voice.mode == "aeolian":
-		tempo = random.choice(range(70, 101))
+		tempo = random.choice(range(80, 101))
 	elif Voice.mode == "ionian":
 		tempo = random.choice(range(80, 111))
 	MyMIDI.addTempo(track,time, tempo)

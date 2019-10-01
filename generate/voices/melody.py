@@ -175,19 +175,20 @@ class Melody(Voice):
 		# 		2: [(10,2), (6,2,4), (4,2,6), (6,4,2), (8,2,2), (10, 1, 1), (6,6), (4,4,4)]
 		# 	}
 
+		# add half notes for all: no figuration
 		if Voice.time_sig == (2,2):
 			rhythm_mapping = {
-				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)],
+				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2), (8,)],
 				2: [(3,3,2), (6,1,1)]
 			}
 		elif Voice.time_sig == (3,2):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(8,4), (10,2)], 1: [(8,4), (10,2)],
+				-1: [(12,)], 0: [(8,4), (10,2)], 1: [(8,4), (10,2), (12,)],
 				2: [(6,6), (9,3), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
 			}
 		elif Voice.time_sig == (2,3):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (10,2)],
+				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (10,2), (12,)],
 				2: [(9,3), (8,4), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
 			}
 
@@ -197,7 +198,7 @@ class Melody(Voice):
 			random.shuffle(possible_rhythms)
 			while True:
 				chosen_rhythm = possible_rhythms.pop()
-				if chosen_rhythm not in chosen_rhythms.values():
+				if chosen_rhythm not in chosen_rhythms.values() or chosen_rhythm in {(12,), (8,)}:
 					chosen_rhythms[rhythm_symbol] = chosen_rhythm
 					break
 
@@ -216,7 +217,7 @@ class Melody(Voice):
 		phrase4_start_index = 12
 		phrase2_start_index = 4
 		# remove?
-		include_octave = random.choice((True, True, False))
+		include_octave = random.choice((True, True))
 		if Voice.chord_sequence[0].chord_symbol == "0I":
 			self.all_scale_degree_options.append([0, 2, 4])
 		# separate first note to allow irregular starts e.g., major 2nd
@@ -472,11 +473,14 @@ class Melody(Voice):
 		melody_slope = Voice.calculate_slope(degree_mvmt)
 		degree_mvmt = abs(degree_mvmt)
 
-		if self.rhythm_symbols[self.chord_index - 1] == -1:
-			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
-			return True
+		# if self.rhythm_symbols[self.chord_index - 1] == -1:
+		# 	self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
+		# 	return True
 
 		embellish_amount = len(self.finalized_rhythms[self.chord_index - 1])
+		if embellish_amount == 1:
+			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
+			return True
 		if embellish_amount == 2:
 			all_figurations = self.all_single_figurations
 		elif embellish_amount == 3:
@@ -584,7 +588,7 @@ class Melody(Voice):
 		# 	unit_length = 8
 		# elif Voice.beat_division == 3:
 		# 	unit_length = 12
-		unit_length = self.finalized_rhythms[self.rhythm_symbols.index(-1)][0]
+		unit_length = sum(self.finalized_rhythms[0])
 		chord_quarter_length = Voice.measure_length
 
 		self.logger.warning(f"Unit length: {unit_length}")
@@ -592,10 +596,9 @@ class Melody(Voice):
 
 		melodic_minor = False
 		dominant_harmony = {"V"}
-		# sustain on penultimate remove both figures before halftime
 		# sustain + rest (+/- pickup)
 		# ensure pickup note(s) include melodic minor
-		# use sustain on all notes if waltz
+		# slowdown ending (remove waltz on final chord)
 		for chord_index, scale_group in enumerate(self.nested_scale_degrees):
 
 			chord_name = Voice.chord_sequence[chord_index].chord_name

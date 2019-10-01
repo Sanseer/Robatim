@@ -18,7 +18,7 @@ class Voice:
 	beat_division = []
 	measure_length = []
 	time_sig = (4, 2)
-	voice_volumes = (80, 40, 40, 40)
+	voice_volumes = (80, 20, 20, 20)
 
 	bass_motion = []
 	tenor_motion = []
