@@ -37,10 +37,9 @@ class Chord:
 					note_shift = note_alterations.get(scale_degree, 0)
 					chromatic_shift = scale_sequence[scale_degree] + note_shift
 					current_pitch = root_pitch + chromatic_shift
-					if 0 < current_pitch < 128:
+					if 0 <= current_pitch <= 127:
 						Chord.all_pitches_to_degrees[self.chord_name][current_pitch] = scale_degree
 				root_pitch += 12
-				# current_pitch = root_pitch
 
 		self.pitches_to_degrees = Chord.all_pitches_to_degrees[self.chord_name]
 

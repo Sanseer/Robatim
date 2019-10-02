@@ -45,7 +45,7 @@ class Melody(Voice):
 		self.melodic_direction = [None for _ in range(16)]
 		self.chosen_scale_degress = [None for _ in range(16)]
 		self.current_scale_degree_options = [[] for _ in range(16)]
-		self.melody_figure_options = [[] for _ in range(16)]
+		self.melody_figure_options = [[] for _ in range(15)]
 		self.all_scale_degree_options = []
 
 		self.chordal_voice = False
@@ -110,24 +110,24 @@ class Melody(Voice):
 		"""Choose all midi pitches that are diatonic to the key signature"""
 		current_pitch = -12
 		root_pitch = current_pitch + Voice.tonics[Voice.tonic]
-		scale_sequence = Voice.mode_notes[Voice.mode][:7]
+		scale_sequence = Voice.mode_notes[Voice.mode]
 
 		all_midi_pitches = []
 		while root_pitch < 128:
 			for chromatic_shift in scale_sequence:
 				current_pitch = root_pitch + chromatic_shift
-				all_midi_pitches.append(current_pitch)
+				if 0 <= current_pitch <= 127:
+					Voice.all_midi_pitches.append(current_pitch)
 			root_pitch += 12
-
-		Voice.all_midi_pitches = [
-			midi_pitch for midi_pitch in all_midi_pitches if 0 <= midi_pitch <= 127]
 
 		self.logger.warning(f"All midi pitches: {Voice.all_midi_pitches}")
 		self.logger.warning("")
 
 	def make_chord_progression(self):
 		"""Make a chord progression using common practice idioms"""
-		chord_structure = random.choice(idms_b.chord_patterns_16)
+		chord_structure = random.choice(tuple(idms_b.chord_patterns_16))
+		Voice.chord_acceleration = idms_b.chord_patterns_16[chord_structure]
+		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
 		chord_str_sequence = []
 		if chord_structure[0] == "TON":
@@ -161,7 +161,6 @@ class Melody(Voice):
 					self.rhythm_symbols[index] = rhythm_num
 		else:
 			self.rhythm_symbols = raw_rhythm_symbols
-		print(f"Rhythm symbols: {self.rhythm_symbols}")
 		self.logger.warning(f"Rhythm symbols: {self.rhythm_symbols}")
 
 		# if Voice.beat_division == 2:
@@ -176,20 +175,20 @@ class Melody(Voice):
 		# 	}
 
 		# add half notes for all: no figuration
-		if Voice.time_sig == (2,2):
+		if Voice.time_sig in {(2,2), (4,2)}:
 			rhythm_mapping = {
-				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2), (8,)],
+				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)],
 				2: [(3,3,2), (6,1,1)]
+			}
+		elif Voice.time_sig in {(2,3), (4,3)}:
+			rhythm_mapping = {
+				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (10,2)],
+				2: [(9,3), (8,4), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
 			}
 		elif Voice.time_sig == (3,2):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(8,4), (10,2)], 1: [(8,4), (10,2), (12,)],
+				-1: [(12,)], 0: [(8,4), (10,2)], 1: [(8,4), (10,2)],
 				2: [(6,6), (9,3), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
-			}
-		elif Voice.time_sig == (2,3):
-			rhythm_mapping = {
-				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (10,2), (12,)],
-				2: [(9,3), (8,4), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
 			}
 
 		chosen_rhythms = {}
@@ -198,7 +197,7 @@ class Melody(Voice):
 			random.shuffle(possible_rhythms)
 			while True:
 				chosen_rhythm = possible_rhythms.pop()
-				if chosen_rhythm not in chosen_rhythms.values() or chosen_rhythm in {(12,), (8,)}:
+				if chosen_rhythm not in chosen_rhythms.values():
 					chosen_rhythms[rhythm_symbol] = chosen_rhythm
 					break
 
@@ -228,7 +227,6 @@ class Melody(Voice):
 			if phrase2_start_index <= chord_index < phrase4_start_index:
 				if include_octave and 0 in self.all_scale_degree_options[-1]:
 					self.all_scale_degree_options[-1].append(7)
-
 			elif chord_index >= phrase4_start_index: 
 				for scale_degree in current_scale_degrees:
 					if scale_degree >= 4:
@@ -460,7 +458,11 @@ class Melody(Voice):
 
 	def validate_melody_figure(self):
 		"""Check specific melody against figuration options"""
-		if self.chord_index == 15:
+		# if self.chord_index == 15:
+		# 	self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
+		# 	return True
+
+		if self.rhythm_symbols[self.chord_index - 1] == -1:
 			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
 			return True
 
@@ -473,14 +475,11 @@ class Melody(Voice):
 		melody_slope = Voice.calculate_slope(degree_mvmt)
 		degree_mvmt = abs(degree_mvmt)
 
-		# if self.rhythm_symbols[self.chord_index - 1] == -1:
-		# 	self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
-		# 	return True
 
 		embellish_amount = len(self.finalized_rhythms[self.chord_index - 1])
-		if embellish_amount == 1:
-			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
-			return True
+		# if embellish_amount == 1:
+		# 	self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
+		# 	return True
 		if embellish_amount == 2:
 			all_figurations = self.all_single_figurations
 		elif embellish_amount == 3:
@@ -584,18 +583,19 @@ class Melody(Voice):
 		self.logger.warning(f"Melody range: {melody_range}")
 
 		current_time = 0
-		# if Voice.beat_division == 2:
-		# 	unit_length = 8
-		# elif Voice.beat_division == 3:
-		# 	unit_length = 12
 		unit_length = sum(self.finalized_rhythms[0])
-		chord_quarter_length = Voice.measure_length
+		if Voice.time_sig in {(4,3), (4,2)}:
+			chord_quarter_length = Voice.measure_length // 2
+		else:
+			chord_quarter_length = Voice.measure_length
 
 		self.logger.warning(f"Unit length: {unit_length}")
 		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
 
 		melodic_minor = False
 		dominant_harmony = {"V"}
+		break_notes = random.choice((True, False))
+		print(f"Break melody: {break_notes}")
 		# sustain + rest (+/- pickup)
 		# ensure pickup note(s) include melodic minor
 		# slowdown ending (remove waltz on final chord)
@@ -618,7 +618,6 @@ class Melody(Voice):
 						note_alterations[5] = 1
 						print("Melodic minor!")
 
-
 			for embellish_index, scale_degree in enumerate(scale_group):
 				embellish_duration = self.finalized_rhythms[chord_index][embellish_index]
 				note_offset = note_alterations.get(scale_degree, 0)
@@ -626,7 +625,7 @@ class Melody(Voice):
 
 				raw_note_duration = 960 * chord_quarter_length * embellish_fraction
 
-				if raw_note_duration > 960 and self.rhythm_symbols[chord_index] != -1:
+				if raw_note_duration > 960 and self.rhythm_symbols[chord_index] != -1 and break_notes:
 					fixed_note_duration = 960
 				else:
 					fixed_note_duration = raw_note_duration

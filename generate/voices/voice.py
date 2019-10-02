@@ -7,24 +7,25 @@ class Voice:
 	mode = None
 	idms_mode = None
 	tonic = None
+	waltz = False
 	all_midi_pitches = []
+
+	chord_acceleration = False
 
 	Note = collections.namedtuple('Note', ["pitch", "time", "duration"])
 	midi_score = []
 	lily_score = []
 	chorale_scale_degrees = []
-	waltz = False
 
 	beat_division = []
 	measure_length = []
 	time_sig = (4, 2)
-	voice_volumes = (80, 20, 20, 20)
+	voice_volumes = (80, 40, 40, 40)
 
 	bass_motion = []
 	tenor_motion = []
 	alto_motion = []
 	soprano_motion = []
-
 
 	mode_notes = {
 		"lydian": (0, 2, 4, 6, 7, 9, 11),

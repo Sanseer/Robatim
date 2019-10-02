@@ -275,28 +275,75 @@ class Chorale(Voice):
 			Voice.midi_score.append([])
 			Voice.chorale_scale_degrees.append([])
 
-		if Voice.measure_length == 2:
-			raw_chord_duration = 960 * 2
-
-			all_accompaniments = {
+		chord_accompaniments = {
+			(2,2): {
 				(960,): ({0,1,2,3},), (960, 960): ({0}, {1,2,3}),
-				(1440,): ({0,1,2,3},),
-			}
-
-		elif Voice.measure_length == 3:
-			raw_chord_duration = 960 * 3
-
-			all_accompaniments = {
+				(960 * 3 // 2,): ({0,1,2,3},),
+			}, (2,3): {
+				(960,): ({0,1,2,3},), (960, 960): ({0}, {1,2,3}),
+				(960 * 11 // 6,): ({0,1,2,3},)
+			}, (3,2): {
 				(960,): ({0,1,2,3},), (960, 960, 960): ({0}, {1,2,3}, {1,2,3}),
 				(960 * 2,): ({0,1,2,3},)
+			}, (4,2): {
+				(960,): ({0,1,2,3},),
+				(960 * 2, 960 * 2): ({0,1,2,3}, {}), 
+				(960, 960): ({0}, {1,2,3}),
+				(960, 960, 960, 960): ({0}, {1,2,3}, {}, {1,2,3})
+			}, (4,3): {
+				(960,): ({0,1,2,3},),
+				(960 * 2, 960 * 2): ({0,1,2,3}, {}), 
+				(960, 960): ({0}, {1,2,3}),
+				(960, 960, 960, 960): ({0}, {1,2,3}, {}, {1,2,3})
 			}
+		}
+		if Voice.time_sig == (3,2):
+			raw_chord_duration = 960 * 3
+		else:
+			raw_chord_duration = 960 * 2
+		# raw_chord_duration = raw_chord_durations[Voice.time_sig]
+		chord_accompaniment = chord_accompaniments[Voice.time_sig]
+
+		if Voice.time_sig in {(4,2), (4,3)}:
+			if Voice.chord_acceleration:
+				chord_accompaniment.pop((960 *2, 960* 2))
+				choice_distribution = [2,1,1]
+			else:
+				choice_distribution = [1,1,1,1]
+		else:
+			choice_distribution = [1,1,1]
+			
 		# include rest for full sustain at halfway point and ending
 
-		note_durations = random.choice(tuple(all_accompaniments))
-		voices_used = all_accompaniments[note_durations]
+		note_durations = random.choices(
+			tuple(chord_accompaniment), weights=choice_distribution)[0]
+
+		voices_used = chord_accompaniment[note_durations]
+		chord_units_used = sum(note_durations) // raw_chord_duration
+		if chord_units_used == 0:
+			chord_units_used = 1
+		print(f"Chord units used: {chord_units_used}")
+		if chord_units_used > 1:
+			all_note_durations = [] 
+			all_voices_used = []
+			note_index = 0
+			for _ in range(chord_units_used):
+				all_note_durations.append([])
+				all_voices_used.append([])
+				while sum(all_note_durations[-1])< raw_chord_duration:
+					all_note_durations[-1].append(note_durations[note_index])
+					all_voices_used[-1].append(voices_used[note_index])
+					note_index += 1
+		else:
+			all_note_durations = [note_durations]
+			all_voices_used = [voices_used]
+
+
+		print(f"All note durations: {all_note_durations}")
+		print(f"All voices used: {all_voices_used}")
 		if {1,2,3} in voices_used:
 			Voice.waltz = True
-			Voice.voice_volumes = (80, 60, 60, 60)
+			Voice.voice_volumes = (80, 50, 50, 50)
 		print(f"Waltz? {Voice.waltz}")
 		print(voices_used)
 
@@ -305,8 +352,12 @@ class Chorale(Voice):
 
 		for chord_index, current_chord_obj in enumerate(Voice.chord_sequence):
 			pitches_to_degrees = current_chord_obj.pitches_to_degrees
+			note_durations = all_note_durations[chord_index % chord_units_used]
+			voices_used = all_voices_used[chord_index % chord_units_used]
+			self.logger.warning(f"Note durations: {note_durations}")
 			if chord_index in self.unique_chord_indices:
 				current_pitch_combo = next(unique_chord_iter)
+				self.logger.warning(f"Current pitch combo: {current_pitch_combo}")
 				last_pitch_combo = []
 				for voice_index, current_pitch in enumerate(current_pitch_combo):
 					note_time = current_time
@@ -318,7 +369,10 @@ class Chorale(Voice):
 								pitches_to_degrees[current_pitch])
 						note_time += note_duration
 					last_pitch_combo.append(current_pitch)
+					self.logger.warning(
+						f"Added notes: {Voice.midi_score[voice_index + 1][-len(note_durations):]}")
 			else:
+				self.logger.warning(f"Last pitch combo: {last_pitch_combo}")
 				for voice_index, last_pitch in enumerate(last_pitch_combo):
 					note_time = current_time
 					for beat_index, note_duration in enumerate(note_durations):
@@ -328,6 +382,8 @@ class Chorale(Voice):
 							Voice.chorale_scale_degrees[voice_index].append(
 								pitches_to_degrees[last_pitch])
 						note_time += note_duration
+					self.logger.warning(
+						f"Added notes: {Voice.midi_score[voice_index + 1][-len(note_durations):]}")
 
 			current_time += raw_chord_duration
 

@@ -1,14 +1,12 @@
-# 2/4, 3/4, 6/8, 9/8
-# exclude quadruple time b/c it behaves similarly to duple time
-# may readd later
 # exclude 9/8 because uneven divisions
-time_sigs = ((2,2), (3,2), (2,3))
+# 2/4, 3/4, 6/8, 4/4, 12/8
+time_sigs = ((2,2), (3,2), (2,3), (4,2), (3,2), (4,3))
 
 chord_patterns_8 = []
-chord_patterns_16 = [
-	["TON"] + ["RPT"] * 5 + ["HC", "RPT"] + ["TON"] * 5 + ["PAC1", "PAC2", "RPT"],
-	["TON"] + ["RPT"] * 5 + ["HC", "RPT"] + ["TON"] * 4 + ["PAC1", "RPT", "PAC2", "RPT"]
-]
+chord_patterns_16 = {
+	("TON",) + ("RPT",) * 5 + ("HC", "RPT") + ("TON",) * 5 + ("PAC1", "PAC2", "RPT"): True,
+	("TON",) + ("RPT",) * 5 + ("HC", "RPT") + ("TON",) * 4 + ("PAC1", "RPT", "PAC2", "RPT"): False
+}
 
 # I I I I / I I V V
 # I I I I / V V I I
@@ -20,6 +18,7 @@ rhythm_patterns = (
 	((0, 0, 0, -1), (0, 0, 1, -1), (0, 1, 0, -1)), 
 	((0, 0, 0, -1), (0, 0, 1, -1), (0, 1, 0, -1), (0, 0 , 2, -1), (0, 2, 0, -1), 
 		(0, 1, 2, -1), (0, 2, 1, -1), (0, 0, -1, -1), (0, 1, -1, -1), (0, 2, -1, -1),
+		(0, 0, -1, -1), (0, 1, -1, -1), (0, 2, -1, -1),
 		(0, 0, -1, -1), (0, 1, -1, -1), (0, 2, -1, -1),
 		(0, 0, -1, -1), (0, 1, -1, -1), (0, 2, -1, -1)),
 	((0, 0, 0, -1), (0, 0, 1, -1), (0, 1, 0, -1), (0, 0, 2, -1), (0, 2, 0, -1),
