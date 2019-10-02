@@ -1,10 +1,63 @@
 import random
+import json
+import requests
 
 from generate.midi_export import MIDIFile
 from generate.voices.voice import Voice
 from generate.voices.melody import Melody
 import generate.voices.chorale as chorale
 
+def make_lily_file():
+	"""Generate Lilypond file from musical piece"""
+
+	if Voice.mode == "ionian":
+		mode = "major"
+	elif Voice.mode == "aeolian":
+		mode = "minor"
+
+	if Voice.beat_division == 3:
+		time_sig = f"{Voice.measure_length * 3}/8"
+	elif Voice.beat_division == 2:
+		time_sig = f"{Voice.measure_length}/4"
+	title = f"Medley in {Voice.tonic} {mode}"
+
+	with open("old_layout.txt", 'r') as f:
+		new_file = f.read()
+
+	for lily_part in Voice.lily_score:
+		new_file = new_file.replace(
+			"PART_SLOT", " ".join(["\\key", 
+			Voice.tonic.replace('#','is').replace('b',"es").lower(),
+			f"\\{mode} \\time {time_sig} {lily_part}"]), 1)
+
+	new_file = new_file.replace("PART_SLOT", "")
+	new_file = new_file.replace("Medley", title)
+
+	with open("new_layout.txt", 'w') as f:
+		f.write(new_file)
+
+def make_sheet_music():
+	"""Generate sheet music pdf of musical piece"""
+	with open("new_layout.txt", 'r') as f:
+		sheet_code = f.read()
+
+	payload = {
+		"version": "stable", "code": sheet_code, "id": ""
+	}
+	# AWS can't parse python dictionaries for json objects
+	with open("payload.json", 'w') as f:
+		json.dump(payload, f)
+	with open("payload.json", 'r') as f:
+		sheet_music_response = requests.post(
+			"https://7icpm9qr6a.execute-api.us-west-2.amazonaws.com/prod/prepare_preview/stable", data=f)
+
+	response_id = sheet_music_response.json()["id"]
+
+	pdf_response = requests.get(
+		f"https://s3-us-west-2.amazonaws.com/lilybin-scores/{response_id}.pdf")
+
+	with open("final_score.pdf", "wb") as f:
+		f.write(pdf_response.content)
 
 if __name__ == "__main__":
 	track    = 0
@@ -56,35 +109,9 @@ if __name__ == "__main__":
 	with open("song0.mid", "wb")  as output_file:
 		MyMIDI.writeFile(output_file)
 
-	def make_lily_file():
-
-		if Voice.mode == "ionian":
-			mode = "major"
-		elif Voice.mode == "aeolian":
-			mode = "minor"
-
-		if Voice.beat_division == 3:
-			time_sig = f"{Voice.measure_length * 3}/8"
-		elif Voice.beat_division == 2:
-			time_sig = f"{Voice.measure_length}/4"
-		title = f"Medley in {Voice.tonic} {mode}"
-
-		with open("old_layout.txt", 'r') as f:
-			new_file = f.read()
-
-		for lily_part in Voice.lily_score:
-			new_file = new_file.replace(
-				"PART_SLOT", " ".join(["\\key", 
-				Voice.tonic.replace('#','is').replace('b',"es").lower(),
-				f"\\{mode} \\time {time_sig} {lily_part}"]), 1)
-
-		new_file = new_file.replace("PART_SLOT", "")
-		new_file = new_file.replace("Medley", title)
-
-		with open("new_layout.txt", 'w') as f:
-			f.write(new_file)
 
 	make_lily_file()
+	make_sheet_music()
 
 
 

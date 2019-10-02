@@ -163,18 +163,6 @@ class Melody(Voice):
 			self.rhythm_symbols = raw_rhythm_symbols
 		self.logger.warning(f"Rhythm symbols: {self.rhythm_symbols}")
 
-		# if Voice.beat_division == 2:
-		# 	rhythm_mapping = {
-		# 		-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)], 
-		# 		2: [(3,3,2), (6,1,1)]
-		# 		}
-		# elif Voice.beat_division == 3:
-		# 	rhythm_mapping = {
-		# 		-1: [(12,)], 0: [(8,4), (10, 2)], 1: [(8,4), (10, 2)],
-		# 		2: [(10,2), (6,2,4), (4,2,6), (6,4,2), (8,2,2), (10, 1, 1), (6,6), (4,4,4)]
-		# 	}
-
-		# add half notes for all: no figuration
 		if Voice.time_sig in {(2,2), (4,2)}:
 			rhythm_mapping = {
 				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)],
@@ -458,9 +446,6 @@ class Melody(Voice):
 
 	def validate_melody_figure(self):
 		"""Check specific melody against figuration options"""
-		# if self.chord_index == 15:
-		# 	self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
-		# 	return True
 
 		if self.rhythm_symbols[self.chord_index - 1] == -1:
 			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
@@ -477,9 +462,6 @@ class Melody(Voice):
 
 
 		embellish_amount = len(self.finalized_rhythms[self.chord_index - 1])
-		# if embellish_amount == 1:
-		# 	self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
-		# 	return True
 		if embellish_amount == 2:
 			all_figurations = self.all_single_figurations
 		elif embellish_amount == 3:

@@ -3,3 +3,5 @@ new_layout.txt
 __pycache__
 *.log
 logs
+*.json
+*.pdf

@@ -301,7 +301,6 @@ class Chorale(Voice):
 			raw_chord_duration = 960 * 3
 		else:
 			raw_chord_duration = 960 * 2
-		# raw_chord_duration = raw_chord_durations[Voice.time_sig]
 		chord_accompaniment = chord_accompaniments[Voice.time_sig]
 
 		if Voice.time_sig in {(4,2), (4,3)}:
