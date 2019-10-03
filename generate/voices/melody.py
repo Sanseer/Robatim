@@ -33,7 +33,6 @@ class Melody(Voice):
 		Voice.measure_length = Voice.time_sig[0]
 		Voice.beat_division = Voice.time_sig[1]
 		print(f"{Voice.measure_length} beats divided by {Voice.beat_division}")
-		#4/4 and 12/8 should have base melody notes on half notes, if used
 
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
 		self.rhythm_symbols = [None for _ in range(16)]
@@ -175,7 +174,7 @@ class Melody(Voice):
 			}
 		elif Voice.time_sig == (3,2):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(8,4), (10,2)], 1: [(8,4), (10,2)],
+				-1: [(12,)], 0: [(8,4), (10,2)], 1: [(8,4), (10,2), (8,2,2), (6,2,4)],
 				2: [(6,6), (9,3), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
 			}
 
@@ -309,12 +308,13 @@ class Melody(Voice):
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
 		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
 
-		if self.current_degree_choice == self.previous_degree_choice:
-			self.melodic_direction[self.chord_index] = '_'
-		elif self.current_degree_choice > self.previous_degree_choice:
-			self.melodic_direction[self.chord_index] = '>'
-		elif self.current_degree_choice < self.previous_degree_choice:
-			self.melodic_direction[self.chord_index] = '<'
+		if self.chord_index > 0:
+			if self.current_degree_choice == self.previous_degree_choice:
+				self.melodic_direction[self.chord_index] = '_'
+			elif self.current_degree_choice > self.previous_degree_choice:
+				self.melodic_direction[self.chord_index] = '>'
+			elif self.current_degree_choice < self.previous_degree_choice:
+				self.melodic_direction[self.chord_index] = '<'
 
 		self.chosen_scale_degress[self.chord_index] = self.current_degree_choice 
 		if self.validate_base_melody() and self.validate_melody_figure():
@@ -366,7 +366,7 @@ class Melody(Voice):
 
 		highest_scale_degree = max(self.chosen_scale_degress[:self.chord_index + 1])
 		if (highest_scale_degree > 4 and 
-		  self.chosen_scale_degress.count(highest_scale_degree) > 2):
+		  self.chosen_scale_degress.count(highest_scale_degree) > 1):
 			self.logger.warning("Too much climax")
 			self.logger.warning('*' * 30)
 			return False
@@ -405,6 +405,23 @@ class Melody(Voice):
 			self.logger.warning("Octave leap can only occur halfway through")
 			self.logger.warning('*' * 30)
 			return False
+		if len(self.unnested_scale_degrees) >= 3:
+			current_leap_direction = None
+			for scale_degree0, scale_degree1 in zip(
+			  self.unnested_scale_degrees, self.unnested_scale_degrees[1:]): 
+				degree_mvmt = scale_degree1 - scale_degree0
+				current_move_slope = Voice.calculate_slope(degree_mvmt)
+
+				if (current_leap_direction is not None and
+				  current_leap_direction == -current_move_slope):
+					if abs(degree_mvmt) > 1:
+						self.logger.warning("Leap should be followed by stepwise motion (full melody)")
+						self.logger.warning('*' * 30)
+						return False
+					current_leap_direction = None
+				elif abs(degree_mvmt) > 2:
+					current_leap_direction = current_move_slope
+
 		if self.chord_index >= 3:
 			if (self.chosen_scale_degress[self.chord_index - 1:self.chord_index + 1] == 
 			  self.chosen_scale_degress[self.chord_index - 3:self.chord_index - 1]):
@@ -419,7 +436,7 @@ class Melody(Voice):
 
 			if (abs(previous_move_distance) >= 5 and 
 			  (abs_current_move_distance > 3 or previous_move_slope == current_move_slope)):
-				self.logger.warning("Leap should be followed by stepwise motion")
+				self.logger.warning("Leap should be followed by stepwise motion (base melody)")
 				self.logger.warning('*' * 30)
 				return False
 			if previous_move_slope == 0 and current_move_slope != 0:
@@ -503,44 +520,10 @@ class Melody(Voice):
 
 			highest_scale_degree = max(unnested_scalar_melody)
 			if (highest_scale_degree > 4 and 
-			  unnested_scalar_melody.count(highest_scale_degree) > 2):
+			  unnested_scalar_melody.count(highest_scale_degree) > 1):
 				self.logger.warning("Avoid multiple climaxes")
 				self.logger.warning('*' * 30)
 				continue
-
-			# you can repeat motifs but only in symmetrical positions
-
-			# twist_notes = []
-			# triple_motifs_set = set()
-			# full_melody_str = "".join(str(note) for note in unnested_scalar_melody)
-			# for note1, note2, note3 in zip(
-			#   unnested_scalar_melody, unnested_scalar_melody[1:], unnested_scalar_melody[2:]):
-			# 	new_triple_motif = (note1, note2, note3)
-			# 	if new_triple_motif in triple_motifs_set:
-			# 		break
-			# 	triple_motifs_set.add(new_triple_motif)
-			# 	if note1 == note3 and note1 != note2:
-			# 		twist_group = [str(note1), str(note2)]
-			# 		twist_group.sort()
-			# 		if twist_group not in twist_notes:
-			# 			twist_notes.append(twist_group)
-
-			# 			self.logger.warning(f"Twist notes: {twist_notes}")
-			# 			if len(twist_notes) > 1:
-			# 				self.logger.warning(f"Multiple twists not allowed")
-			# 				self.logger.warning('*' * 30)
-			# 				break
-			# 			forward_twist = "".join(*twist_group, twist_group[0])
-			# 			backward_twist = "".join(twist_group[1], *twist_group])
-			# 			twist_count = full_melody_str.count(forward_twist)
-			# 			twist_count += full_melody_str.count(backward_twist)
-			# 			if twist_count >= 2:
-			# 				self.logger.warning(f"No twisting melody")
-			# 				self.logger.warning('*' * 30)
-			# 				break
-			# else:
-			# 	valid_figure = inbetween
-			# 	break
 
 			valid_figure = inbetween
 			break
