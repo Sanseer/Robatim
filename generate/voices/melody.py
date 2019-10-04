@@ -48,6 +48,8 @@ class Melody(Voice):
 		self.all_scale_degree_options = []
 
 		self.chordal_voice = False
+		self.repeat_basic_idea = random.choice((True, False))
+		print(f"Repeat basic idea: {self.repeat_basic_idea}")
 
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [[current - 1], [current + 1]],
@@ -169,12 +171,12 @@ class Melody(Voice):
 			}
 		elif Voice.time_sig in {(2,3), (4,3)}:
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (10,2)],
+				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (10,2), (4,2,6) ,(6,2,4)],
 				2: [(9,3), (8,4), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
 			}
 		elif Voice.time_sig == (3,2):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(8,4), (10,2)], 1: [(8,4), (10,2), (8,2,2), (6,2,4)],
+				-1: [(12,)], 0: [(8,4), (10,2), (4,4,4)], 1: [(8,4), (10,2), (8,2,2), (4,2,6), (6,2,4), (4,4,4)],
 				2: [(6,6), (9,3), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
 			}
 
@@ -252,6 +254,8 @@ class Melody(Voice):
 		while None in self.chosen_scale_degress:
 			self.logger.warning(f"Chord index: {self.chord_index}")
 			self.logger.warning(f"Current scale degree options: {self.current_scale_degree_options}")
+			if self.chord_index == 0:
+				self.create_first_melody_note()
 			if self.melody_figure_options[self.chord_index - 1]:
 				self.attempt_melody_figure()
 			elif self.current_scale_degree_options[self.chord_index]:
@@ -308,13 +312,12 @@ class Melody(Voice):
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
 		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
 
-		if self.chord_index > 0:
-			if self.current_degree_choice == self.previous_degree_choice:
-				self.melodic_direction[self.chord_index] = '_'
-			elif self.current_degree_choice > self.previous_degree_choice:
-				self.melodic_direction[self.chord_index] = '>'
-			elif self.current_degree_choice < self.previous_degree_choice:
-				self.melodic_direction[self.chord_index] = '<'
+		if self.current_degree_choice == self.previous_degree_choice:
+			self.melodic_direction[self.chord_index] = '_'
+		elif self.current_degree_choice > self.previous_degree_choice:
+			self.melodic_direction[self.chord_index] = '>'
+		elif self.current_degree_choice < self.previous_degree_choice:
+			self.melodic_direction[self.chord_index] = '<'
 
 		self.chosen_scale_degress[self.chord_index] = self.current_degree_choice 
 		if self.validate_base_melody() and self.validate_melody_figure():
@@ -421,7 +424,6 @@ class Melody(Voice):
 					current_leap_direction = None
 				elif abs(degree_mvmt) > 2:
 					current_leap_direction = current_move_slope
-
 		if self.chord_index >= 3:
 			if (self.chosen_scale_degress[self.chord_index - 1:self.chord_index + 1] == 
 			  self.chosen_scale_degress[self.chord_index - 3:self.chord_index - 1]):
@@ -523,6 +525,11 @@ class Melody(Voice):
 			  unnested_scalar_melody.count(highest_scale_degree) > 1):
 				self.logger.warning("Avoid multiple climaxes")
 				self.logger.warning('*' * 30)
+				continue
+
+			if (self.repeat_basic_idea and self.chord_index == 10 and 
+			  Voice.chord_sequence[0] == Voice.chord_sequence[8] and 
+			  self.nested_scale_degrees[0] != self.nested_scale_degrees[8]):
 				continue
 
 			valid_figure = inbetween
