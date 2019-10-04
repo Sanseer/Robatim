@@ -222,13 +222,13 @@ class Voice:
 		Voice.lily_score.append(lily_string)
 		self.logger.warning(f"Lily part: {lily_part}")
 
-	def get_interval(self, old_pitch, new_pitch):
+	def get_interval(self, old_pitch, new_pitch, current_pitches_dict):
 
 		pitch_diff = new_pitch - old_pitch
 		chromatic_diff = pitch_diff % 12
 
-		old_degree = self.current_pitches_dict[old_pitch]
-		new_degree = self.current_pitches_dict[new_pitch]
+		old_degree = current_pitches_dict[old_pitch]
+		new_degree = current_pitches_dict[new_pitch]
 
 		generic_interval = new_degree - old_degree
 		if generic_interval < 0:

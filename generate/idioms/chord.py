@@ -45,3 +45,6 @@ class Chord:
 
 	def __eq__(self, other):
 		return self.chord_symbol == other.chord_symbol
+
+	def __str__(self):
+		return self.chord_symbol

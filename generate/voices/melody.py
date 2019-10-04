@@ -48,7 +48,7 @@ class Melody(Voice):
 		self.all_scale_degree_options = []
 
 		self.chordal_voice = False
-		self.repeat_basic_idea = random.choice((True, False))
+		self.repeat_basic_idea = random.choice((True, False, False))
 		print(f"Repeat basic idea: {self.repeat_basic_idea}")
 
 		self.all_single_figurations = {
@@ -206,7 +206,7 @@ class Melody(Voice):
 		phrase2_start_index = 4
 		# remove?
 		include_octave = random.choice((True, True))
-		if Voice.chord_sequence[0].chord_symbol == "0I":
+		if str(Voice.chord_sequence[0]) == "0I":
 			self.all_scale_degree_options.append([0, 2, 4])
 		# separate first note to allow irregular starts e.g., major 2nd
 		for chord_index, chord_obj in enumerate(Voice.chord_sequence[1:-2], 1):
