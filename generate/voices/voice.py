@@ -117,6 +117,7 @@ class Voice:
 		note_index = 0
 		current_time = self.midi_notes[0].time
 		if Voice.waltz and self.chordal_voice and self.part_name != "bass":
+			# fix for reverse waltz
 			if Voice.beat_division == 2:
 				lily_part = ["r4"]
 			elif Voice.beat_division == 3:

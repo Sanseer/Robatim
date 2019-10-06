@@ -166,8 +166,8 @@ class Melody(Voice):
 
 		if Voice.time_sig in {(2,2), (4,2)}:
 			rhythm_mapping = {
-				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)],
-				2: [(3,3,2), (6,1,1)]
+				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2), (4,2,2)],
+				2: [(3,3,2), (6,1,1), (4,2,2)]
 			}
 		elif Voice.time_sig in {(2,3), (4,3)}:
 			rhythm_mapping = {
@@ -408,6 +408,10 @@ class Melody(Voice):
 			self.logger.warning("Octave leap can only occur halfway through")
 			self.logger.warning('*' * 30)
 			return False
+		# if (not self.repeat_basic_idea and self.chord_index == 8 and 
+		#   self.current_degree_choice == 0):
+		# 	self.logger.warning("Prevent premature PAC")
+		# 	return False
 		if len(self.unnested_scale_degrees) >= 3:
 			current_leap_direction = None
 			for scale_degree0, scale_degree1 in zip(

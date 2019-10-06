@@ -34,7 +34,7 @@ class Chorale(Voice):
 			self.alto_soprano_motion]
 
 		self.condensed_chords = []
-		self.unique_chord_indices = []
+		self.unique_chord_indices = set()
 
 		self.logger = logging.getLogger("chorale")
 		chorale_handler = logging.FileHandler("logs/chorale.log", mode='w')
@@ -51,13 +51,13 @@ class Chorale(Voice):
 	def condense_chords(self):
 		current_chord_obj = Voice.chord_sequence[0]
 		self.condensed_chords.append(current_chord_obj)
-		self.unique_chord_indices.append(0)
+		self.unique_chord_indices.add(0)
 		previous_chord_obj = current_chord_obj
 
 		for chord_index, current_chord_obj in enumerate(Voice.chord_sequence[1:], 1):
 			if current_chord_obj != previous_chord_obj:
 				self.condensed_chords.append(current_chord_obj)
-				self.unique_chord_indices.append(chord_index)
+				self.unique_chord_indices.add(chord_index)
 			previous_chord_obj = current_chord_obj
 
 	def make_chord_voicings(self):
@@ -243,23 +243,22 @@ class Chorale(Voice):
 		alto_motion = self.alto_motion[:]
 		soprano_motion = self.soprano_motion[:]
 
-		composite_motion = [tenor_motion, alto_motion, soprano_motion]
-		for voice_index, new_pitch in enumerate(pitch_combo[1:], 1):
-			old_pitch = self.chosen_chord_voicings[self.chord_index - 1][voice_index] 
-
-			if abs(new_pitch - old_pitch) > 12:
-				return False
-			if (self.chord_index > 1 and
-			  abs(old_pitch - self.chosen_chord_voicings[self.chord_index - 2][voice_index]) > 5
-			  and (abs(new_pitch - old_pitch) > 2 or
-			  composite_motion[voice_index][-1] == 
-			  composite_motion[voice_index][-2])):
-				return False
-
 		self.add_voice_motion(bass_motion, b_pitch, 0)
 		self.add_voice_motion(tenor_motion, t_pitch, 1)
 		self.add_voice_motion(alto_motion, a_pitch, 2)
 		self.add_voice_motion(soprano_motion, s_pitch, 3)
+
+		composite_motion = [tenor_motion, alto_motion, soprano_motion]
+		for voice_index, new_pitch in enumerate(pitch_combo[1:]):
+			old_pitch = self.chosen_chord_voicings[self.chord_index - 1][voice_index + 1] 
+			if abs(new_pitch - old_pitch) > 12:
+				return False
+			if (self.chord_index > 1 and
+			  abs(old_pitch - self.chosen_chord_voicings[self.chord_index - 2][voice_index + 1]) > 5
+			  and (abs(new_pitch - old_pitch) > 2 or
+			  composite_motion[voice_index][-1] == 
+			  composite_motion[voice_index][-2])):
+				return False
 
 		bass_tenor_motion = self.bass_tenor_motion[:]
 		bass_alto_motion = self.bass_alto_motion[:]
@@ -322,28 +321,37 @@ class Chorale(Voice):
 		for _ in range(4):
 			Voice.midi_score.append([])
 			Voice.chorale_scale_degrees.append([])
-
 		chord_accompaniments = {
-			(2,2): {
-				(960,): ({0,1,2,3},), (960, 960): ({0}, {1,2,3}),
-				(960 * 3 // 2,): ({0,1,2,3},),
-			}, (2,3): {
-				(960,): ({0,1,2,3},), (960, 960): ({0}, {1,2,3}),
-				(960 * 11 // 6,): ({0,1,2,3},)
-			}, (3,2): {
-				(960,): ({0,1,2,3},), (960, 960, 960): ({0}, {1,2,3}, {1,2,3}),
-				(960 * 2,): ({0,1,2,3},)
-			}, (4,2): {
-				(960,): ({0,1,2,3},),
-				(960 * 2, 960 * 2): ({0,1,2,3}, {}), 
-				(960, 960): ({0}, {1,2,3}),
-				(960, 960, 960, 960): ({0}, {1,2,3}, {}, {1,2,3})
-			}, (4,3): {
-				(960,): ({0,1,2,3},),
-				(960 * 2, 960 * 2): ({0,1,2,3}, {}), 
-				(960, 960): ({0}, {1,2,3}),
-				(960, 960, 960, 960): ({0}, {1,2,3}, {}, {1,2,3})
-			}
+			(2,2): [
+				((960,), ({0,1,2,3},)), ((960, 960), ({0}, {1,2,3})),
+				((960 * 3 // 2,), ({0,1,2,3},)), ((960, 960), ({1,2,3}, {0})),
+				((480, 480, 480), ({0,1,2,3}, {}, {0,1,2,3})),
+				((480, 240, 480, 240, 480), ({0,1,2}, {}, {0,1,2,3}, {}, {0,1,2})),
+				((480, 480, 480, 480), ({2}, {1}, {3}, {0}))
+			], (2,3): [
+				((960,), ({0,1,2,3},)), ((960, 960), ({0}, {1,2,3})),
+				((960 * 10 // 6,), ({0,1,2,3},)), ((960, 960), ({1,2,3}, {0})),
+				((960 * 2 // 3, 320, 960 * 2 // 3), ({0,1,2,3}, {}, {0,1,2,3}))
+			], (3,2): [
+				((960,), ({0,1,2,3},)), ((960, 960, 960), ({0}, {1,2,3}, {1,2,3})),
+				((960 * 2,), ({0,1,2,3},)),
+				((480, 480, 480, 480, 480), ({0,1,2,3}, {}, {0,1,2,3}, {}, {0,1,2,3}))
+			], (4,2): [
+				((960,), ({0,1,2,3},)), ((960, 960), ({0}, {1,2,3})),
+				((960 * 3 // 2,), ({0,1,2,3},)), ((960, 960), ({1,2,3}, {0})),
+				((480, 480, 480), ({0,1,2,3}, {}, {0,1,2,3})),
+				((480, 240, 480, 240, 480), ({0,1,2}, {}, {0,1,2,3}, {}, {0,1,2})),
+				((480, 480, 480, 480), ({2}, {1}, {3}, {0})),
+				((960, 960, 960, 960), ({0}, {1,2,3}, {}, {1,2,3})),
+				((960 * 2, 960 * 2), ({0,1,2,3}, {}))
+			], (4,3): [
+				((960,), ({0,1,2,3},)), ((960, 960), ({0}, {1,2,3})),
+				((960 * 10 // 6,), ({0,1,2,3},)), ((960, 960), ({1,2,3}, {0})),
+				((960 * 2 // 3, 320, 960 * 2 // 3), ({0,1,2,3}, {}, {0,1,2,3})),
+				((960, 960, 960, 960), ({0}, {1,2,3}, {}, {1,2,3})),
+				((960 * 2, 960 * 2), ({0,1,2,3}, {}))
+
+			]
 		}
 		if Voice.time_sig == (3,2):
 			raw_chord_duration = 960 * 3
@@ -351,21 +359,26 @@ class Chorale(Voice):
 			raw_chord_duration = 960 * 2
 		chord_accompaniment = chord_accompaniments[Voice.time_sig]
 
-		if Voice.time_sig in {(4,2), (4,3)}:
+		if Voice.time_sig[0] == 4:
 			if Voice.chord_acceleration:
-				chord_accompaniment.pop((960 *2, 960* 2))
-				choice_distribution = [2,1,1]
-			else:
-				choice_distribution = [1,1,1,1]
-		else:
-			choice_distribution = [1,1,1]
+				chord_accompaniment.pop()
+		# if Voice.time_sig in {(4,2), (4,3)}:
+		# 	if Voice.chord_acceleration:
+		# 		chord_accompaniment.pop((960 *2, 960* 2))
+		# 		choice_distribution = [2,1,1]
+		# 	else:
+		# 		choice_distribution = [1,1,1,1]
+		# else:
+		# 	choice_distribution = [1,1,1]
 			
 		# include rest for full sustain at halfway point and ending
 
-		note_durations = random.choices(
-			tuple(chord_accompaniment), weights=choice_distribution)[0]
+		# note_durations = random.choices(
+		# 	tuple(chord_accompaniment), weights=choice_distribution)[0]
 
-		voices_used = chord_accompaniment[note_durations]
+		note_durations, voices_used = random.choice(chord_accompaniment)
+
+		# voices_used = chord_accompaniment[note_durations]
 		chord_units_used = sum(note_durations) // raw_chord_duration
 		if chord_units_used == 0:
 			chord_units_used = 1
@@ -392,7 +405,6 @@ class Chorale(Voice):
 			Voice.waltz = True
 			Voice.voice_volumes = (80, 50, 50, 50)
 		print(f"Waltz? {Voice.waltz}")
-		print(voices_used)
 
 		unique_chord_iter = iter(self.chosen_chord_voicings)
 		current_time = 0
