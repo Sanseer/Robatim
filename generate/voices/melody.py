@@ -30,8 +30,13 @@ class Melody(Voice):
 		Voice.time_sig = random.choice(idms_b.time_sigs)
 		Voice.tonic = random.choice(self.idms_mode.key_sigs)
 		print(f"{Voice.tonic} {Voice.mode}")
+
 		Voice.measure_length = Voice.time_sig[0]
 		Voice.beat_division = Voice.time_sig[1]
+		if Voice.beat_division == 2:
+			Voice.beat_durations = Voice.simple_beat_durations
+		elif Voice.beat_division == 3:
+			Voice.beat_durations = Voice.compound_beat_durations
 		print(f"{Voice.measure_length} beats divided by {Voice.beat_division}")
 
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
@@ -103,6 +108,7 @@ class Melody(Voice):
 		self.realize_melody()
 
 		self.plot_midi_notes()
+		self.add_rest_placeholders()
 		self.set_sheet_notes()
 		self.make_lily_part()
 		Voice.midi_score.append(self.midi_notes)
@@ -572,6 +578,8 @@ class Melody(Voice):
 		dominant_harmony = {"V", "V7", "V6"}
 		break_notes = random.choice((True, False))
 		print(f"Break melody: {break_notes}")
+		add_rest = False
+
 		# sustain + rest (+/- pickup)
 		# ensure pickup note(s) include melodic minor
 		# slowdown ending (remove waltz on final chord) strum chord
@@ -607,16 +615,36 @@ class Melody(Voice):
 
 				if raw_note_duration > 960 and self.rhythm_symbols[chord_index] != -1 and break_notes:
 					fixed_note_duration = 960
+					add_rest = True
+					extra_duration = int(raw_note_duration - 960)
 				else:
 					fixed_note_duration = raw_note_duration
 				midi_pitch = melody_range[scale_degree + 3]
 				self.midi_notes.append(
 					Voice.Note(midi_pitch + note_offset, int(current_time), int(fixed_note_duration)))
+				if add_rest:
+					self.midi_notes.append(
+						Voice.Note("Rest", int(current_time + 960), extra_duration))
 				current_time += raw_note_duration
 
-				previous_scale_degree = scale_degree
+				add_rest = False
 
 		self.logger.warning(f"Midi melody: {self.midi_notes}")
+
+	def add_rest_placeholders(self):
+		unnested_scale_degrees = []
+		object_index = 0
+
+		for midi_note in self.midi_notes:
+			if midi_note.pitch == "Rest":
+				unnested_scale_degrees.append(None)
+			else:
+				unnested_scale_degrees.append(
+					self.unnested_scale_degrees[object_index])
+				object_index += 1
+
+		self.unnested_scale_degrees = unnested_scale_degrees
+
 
 
 

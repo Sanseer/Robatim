@@ -82,7 +82,8 @@ if __name__ == "__main__":
 
 	Melody().make_melody()
 	for new_note in Voice.midi_score[0]:
-		MyMIDI.addNote(track, channel, *new_note, 100)
+		if isinstance(new_note.pitch, int):
+			MyMIDI.addNote(track, channel, *new_note, 100)
 
 	chorale.Chorale().create_parts()
 	chorale.Bass().create_part()

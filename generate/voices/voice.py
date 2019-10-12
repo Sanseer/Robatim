@@ -57,6 +57,7 @@ class Voice:
 		2 * Fraction("1/3"):"4", 0.5: "8.", 1 * Fraction("1/3"): "8", 
 		0.5 * Fraction("1/3"): "16"  
 	}
+	beat_durations = {}
 	interval_names = {
 		(0,0): "P8", (0,1): "d2", (1,0): "A1", (1,1): "m2", (2,1): "M2", (2,2): "d3",
 		(3,1): "A2", (3,2): "m3", (4,2): "M3", (4,3): "d4", (5,2): "A3", (5,3): "P4",
@@ -92,6 +93,9 @@ class Voice:
 		tonic_index = Voice.note_letters.index(tonic_letter)
 		for midi_note, scale_degree in zip(
 		  self.midi_notes, self.unnested_scale_degrees):
+			if scale_degree is None:
+				self.sheet_notes.append(None)
+				continue
 			true_midi_pitch = midi_note.pitch
 			# self.logger.warning(f"True midi pitch: {true_midi_pitch}")
 			scale_midi_pitch =  true_midi_pitch % 12
@@ -116,20 +120,37 @@ class Voice:
 
 		note_index = 0
 		current_time = self.midi_notes[0].time
-		if Voice.waltz and self.chordal_voice and self.part_name != "bass":
-			# fix for reverse waltz
-			if Voice.beat_division == 2:
-				lily_part = ["r4"]
-			elif Voice.beat_division == 3:
-				lily_part = ["r4."]
-		else:
-			lily_part = []
-
-		# add rest at end for chorale parts
+		lily_part = []
 
 		for midi_note, sheet_note in zip(self.midi_notes, self.sheet_notes):
 			self.logger.warning(midi_note)
 			self.logger.warning(sheet_note)
+
+			object_duration = Fraction(numerator=midi_note.duration, denominator=960)
+			if sheet_note is None:
+				if object_duration in Voice.beat_durations: 
+					lily_rest = f"r{Voice.beat_durations[object_duration]}"
+				else: 
+					rest_partitions = []
+					remaining_rhythm = object_duration
+					for current_rhythm in Voice.beat_durations:
+						if current_rhythm <= remaining_rhythm:
+							rest_partitions.append(current_rhythm)
+							remaining_rhythm -= current_rhythm
+						if remaining_rhythm == 0:
+							break
+					lily_rest = ""
+					for beat_part in beat_partitions[:-1]:
+						lily_rest = "".join([
+							lily_rest, Voice.beat_durations[beat_part], "~ "])
+
+					lily_rest = "".join([
+						lily_rest, Voice.beat_durations[beat_partitions[-1]]])
+
+				lily_part.append(lily_rest)
+				continue
+
+
 			accidental_mark = ""
 			octave_mark = ""
 			note_letter = sheet_note[0].lower()
@@ -157,20 +178,14 @@ class Voice:
 					accidental_amount = sheet_note.count('b')
 					accidental_mark = "es" * accidental_amount
 
-			if Voice.beat_division == 2:
-				beat_durations = Voice.simple_beat_durations
-			elif Voice.beat_division == 3:
-				beat_durations = Voice.compound_beat_durations
-
-			note_duration = Fraction(numerator=midi_note.duration, denominator=960)
-			if note_duration in beat_durations:
+			if object_duration in Voice.beat_durations:
 				lily_note = "".join([
 					note_letter, accidental_mark, octave_mark, 
-					beat_durations[note_duration]])
+					Voice.beat_durations[object_duration]])
 			else:
 				beat_partitions = []
-				remaining_rhythm = note_duration
-				for current_rhythm in beat_durations:
+				remaining_rhythm = object_duration
+				for current_rhythm in Voice.beat_durations:
 					if current_rhythm <= remaining_rhythm:
 						beat_partitions.append(current_rhythm)
 						remaining_rhythm -= current_rhythm
@@ -180,44 +195,13 @@ class Voice:
 				for beat_part in beat_partitions[:-1]:
 					lily_note = "".join([
 						lily_note, note_letter, accidental_mark, octave_mark,
-						beat_durations[beat_part], "~ "])
+						Voice.beat_durations[beat_part], "~ "])
 
 				lily_note = "".join([
 					lily_note, note_letter, accidental_mark, octave_mark, 
-					beat_durations[beat_partitions[-1]]])
+					Voice.beat_durations[beat_partitions[-1]]])
 
 			lily_part.append(lily_note)
-
-			self.logger.warning(note_index)
-
-			if note_index < len(self.midi_notes) - 1:
-				self.logger.warning("Checking rest possibility")
-				self.logger.warning(f"Current time: {current_time}")
-				next_note_start = self.midi_notes[note_index + 1].time
-				self.logger.warning(f"Note duration: {midi_note.duration}")
-				self.logger.warning(f"Next note start: {next_note_start}") 
-				if current_time + midi_note.duration < next_note_start:
-					unused_ticks = next_note_start - current_time - midi_note.duration
-					self.logger.warning(f"Unused ticks: {unused_ticks}")
-					unused_duration = Fraction(numerator=unused_ticks, denominator=960)
-					if unused_duration in beat_durations:
-						lily_part.append(f"r{beat_durations[unused_duration]}") 
-					else:
-						rest_partitions = []
-						remaining_rhythm = unused_duration
-
-						for current_rhythm in beat_durations:
-							if current_rhythm <= remaining_rhythm:
-								rest_partitions.append(current_rhythm)
-								remaining_rhythm -= current_rhythm
-							if remaining_rhythm == 0:
-								break
-
-						for rest_part in rest_partitions:
-							lily_part.append(f"r{beat_durations[rest_part]}")
-				current_time = next_note_start 
-
-			note_index += 1
 
 		lily_string = " ".join(note for note in lily_part) 
 		Voice.lily_score.append(lily_string)
