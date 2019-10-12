@@ -95,7 +95,8 @@ if __name__ == "__main__":
 		channel += 1
 		volume = Voice.voice_volumes[voice_index]
 		for new_note in part:
-			MyMIDI.addNote(track, channel, *new_note, volume)
+			if isinstance(new_note.pitch, int): 
+				MyMIDI.addNote(track, channel, *new_note, volume)
 
 	if Voice.mode == "aeolian":
 		tempo = random.choice(range(80, 101))

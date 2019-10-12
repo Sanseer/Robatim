@@ -131,11 +131,13 @@ class Melody(Voice):
 		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
 		chord_str_sequence = []
-		if chord_structure[0] == "TON":
-			chord_str_sequence.append("0I")
+		# if chord_structure[0] == "TON":
+		# 	chord_str_sequence.append("0I")
 
-		for chord_pattern in chord_structure[1:]:
-			if chord_pattern == "RPT":
+		for chord_pattern in chord_structure:
+			if chord_pattern == "TON":
+				chord_str_sequence.append("0I") 
+			elif chord_pattern == "RPT":
 				chord_str_sequence.append(chord_str_sequence[-1])
 			else:
 				chord_choices = Voice.idms_mode.chord_ids[chord_pattern]
@@ -144,6 +146,8 @@ class Melody(Voice):
 
 		self.logger.warning(f"{chord_str_sequence}")
 		self.logger.warning("")
+
+		print(f"Chord str sequence: {chord_str_sequence}")
 
 		for current_chord_str in chord_str_sequence:
 			Voice.chord_sequence.append(Chord(current_chord_str))
@@ -353,10 +357,10 @@ class Melody(Voice):
 				return False
 
 		relevant_melodic_mvt = melodic_mvmt[1:]
-		# if ">>>" in relevant_melodic_mvt:
-		# 	self.logger.warning("Ascending cascade")
-		# 	self.logger.warning('*' * 30)
-		# 	return False
+		if ">>>" in relevant_melodic_mvt:
+			self.logger.warning("Ascending cascade")
+			self.logger.warning('*' * 30)
+			return False
 		# if melodic_mvmt.count('_') > 8:
 		# 	self.logger.warning("Too much pause")
 		# 	self.logger.warning('*' * 30)
@@ -408,10 +412,6 @@ class Melody(Voice):
 			self.logger.warning("Octave leap can only occur halfway through")
 			self.logger.warning('*' * 30)
 			return False
-		# if (not self.repeat_basic_idea and self.chord_index == 8 and 
-		#   self.current_degree_choice == 0):
-		# 	self.logger.warning("Prevent premature PAC")
-		# 	return False
 		if len(self.unnested_scale_degrees) >= 3:
 			current_leap_direction = None
 			for scale_degree0, scale_degree1 in zip(
@@ -569,12 +569,13 @@ class Melody(Voice):
 		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
 
 		melodic_minor = False
-		dominant_harmony = {"V"}
+		dominant_harmony = {"V", "V7", "V6"}
 		break_notes = random.choice((True, False))
 		print(f"Break melody: {break_notes}")
 		# sustain + rest (+/- pickup)
 		# ensure pickup note(s) include melodic minor
-		# slowdown ending (remove waltz on final chord)
+		# slowdown ending (remove waltz on final chord) strum chord
+		# repeated ending of last 2 bars
 		for chord_index, scale_group in enumerate(self.nested_scale_degrees):
 
 			chord_name = Voice.chord_sequence[chord_index].chord_name
@@ -584,7 +585,9 @@ class Melody(Voice):
 				note_alterations = Chord.minor_mode_alterations[chord_name]
 			else: 
 				note_alterations = {}
+				
 			if Voice.mode == "aeolian" and chord_name in dominant_harmony:
+				# doesn't count melodic minor if between >= 2 chords
 				if melodic_minor: 
 					note_alterations[5] = 1 
 				else:
@@ -596,7 +599,8 @@ class Melody(Voice):
 
 			for embellish_index, scale_degree in enumerate(scale_group):
 				embellish_duration = self.finalized_rhythms[chord_index][embellish_index]
-				note_offset = note_alterations.get(scale_degree, 0)
+				# account for negative scale degrees
+				note_offset = note_alterations.get(scale_degree % 7, 0)
 				embellish_fraction = Fraction(numerator=embellish_duration, denominator=unit_length)
 
 				raw_note_duration = 960 * chord_quarter_length * embellish_fraction
@@ -609,6 +613,8 @@ class Melody(Voice):
 				self.midi_notes.append(
 					Voice.Note(midi_pitch + note_offset, int(current_time), int(fixed_note_duration)))
 				current_time += raw_note_duration
+
+				previous_scale_degree = scale_degree
 
 		self.logger.warning(f"Midi melody: {self.midi_notes}")
 

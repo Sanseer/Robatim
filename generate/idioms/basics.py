@@ -4,8 +4,8 @@ time_sigs = ((2,2), (3,2), (2,3), (4,2), (3,2), (4,3))
 
 chord_patterns_8 = []
 chord_patterns_16 = {
-	("TON",) + ("RPT",) * 5 + ("HC", "RPT") + ("TON",) * 5 + ("PAC1", "PAC2", "RPT"): True,
-	("TON",) + ("RPT",) * 5 + ("HC", "RPT") + ("TON",) * 4 + ("PAC1", "RPT", "PAC2", "RPT"): False
+	("TON",) + ("RPT",) * 5 + ("HC", "RPT") + ("TON",) * 5 + ("PAC1", "TON", "RPT"): True,
+	("TON",) + ("RPT",) * 5 + ("HC", "RPT") + ("TON",) * 4 + ("PAC1", "RPT", "TON", "RPT"): False
 }
 
 # I I I I / I I V V

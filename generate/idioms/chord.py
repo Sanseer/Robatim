@@ -5,20 +5,25 @@ from generate.voices.voice import Voice
 class Chord:
 
 	chord_members = {
-		"I": (0,2,4), "V": (4,6,1)
+		"I": (0, 2, 4), "V": (4, 6, 1), "V7": (4, 6, 1, 3), "V6":(4, 6, 1) 
 	}
 	minor_mode_alterations = {
-		"V": {4: 0, 6: 1, 1: 0},
+		"V": {6: 1}, "V7": {6: 1}, "V6": {6: 1}
 	}
 	major_mode_alterations = {
 		None: None,
 	}
 	all_pitches_to_degrees = collections.defaultdict(dict)
+	
+	bass_degrees = {
+		"I": 0, "V": 4, "V7": 4, "V6": 6
+	}
 
 	def __init__(self, chord_symbol):
 		self.chord_name = chord_symbol[1:] 
 		self.chord_symbol = chord_symbol
 		self.scale_degrees = Chord.chord_members[self.chord_name]
+		self.bass_degree = Chord.bass_degrees[self.chord_name]
 
 		if self.chord_name not in Chord.all_pitches_to_degrees:
 			current_pitch = -12
