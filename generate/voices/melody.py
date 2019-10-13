@@ -78,7 +78,8 @@ class Melody(Voice):
 				[previous - slope, previous], 
 				[current + slope, current + slope], 
 				[current + slope * 2, current + slope],
-				[previous, previous], [previous, current]],
+				[previous, previous], [previous, current],
+				[current, current + slope]],
 			2: lambda previous, current, slope: [
 				[current + slope * 2, current + slope],
 				[previous + slope, previous + slope], 
@@ -106,9 +107,9 @@ class Melody(Voice):
 		self.make_chord_progression()
 		self.create_rhythm()
 		self.realize_melody()
-
 		self.plot_midi_notes()
 		self.add_rest_placeholders()
+
 		self.set_sheet_notes()
 		self.make_lily_part()
 		Voice.midi_score.append(self.midi_notes)
@@ -172,35 +173,41 @@ class Melody(Voice):
 					self.rhythm_symbols[index] = rhythm_num
 		else:
 			self.rhythm_symbols = raw_rhythm_symbols
-		self.logger.warning(f"Rhythm symbols: {self.rhythm_symbols}")
+		print(f"Rhythm symbols: {self.rhythm_symbols}")
 
 		if Voice.time_sig in {(2,2), (4,2)}:
 			rhythm_mapping = {
 				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2), (4,2,2)],
-				2: [(3,3,2), (6,1,1), (4,2,2)]
+				2: [(3,3,2), (6,1,1), (4,2,2)], -2: [(4,4), (6,2)]
 			}
 		elif Voice.time_sig in {(2,3), (4,3)}:
 			rhythm_mapping = {
 				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (10,2), (4,2,6) ,(6,2,4)],
-				2: [(9,3), (8,4), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
+				2: [(9,3), (8,4), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)],
+				-2: [(6,6), (10,2)]
 			}
 		elif Voice.time_sig == (3,2):
 			rhythm_mapping = {
 				-1: [(12,)], 0: [(8,4), (10,2), (4,4,4)], 1: [(8,4), (10,2), (8,2,2), (4,2,6), (6,2,4), (4,4,4)],
-				2: [(6,6), (9,3), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)]
+				2: [(6,6), (9,3), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)],
+				-2: [(8,4), (10,2)]
 			}
 
 		chosen_rhythms = {}
-		for rhythm_symbol in set(self.rhythm_symbols):
+		rhythm_symbol_set = set(self.rhythm_symbols)
+		if -2 in rhythm_symbol_set:
+			Voice.pickup = True
+		print(f"Pickup note? {Voice.pickup}")
+		for rhythm_symbol in rhythm_symbol_set:
 			possible_rhythms = rhythm_mapping[rhythm_symbol]
 			random.shuffle(possible_rhythms)
 			while True:
 				chosen_rhythm = possible_rhythms.pop()
-				if chosen_rhythm not in chosen_rhythms.values():
+				if chosen_rhythm not in chosen_rhythms.values() or rhythm_symbol == -2:
 					chosen_rhythms[rhythm_symbol] = chosen_rhythm
 					break
 
-		self.logger.warning(f"Chosen rhythms: {chosen_rhythms}")
+		print(f"Chosen rhythms: {chosen_rhythms}")
 
 		self.finalized_rhythms = [
 			chosen_rhythms[rhythm_symbol] for rhythm_symbol in self.rhythm_symbols]
@@ -274,8 +281,9 @@ class Melody(Voice):
 				self.backtrack_score()
 
 		self.nested_scale_degrees[-1] = [self.current_degree_choice]
-		self.set_unnested_melody()
-		self.unnested_scale_degrees.append(self.current_degree_choice)
+		self.logger.warning(f"Nested scale degrees: {self.nested_scale_degrees}")
+		self.reset_unnested_melody()
+		self.logger.warning(f"Unnested scale degrees: {self.unnested_scale_degrees}")
 
 	def backtrack_score(self):
 		"""Reverse to the previous chord to fix bad notes"""
@@ -367,10 +375,10 @@ class Melody(Voice):
 			self.logger.warning("Ascending cascade")
 			self.logger.warning('*' * 30)
 			return False
-		# if melodic_mvmt.count('_') > 8:
-		# 	self.logger.warning("Too much pause")
-		# 	self.logger.warning('*' * 30)
-		# 	return False
+		if melodic_mvmt.count('_') > 8:
+			self.logger.warning("Too much pause")
+			self.logger.warning('*' * 30)
+			return False
 		if (self.chord_index == 7 and 
 		  self.previous_degree_choice != self.current_degree_choice):
 			self.logger.warning("Rest halfway through")
@@ -476,9 +484,14 @@ class Melody(Voice):
 	def validate_melody_figure(self):
 		"""Check specific melody against figuration options"""
 
-		if self.rhythm_symbols[self.chord_index - 1] == -1:
+		last_rhythm_symbol = self.rhythm_symbols[self.chord_index - 1]
+		if last_rhythm_symbol == -1:
 			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
 			return True
+		if last_rhythm_symbol == -2:
+			self.melody_figure_options[self.chord_index - 1] = [
+				[self.current_degree_choice - 1]]
+			return self.find_valid_figure()
 
 		remaining_figures = self.melody_figure_options[self.chord_index - 1]
 		if remaining_figures:
@@ -502,7 +515,7 @@ class Melody(Voice):
 		self.melody_figure_options[self.chord_index - 1] = possible_scale_degrees
 		return self.find_valid_figure()
 
-	def set_unnested_melody(self):
+	def reset_unnested_melody(self):
 		"""Create a unnested sequence of the currently approved melody"""
 		self.unnested_scale_degrees = []
 		for melody_group in self.nested_scale_degrees[:self.chord_index - 1]:
@@ -512,8 +525,10 @@ class Melody(Voice):
 
 	def find_valid_figure(self):
 		valid_figure = None
-		self.set_unnested_melody()
+		self.reset_unnested_melody()
 		remaining_figures = self.melody_figure_options[self.chord_index - 1]
+
+		random.shuffle(remaining_figures)
 		# alias has side effect but allows easier referencing
 		while remaining_figures:
 			inbetween = remaining_figures.pop()
@@ -545,7 +560,6 @@ class Melody(Voice):
 			valid_figure = inbetween
 			break
 
-
 		if valid_figure is None:
 			self.logger.warning("Melody failed")
 			return False
@@ -574,6 +588,7 @@ class Melody(Voice):
 		self.logger.warning(f"Unit length: {unit_length}")
 		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
 
+		object_index = 0
 		melodic_minor = False
 		dominant_harmony = {"V", "V7", "V6"}
 		break_notes = random.choice((True, False))
@@ -583,7 +598,9 @@ class Melody(Voice):
 		# sustain + rest (+/- pickup)
 		# ensure pickup note(s) include melodic minor
 		# slowdown ending (remove waltz on final chord) strum chord
-		# repeated ending of last 2 bars
+		# repeated ending of last 2 bars (with optional pickup)
+		# drum roll ending
+
 		for chord_index, scale_group in enumerate(self.nested_scale_degrees):
 
 			chord_name = Voice.chord_sequence[chord_index].chord_name
@@ -613,37 +630,45 @@ class Melody(Voice):
 
 				raw_note_duration = 960 * chord_quarter_length * embellish_fraction
 
-				if raw_note_duration > 960 and self.rhythm_symbols[chord_index] != -1 and break_notes:
+				if raw_note_duration > 960 and self.rhythm_symbols[chord_index] >= 0 and break_notes:
 					fixed_note_duration = 960
 					add_rest = True
 					extra_duration = int(raw_note_duration - 960)
 				else:
 					fixed_note_duration = raw_note_duration
-				midi_pitch = melody_range[scale_degree + 3]
-				self.midi_notes.append(
-					Voice.Note(midi_pitch + note_offset, int(current_time), int(fixed_note_duration)))
-				if add_rest:
+				if chord_index == 7 and embellish_index == 0 and self.rhythm_symbols[6] == -1:
 					self.midi_notes.append(
-						Voice.Note("Rest", int(current_time + 960), extra_duration))
-				current_time += raw_note_duration
+						Voice.Note("Rest", int(current_time), int(fixed_note_duration)))
+					self.nested_scale_degrees[chord_index][embellish_index] = None
+					# needed all numbers in unnested sequence for validation
+					self.unnested_scale_degrees.pop(object_index)
+				else:
+					midi_pitch = melody_range[scale_degree + 3]
+					self.midi_notes.append(
+						Voice.Note(midi_pitch + note_offset, int(current_time), int(fixed_note_duration)))
+					if add_rest:
+						self.midi_notes.append(
+							Voice.Note("Rest", int(current_time + 960), extra_duration))
 
+				current_time += raw_note_duration
 				add_rest = False
+				object_index += 1
 
 		self.logger.warning(f"Midi melody: {self.midi_notes}")
 
 	def add_rest_placeholders(self):
 		unnested_scale_degrees = []
-		object_index = 0
+		unnested_melody_iter = iter(self.unnested_scale_degrees)
 
 		for midi_note in self.midi_notes:
 			if midi_note.pitch == "Rest":
 				unnested_scale_degrees.append(None)
 			else:
-				unnested_scale_degrees.append(
-					self.unnested_scale_degrees[object_index])
-				object_index += 1
+				unnested_scale_degrees.append(next(unnested_melody_iter))
 
 		self.unnested_scale_degrees = unnested_scale_degrees
+		self.logger.warning(f"Final unnested melody: {self.unnested_scale_degrees}")
+		self.logger.warning(f"Final nested melody: {self.nested_scale_degrees}")
 
 
 

@@ -8,6 +8,7 @@ class Voice:
 	idms_mode = None
 	tonic = None
 	waltz = False
+	pickup = False
 	all_midi_pitches = []
 
 	chord_acceleration = False
@@ -91,8 +92,14 @@ class Voice:
 		tonic_letter = Voice.tonic.replace('#',"").replace('b',"")
 		# self.logger.warning(f"Tonic letter {tonic_letter}")
 		tonic_index = Voice.note_letters.index(tonic_letter)
+
+		self.logger.warning(len(self.midi_notes))
+		self.logger.warning(len(self.unnested_scale_degrees))
+
 		for midi_note, scale_degree in zip(
 		  self.midi_notes, self.unnested_scale_degrees):
+			self.logger.warning(midi_note)
+			self.logger.warning(scale_degree)
 			if scale_degree is None:
 				self.sheet_notes.append(None)
 				continue
@@ -112,19 +119,22 @@ class Voice:
 					# self.logger.warning(f"Chosen note designation: {possible_note_name}{octave}")
 					break
 
+		self.logger.warning(self.sheet_notes)
+
 		# self.logger.warning(f"Sheet notes: {self.sheet_notes}")
 
 
 	def make_lily_part(self):
 		"""Write sheet music text notation for voice part"""
 
-		note_index = 0
+		object_index = 0
 		current_time = self.midi_notes[0].time
 		lily_part = []
 
 		for midi_note, sheet_note in zip(self.midi_notes, self.sheet_notes):
 			self.logger.warning(midi_note)
 			self.logger.warning(sheet_note)
+			self.logger.warning(object_index)
 
 			object_duration = Fraction(numerator=midi_note.duration, denominator=960)
 			if sheet_note is None:
@@ -140,12 +150,12 @@ class Voice:
 						if remaining_rhythm == 0:
 							break
 					lily_rest = ""
-					for beat_part in beat_partitions[:-1]:
+					for rest_part in rest_partitions[:-1]:
 						lily_rest = "".join([
-							lily_rest, Voice.beat_durations[beat_part], "~ "])
+							lily_rest, "r", Voice.beat_durations[rest_part], "~ "])
 
 					lily_rest = "".join([
-						lily_rest, Voice.beat_durations[beat_partitions[-1]]])
+						lily_rest, "r", Voice.beat_durations[rest_partitions[-1]]])
 
 				lily_part.append(lily_rest)
 				continue
@@ -202,6 +212,7 @@ class Voice:
 					Voice.beat_durations[beat_partitions[-1]]])
 
 			lily_part.append(lily_note)
+			object_index += 1
 
 		lily_string = " ".join(note for note in lily_part) 
 		Voice.lily_score.append(lily_string)

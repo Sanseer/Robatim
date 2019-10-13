@@ -376,6 +376,8 @@ class Chorale(Voice):
 				((960 * 2, 960 * 2), ({0,1,2,3}, {}))
 			]
 		}
+
+		# add 3rd parameter for volume
 		if Voice.time_sig == (3,2):
 			raw_chord_duration = 960 * 3
 		else:
@@ -407,12 +409,15 @@ class Chorale(Voice):
 			all_note_durations = [note_durations]
 			all_voices_used = [voices_used]
 
-
+		# tenor and bass should not have same note on waltz
 		print(f"All note durations: {all_note_durations}")
 		print(f"All voices used: {all_voices_used}")
 		if {1,2,3} in voices_used:
 			Voice.waltz = True
 			Voice.voice_volumes = (80, 50, 50, 50)
+		elif ({2}, {1}, {3}, {0}) in voices_used:
+			print("Raised volume")
+			Voice.voice_volumes = (70, 70, 70, 70)
 		print(f"Waltz? {Voice.waltz}")
 
 		unique_chord_iter = iter(self.chosen_chord_voicings)
