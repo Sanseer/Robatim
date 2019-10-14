@@ -54,10 +54,10 @@ class Chorale(Voice):
 		self.unique_chord_indices.add(0)
 		previous_chord_obj = current_chord_obj
 
-		for chord_index, current_chord_obj in enumerate(Voice.chord_sequence[1:], 1):
+		for original_chord_index, current_chord_obj in enumerate(Voice.chord_sequence[1:], 1):
 			if current_chord_obj != previous_chord_obj:
 				self.condensed_chords.append(current_chord_obj)
-				self.unique_chord_indices.add(chord_index)
+				self.unique_chord_indices.add(original_chord_index)
 			previous_chord_obj = current_chord_obj
 
 	def make_chord_voicings(self):
@@ -188,7 +188,7 @@ class Chorale(Voice):
 	  self, pitch_combo, current_chord, previous_chord, chord_direction, 
 	  current_pitches_dict, chordal_members, bass_degree):
 		(b_pitch, t_pitch, a_pitch, s_pitch) = pitch_combo
-		if not b_pitch <= t_pitch <= a_pitch <= s_pitch:
+		if not b_pitch < t_pitch <= a_pitch <= s_pitch:
 			return False 
 		if (b_pitch - t_pitch) > 24:
 			return False
@@ -234,6 +234,8 @@ class Chorale(Voice):
 			self.get_interval(a_pitch, s_pitch, current_pitches_dict))
 
 		if self.chord_index == 0:
+			if bass_soprano_intervals[-1] not in {"P5", "P8", "M3", "m3"}:
+				return False
 			self.bass_tenor_intervals.append(bass_tenor_intervals[-1]) 
 			self.bass_alto_intervals.append(bass_alto_intervals[-1]) 
 			self.bass_soprano_intervals.append(bass_soprano_intervals[-1]) 
@@ -294,6 +296,15 @@ class Chorale(Voice):
 			soprano_motion, tenor_soprano_motion, tenor_soprano_intervals)
 		self.add_motion_type(alto_motion, 
 			soprano_motion, alto_soprano_motion, alto_soprano_intervals)
+
+		old_soprano_note =  self.chosen_chord_voicings[self.chord_index - 1][3] 
+		if (self.chord_index == len(self.condensed_chords) - 1 and
+		  (bass_soprano_motion[-1] != "Contrary" or
+		  bass_soprano_intervals[-1] != "P8" or 
+		  abs(s_pitch - old_soprano_note) > 5)):  
+			return False
+		if "P" in bass_soprano_intervals[-1] and "P" in bass_soprano_intervals[-2]:
+			return False
 
 		composite_intervals = [bass_tenor_intervals, bass_alto_intervals, 
 			bass_soprano_intervals, tenor_alto_intervals, 
@@ -415,9 +426,9 @@ class Chorale(Voice):
 		if {1,2,3} in voices_used:
 			Voice.waltz = True
 			Voice.voice_volumes = (80, 50, 50, 50)
-		elif ({2}, {1}, {3}, {0}) in voices_used:
+		elif ({2}, {1}, {3}, {0}) in all_voices_used:
 			print("Raised volume")
-			Voice.voice_volumes = (70, 70, 70, 70)
+			Voice.voice_volumes = (60, 60, 60, 60)
 		print(f"Waltz? {Voice.waltz}")
 
 		unique_chord_iter = iter(self.chosen_chord_voicings)
