@@ -235,6 +235,7 @@ class Chorale(Voice):
 
 		if self.chord_index == 0:
 			if bass_soprano_intervals[-1] not in {"P5", "P8", "M3", "m3"}:
+				self.logger.warning("Soprano starts on proper note")
 				return False
 			self.bass_tenor_intervals.append(bass_tenor_intervals[-1]) 
 			self.bass_alto_intervals.append(bass_alto_intervals[-1]) 
@@ -268,12 +269,14 @@ class Chorale(Voice):
 		for voice_index, new_pitch in enumerate(pitch_combo[1:]):
 			old_pitch = self.chosen_chord_voicings[self.chord_index - 1][voice_index + 1] 
 			if abs(new_pitch - old_pitch) > 12:
+				self.logger.warning("Leap greater than octave")
 				return False
 			if (self.chord_index > 1 and
 			  abs(old_pitch - self.chosen_chord_voicings[self.chord_index - 2][voice_index + 1]) > 5
 			  and (abs(new_pitch - old_pitch) > 2 or
 			  composite_motion[voice_index][-1] == 
 			  composite_motion[voice_index][-2])):
+				self.logger.warning("Leaps followed by stepwise contrary motion")
 				return False
 
 		bass_tenor_motion = self.bass_tenor_motion[:]
@@ -299,11 +302,12 @@ class Chorale(Voice):
 
 		old_soprano_note =  self.chosen_chord_voicings[self.chord_index - 1][3] 
 		if (self.chord_index == len(self.condensed_chords) - 1 and
-		  (bass_soprano_motion[-1] != "Contrary" or
-		  bass_soprano_intervals[-1] != "P8" or 
-		  abs(s_pitch - old_soprano_note) > 5)):  
+		  (bass_soprano_intervals[-1] != "P8" or 
+		  abs(s_pitch - old_soprano_note) > 5)): 
+			self.logger.warning("End on contrary motion") 
 			return False
 		if "P" in bass_soprano_intervals[-1] and "P" in bass_soprano_intervals[-2]:
+			self.logger.warning("Avoid double perfects")
 			return False
 
 		composite_intervals = [bass_tenor_intervals, bass_alto_intervals, 
@@ -317,14 +321,17 @@ class Chorale(Voice):
 		  composite_intervals, composite_mvmts):
 			if (interval_list[-1] in {"P5", "P8"} and 
 			  motion_list[-1] == "Parallel"):
+				self.logger.warning("No parallel fifths or octaves")
 				return False
 			if (interval_list[-2] == "A4" and 
 			  interval_list[-1] not in {"M6", "m6"}): 
 				if current_chord == "I" and previous_chord == "V7":
+					self.logger.warning("Must properly resolve V7")
 					return False
 			if (interval_list[-2] == "d5" and 
 			  interval_list[-1] not in {"M3", "m3"}): 
 				if current_chord == "I" and previous_chord == "V7":
+					self.logger.warning("Must properly resolve V7")
 					return False
 
 		# add new parameters to official sequence
@@ -351,9 +358,14 @@ class Chorale(Voice):
 
 	def make_accompanyment(self):
 
-		for _ in range(4):
-			Voice.midi_score.append([])
-			Voice.chorale_scale_degrees.append([])
+		if Voice.pickup:
+			for _ in range(4):
+				Voice.midi_score.append([Voice.Note("Rest", 0, Voice.pickup_duration)])
+				Voice.chorale_scale_degrees.append([None])
+		else:
+			for _ in range(4):
+				Voice.midi_score.append([])
+				Voice.chorale_scale_degrees.append([])
 		chord_accompaniments = {
 			(2,2): [
 				((960, 960), ({0,1,2,3}, {})), ((960, 960), ({0}, {1,2,3})),
@@ -417,8 +429,8 @@ class Chorale(Voice):
 					all_voices_used[-1].append(voices_used[note_index])
 					note_index += 1
 		else:
-			all_note_durations = [note_durations]
-			all_voices_used = [voices_used]
+			all_note_durations = (note_durations,)
+			all_voices_used = (voices_used,)
 
 		# tenor and bass should not have same note on waltz
 		print(f"All note durations: {all_note_durations}")
@@ -432,7 +444,7 @@ class Chorale(Voice):
 		print(f"Waltz? {Voice.waltz}")
 
 		unique_chord_iter = iter(self.chosen_chord_voicings)
-		current_time = 0
+		current_time = Voice.pickup_duration
 
 		for chord_index, current_chord_obj in enumerate(Voice.chord_sequence):
 			pitches_to_degrees = current_chord_obj.pitches_to_degrees

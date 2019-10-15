@@ -20,6 +20,7 @@ class Voice:
 
 	beat_division = []
 	measure_length = []
+	pickup_duration = 0
 	time_sig = (4, 2)
 	voice_volumes = (80, 40, 40, 40)
 
@@ -128,8 +129,11 @@ class Voice:
 		"""Write sheet music text notation for voice part"""
 
 		object_index = 0
-		current_time = self.midi_notes[0].time
-		lily_part = []
+		if Voice.pickup:
+			object_duration = Voice.pickup_duration // 960
+			lily_part = [f"\\partial {Voice.beat_durations[object_duration]}"]
+		else:
+			lily_part = []
 
 		for midi_note, sheet_note in zip(self.midi_notes, self.sheet_notes):
 			self.logger.warning(midi_note)
