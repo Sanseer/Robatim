@@ -53,12 +53,16 @@ class Melody(Voice):
 		self.all_scale_degree_options = []
 
 		self.chordal_voice = False
+		self.break_notes = random.choice((True, False))
 		self.repeat_basic_idea = random.choice((True, False, False))
+		Voice.repeat_ending = random.choice((True, False))
+		print(f"Repeat ending: {Voice.repeat_ending}")
 		print(f"Repeat basic idea: {self.repeat_basic_idea}")
 
 		self.melody_range = []
 		self.unit_length = 0
-		self.chord_quarter_length = 0
+		Voice.chord_quarter_length = 0
+		self.current_time = 0
 
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [[current - 1], [current + 1]],
@@ -112,8 +116,7 @@ class Melody(Voice):
 		self.create_rhythm()
 		self.realize_melody()
 
-		self.plot_midi_notes()
-		self.add_rest_placeholders()
+		self.add_midi_score()
 
 		self.set_sheet_notes()
 		self.make_lily_part()
@@ -575,7 +578,7 @@ class Melody(Voice):
 		self.logger.warning(f"Nested valid melody: {self.nested_scale_degrees}")
 		return True
 
-	def plot_midi_notes(self):
+	def add_midi_score(self):
 		"""Transform scale degrees into midi pitches"""
 		
 		fifth_degree_pitch = 7 + Voice.tonics[Voice.tonic]
@@ -587,98 +590,67 @@ class Melody(Voice):
 
 		self.unit_length = sum(self.finalized_rhythms[0])
 		if Voice.time_sig in {(4,3), (4,2)}:
-			self.chord_quarter_length = Voice.measure_length // 2
+			Voice.chord_quarter_length = Voice.measure_length // 2
 		else:
-			self.chord_quarter_length = Voice.measure_length
+			Voice.chord_quarter_length = Voice.measure_length
 		self.logger.warning(f"Unit length: {self.unit_length}")
-		self.logger.warning(f"Chord quarter length: {self.chord_quarter_length}")
+		self.logger.warning(f"Chord quarter length: {Voice.chord_quarter_length}")
 
 		if Voice.pickup:
 			index_shift = self.add_pickup_notes()
 		else:
 			index_shift = 0
-		current_time = Voice.pickup_duration
+		self.current_time = Voice.pickup_duration
 
-		object_index = 0
-		melodic_minor = False
-		dominant_harmony = {"V", "V7", "V6"}
-		break_notes = random.choice((True, False))
-		print(f"Break melody: {break_notes}")
-		add_rest = False
+		print(f"Break melody: {self.break_notes}")
 
-		# sustain + rest (+/- pickup)
-		# ensure pickup note(s) include melodic minor
 		# slowdown ending (remove waltz on final chord) strum chord
-		# repeated ending of last 2 bars (with optional pickup)
 		# drum roll ending
 
-		for chord_index, scale_group in enumerate(self.nested_scale_degrees):
-
-			chord_name = Voice.chord_sequence[chord_index].chord_name
-			if Voice.mode == "ionian" and chord_name in Chord.major_mode_alterations:
-				note_alterations = Chord.major_mode_alterations[chord_name]
-			elif Voice.mode == "aeolian" and chord_name in Chord.minor_mode_alterations:
-				note_alterations = Chord.minor_mode_alterations[chord_name]
-			else: 
-				note_alterations = {}
-				
-			if Voice.mode == "aeolian" and chord_name in dominant_harmony:
-				# doesn't count melodic minor if between >= 2 chords
-				if melodic_minor: 
-					note_alterations[5] = 1 
-				else:
-					scale_group_str = "".join(str(scale_degree) for scale_degree in scale_group)
-					if "56" in scale_group_str or "65" in scale_group_str:
-						melodic_minor = True
-						note_alterations[5] = 1
-						print("Melodic minor!")
-
-			for embellish_index, scale_degree in enumerate(scale_group):
-				embellish_duration = self.finalized_rhythms[chord_index][embellish_index]
-				# account for negative scale degrees
-				note_offset = note_alterations.get(scale_degree % 7, 0)
-				embellish_fraction = Fraction(numerator=embellish_duration, denominator=self.unit_length)
-
-				raw_note_duration = int(
-					960 * self.chord_quarter_length * embellish_fraction)
-				# integers required for midi output
-
-				if raw_note_duration > 960 and self.rhythm_symbols[chord_index] >= 0 and break_notes:
-					fixed_note_duration = 960
-					add_rest = True
-					extra_duration = raw_note_duration - 960
-				else:
-					fixed_note_duration = raw_note_duration
-				if chord_index == 7 and embellish_index == 0 and self.rhythm_symbols[6] == -1:
-					self.midi_notes.append(
-						Voice.Note("Rest", int(current_time), int(fixed_note_duration)))
-					self.nested_scale_degrees[chord_index][embellish_index] = None
-					# needed all numbers in unnested sequence for validation
-					self.unnested_scale_degrees.pop(object_index + index_shift)
-				else:
-					midi_pitch = self.melody_range[scale_degree + 3] + note_offset
-					self.midi_notes.append(
-						Voice.Note(midi_pitch, current_time, fixed_note_duration))
-					if add_rest:
-						self.midi_notes.append(
-							Voice.Note("Rest", current_time + 960, extra_duration))
-
-				current_time += raw_note_duration
-				add_rest = False
-				object_index += 1
+		self.nested_scale_degrees.pop()
+		self.add_midi_section(self.nested_scale_degrees, 0, {}, index_shift)
 
 		self.logger.warning(f"Midi melody: {self.midi_notes}")
+		self.unnested_scale_degrees.pop()
+
+		Voice.max_note_duration = 960 * Voice.chord_quarter_length
+		if not Voice.repeat_ending:
+			self.midi_notes.append(
+				Voice.Note("Rest", self.current_time, Voice.max_note_duration))
+			self.current_time += Voice.max_note_duration
+			self.add_rest_placeholders()
+			return
+
+		second_pickup_fraction = Fraction(
+			numerator=sum(self.finalized_rhythms[-5][1:]), denominator=self.unit_length)
+		second_pickup_duration = int(
+			960 * Voice.chord_quarter_length * second_pickup_fraction)  
+
+		ending_duration = Voice.max_note_duration - second_pickup_duration
+		self.midi_notes.append(
+			Voice.Note("Rest", self.current_time, ending_duration))
+
+		self.current_time += ending_duration
+
+		remaining_melody = self.nested_scale_degrees[-4:]
+		remaining_melody[0] = remaining_melody[0][1:]
+
+		end_notes_num = self.add_midi_section(remaining_melody, -5, {-5: 1})
+		self.unnested_scale_degrees.extend(
+			self.unnested_scale_degrees[-end_notes_num:])
+
+		self.midi_notes.append(
+			Voice.Note("Rest", self.current_time, Voice.max_note_duration))
+		self.current_time += Voice.max_note_duration
+		self.add_rest_placeholders()
 
 	def add_pickup_notes(self):
 		"""Adds pick up notes to beginning and returns the number of added objects"""
 		rest_rhythm, *pickup_rhythm = self.finalized_rhythms[7]
-		Voice.pickup_duration = 960 * self.chord_quarter_length
+		Voice.pickup_duration = 960 * Voice.chord_quarter_length
 		first_scale_degree = self.unnested_scale_degrees[0]
 
-		if Voice.mode == "aeolian":
-			note_alterations = {6: 1}
-		else:
-			note_alterations = {}
+		note_alterations = {}
 
 		rest_fraction = Fraction(
 			numerator=rest_rhythm, denominator=self.unit_length)
@@ -714,6 +686,72 @@ class Melody(Voice):
 
 		return len(pickup_rhythm)
 
+	def add_midi_section(
+	  self, melody_section, chord_start_index, note_start_indices, index_shift=None):
+		"""Add selected midi notes to a sequence using scale degrees"""
+		object_index = 0
+		melodic_minor = False
+		dominant_harmony = {"V", "V7", "V6"}
+		add_rest = False
+
+		for chord_index, scale_group in enumerate(melody_section, chord_start_index):
+
+			chord_name = Voice.chord_sequence[chord_index].chord_name
+			if Voice.mode == "ionian" and chord_name in Chord.major_mode_alterations:
+				note_alterations = Chord.major_mode_alterations[chord_name]
+			elif Voice.mode == "aeolian" and chord_name in Chord.minor_mode_alterations:
+				note_alterations = Chord.minor_mode_alterations[chord_name]
+			else: 
+				note_alterations = {}
+				
+			if Voice.mode == "aeolian" and chord_name in dominant_harmony:
+				# doesn't count melodic minor if between >= 2 chords
+				if melodic_minor: 
+					note_alterations[5] = 1 
+				else:
+					scale_group_str = "".join(str(scale_degree) for scale_degree in scale_group)
+					if "56" in scale_group_str or "65" in scale_group_str:
+						melodic_minor = True
+						note_alterations[5] = 1
+						print("Melodic minor!")
+
+			for embellish_index, scale_degree in enumerate(
+			  scale_group, note_start_indices.get(chord_index, 0)):
+				embellish_duration = self.finalized_rhythms[chord_index][embellish_index]
+				# account for negative scale degrees
+				note_offset = note_alterations.get(scale_degree % 7, 0)
+				embellish_fraction = Fraction(numerator=embellish_duration, denominator=self.unit_length)
+
+				raw_note_duration = int(
+					960 * Voice.chord_quarter_length * embellish_fraction)
+				# integers required for midi output
+
+				if raw_note_duration > 960 and self.rhythm_symbols[chord_index] >= 0 and self.break_notes:
+					fixed_note_duration = 960
+					add_rest = True
+					extra_duration = raw_note_duration - 960
+				else:
+					fixed_note_duration = raw_note_duration
+
+				midi_pitch = self.melody_range[scale_degree + 3] + note_offset
+				if chord_index == 7 and embellish_index == 0 and self.rhythm_symbols[6] == -1:
+					self.midi_notes.append(
+						Voice.Note("Rest", self.current_time, fixed_note_duration))
+					# needed all numbers in unnested sequence for validation
+					self.unnested_scale_degrees.pop(object_index + index_shift)
+				else:
+					self.midi_notes.append(
+						Voice.Note(midi_pitch, self.current_time, fixed_note_duration))
+					if add_rest:
+						self.midi_notes.append(
+							Voice.Note("Rest", self.current_time + 960, extra_duration))
+
+				self.current_time += raw_note_duration
+				add_rest = False
+				object_index += 1
+
+		return object_index
+
 	def add_rest_placeholders(self):
 		unnested_scale_degrees = []
 		unnested_melody_iter = iter(self.unnested_scale_degrees)
@@ -721,6 +759,7 @@ class Melody(Voice):
 		for midi_note in self.midi_notes:
 			if midi_note.pitch == "Rest":
 				unnested_scale_degrees.append(None)
+
 			else:
 				unnested_scale_degrees.append(next(unnested_melody_iter))
 

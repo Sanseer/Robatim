@@ -22,24 +22,24 @@ def make_lily_file():
 	title = f"Medley in {Voice.tonic} {mode}"
 
 	with open("old_layout.txt", 'r') as f:
-		new_file = f.read()
+		sheet_code = f.read()
 
 	for lily_part in Voice.lily_score:
-		new_file = new_file.replace(
+		sheet_code = sheet_code.replace(
 			"PART_SLOT", " ".join(["\\key", 
 			Voice.tonic.replace('#','is').replace('b',"es").lower(),
 			f"\\{mode} \\time {time_sig} {lily_part}"]), 1)
 
-	new_file = new_file.replace("PART_SLOT", "")
-	new_file = new_file.replace("Medley", title)
+	sheet_code = sheet_code.replace("PART_SLOT", "")
+	sheet_code = sheet_code.replace("Medley", title)
 
 	with open("new_layout.txt", 'w') as f:
-		f.write(new_file)
+		f.write(sheet_code)
 
-def make_sheet_music():
+	make_score_pdf(sheet_code)
+
+def make_score_pdf(sheet_code):
 	"""Generate sheet music pdf of musical piece"""
-	with open("new_layout.txt", 'r') as f:
-		sheet_code = f.read()
 
 	payload = {
 		"version": "stable", "code": sheet_code, "id": ""
@@ -111,9 +111,7 @@ if __name__ == "__main__":
 	with open("song0.mid", "wb")  as output_file:
 		MyMIDI.writeFile(output_file)
 
-
 	make_lily_file()
-	make_sheet_music()
 
 
 

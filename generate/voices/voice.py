@@ -7,8 +7,8 @@ class Voice:
 	mode = None
 	idms_mode = None
 	tonic = None
-	waltz = False
 	pickup = False
+	repeat_ending = False
 	all_midi_pitches = []
 
 	chord_acceleration = False
@@ -21,6 +21,8 @@ class Voice:
 	beat_division = []
 	measure_length = []
 	pickup_duration = 0
+	chord_quarter_length = 0
+	max_note_duration = 0
 	time_sig = (4, 2)
 	voice_volumes = (80, 40, 40, 40)
 
