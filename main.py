@@ -47,7 +47,7 @@ def make_score_pdf(sheet_code):
 	# AWS can't parse python dictionaries for json objects
 	with open("payload.json", 'w') as f:
 		json.dump(payload, f)
-	with open("payload.json", 'r') as f:
+	with open("payload.json", 'rb') as f:
 		sheet_music_response = requests.post(
 			"https://7icpm9qr6a.execute-api.us-west-2.amazonaws.com/prod/prepare_preview/stable", data=f)
 
