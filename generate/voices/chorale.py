@@ -366,6 +366,8 @@ class Chorale(Voice):
 			for _ in range(4):
 				Voice.midi_score.append([])
 				Voice.chorale_scale_degrees.append([])
+		# start off with nested structures instead of creating them
+		# handle asynchronous notes (strum)
 		chord_accompaniments = {
 			(2,2): [
 				((960, 960), ({0,1,2,3}, {})), ((960, 960), ({0}, {1,2,3})),
@@ -401,7 +403,6 @@ class Chorale(Voice):
 		}
 
 		# add 3rd parameter for volume
-		# Voice.max_note_duration = 960 * Voice.chord_quarter_length
 		chord_accompaniment = chord_accompaniments[Voice.time_sig]
 
 		if Voice.time_sig[0] == 4:

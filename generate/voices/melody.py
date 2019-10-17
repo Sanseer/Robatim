@@ -61,7 +61,6 @@ class Melody(Voice):
 
 		self.melody_range = []
 		self.unit_length = 0
-		Voice.chord_quarter_length = 0
 		self.current_time = 0
 
 		self.all_single_figurations = {
@@ -590,12 +589,13 @@ class Melody(Voice):
 
 		self.unit_length = sum(self.finalized_rhythms[0])
 		if Voice.time_sig in {(4,3), (4,2)}:
-			Voice.chord_quarter_length = Voice.measure_length // 2
+			chord_quarter_length = Voice.measure_length // 2
 		else:
-			Voice.chord_quarter_length = Voice.measure_length
+			chord_quarter_length = Voice.measure_length
 		self.logger.warning(f"Unit length: {self.unit_length}")
-		self.logger.warning(f"Chord quarter length: {Voice.chord_quarter_length}")
+		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
 
+		Voice.max_note_duration = 960 * chord_quarter_length
 		if Voice.pickup:
 			index_shift = self.add_pickup_notes()
 		else:
@@ -613,7 +613,6 @@ class Melody(Voice):
 		self.logger.warning(f"Midi melody: {self.midi_notes}")
 		self.unnested_scale_degrees.pop()
 
-		Voice.max_note_duration = 960 * Voice.chord_quarter_length
 		if not Voice.repeat_ending:
 			self.midi_notes.append(
 				Voice.Note("Rest", self.current_time, Voice.max_note_duration))
@@ -624,7 +623,7 @@ class Melody(Voice):
 		second_pickup_fraction = Fraction(
 			numerator=sum(self.finalized_rhythms[-5][1:]), denominator=self.unit_length)
 		second_pickup_duration = int(
-			960 * Voice.chord_quarter_length * second_pickup_fraction)  
+			Voice.max_note_duration * second_pickup_fraction)  
 
 		ending_duration = Voice.max_note_duration - second_pickup_duration
 		self.midi_notes.append(
@@ -647,7 +646,7 @@ class Melody(Voice):
 	def add_pickup_notes(self):
 		"""Adds pick up notes to beginning and returns the number of added objects"""
 		rest_rhythm, *pickup_rhythm = self.finalized_rhythms[7]
-		Voice.pickup_duration = 960 * Voice.chord_quarter_length
+		Voice.pickup_duration = Voice.max_note_duration
 		first_scale_degree = self.unnested_scale_degrees[0]
 
 		note_alterations = {}
@@ -723,7 +722,7 @@ class Melody(Voice):
 				embellish_fraction = Fraction(numerator=embellish_duration, denominator=self.unit_length)
 
 				raw_note_duration = int(
-					960 * Voice.chord_quarter_length * embellish_fraction)
+					Voice.max_note_duration * embellish_fraction)
 				# integers required for midi output
 
 				if raw_note_duration > 960 and self.rhythm_symbols[chord_index] >= 0 and self.break_notes:

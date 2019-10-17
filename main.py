@@ -105,6 +105,17 @@ if __name__ == "__main__":
 		tempo = random.choice(range(80, 111))
 	MyMIDI.addTempo(track,time, tempo)
 
+	slow_ending = random.choice((True, False))
+	if slow_ending:
+		if Voice.repeat_ending:
+			measure_mark = 16
+		else:
+			measure_mark = 13
+		MyMIDI.addTempo(
+			0, Voice.pickup_duration + Voice.max_note_duration * measure_mark, tempo * 0.95)
+	print(f"Slow ending? {slow_ending}")
+
+
 	print(Voice.mode)
 	print(tempo)
 
