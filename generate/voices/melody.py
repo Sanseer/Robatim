@@ -31,6 +31,8 @@ class Melody(Voice):
 		Voice.tonic = random.choice(self.idms_mode.key_sigs)
 		print(f"{Voice.tonic} {Voice.mode}")
 
+		#chose repeated duplicated basic idea from the start
+
 		Voice.measure_length = Voice.time_sig[0]
 		Voice.beat_division = Voice.time_sig[1]
 		if Voice.beat_division == 2:
@@ -54,14 +56,21 @@ class Melody(Voice):
 
 		self.chordal_voice = False
 		self.break_notes = random.choice((True, False))
-		self.repeat_basic_idea = random.choice((True, False, False))
+		self.restart_basic_idea = random.choice((True, False, False))
 		Voice.repeat_ending = random.choice((True, False))
 		print(f"Repeat ending: {Voice.repeat_ending}")
-		print(f"Repeat basic idea: {self.repeat_basic_idea}")
+		print(f"Repeat basic idea: {self.restart_basic_idea}")
 
 		self.melody_range = []
 		self.unit_length = 0
 		self.current_time = 0
+		self.pickup_rhythm = []
+
+		self.pickup_figurations = {
+			1: {
+				0: ((-1,), (-3,)), 1: ((-2,),), 2: ((-4,),), 3: ((-1,),)
+			}
+		}
 
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [[current - 1], [current + 1]],
@@ -221,6 +230,7 @@ class Melody(Voice):
 
 		self.finalized_rhythms = [
 			chosen_rhythms[rhythm_symbol] for rhythm_symbol in self.rhythm_symbols]
+		self.pickup_rhythm = self.finalized_rhythms[7][1:]
 
 		self.logger.warning(f"Finalized rhythms: {self.finalized_rhythms}")
 		self.logger.warning("")
@@ -498,8 +508,8 @@ class Melody(Voice):
 			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
 			return True
 		if last_rhythm_symbol == -2:
-			self.melody_figure_options[self.chord_index - 1] = [
-				[self.current_degree_choice - 1]]
+			self.melody_figure_options[self.chord_index - 1] = (
+				self.find_pickup_sequences(self.current_degree_choice))
 			return self.find_valid_figure()
 
 		remaining_figures = self.melody_figure_options[self.chord_index - 1]
@@ -561,9 +571,11 @@ class Melody(Voice):
 				self.logger.warning('*' * 30)
 				continue
 
-			if (self.repeat_basic_idea and self.chord_index == 10 and 
+			if (self.restart_basic_idea and self.chord_index == 10 and 
 			  Voice.chord_sequence[0] == Voice.chord_sequence[8] and 
 			  self.nested_scale_degrees[0] != self.nested_scale_degrees[8]):
+				self.logger.warning("Must force restart")
+				self.logger.warning('*' * 30)
 				continue
 
 			valid_figure = inbetween
@@ -645,7 +657,7 @@ class Melody(Voice):
 
 	def add_pickup_notes(self):
 		"""Adds pick up notes to beginning and returns the number of added objects"""
-		rest_rhythm, *pickup_rhythm = self.finalized_rhythms[7]
+		rest_rhythm = self.finalized_rhythms[7][0]
 		Voice.pickup_duration = Voice.max_note_duration
 		first_scale_degree = self.unnested_scale_degrees[0]
 
@@ -656,18 +668,14 @@ class Melody(Voice):
 		rest_duration = int(Voice.pickup_duration * rest_fraction)
 		self.midi_notes.append(Voice.Note("Rest", 0, rest_duration))
 
-		scale_degree_choices = {
-			1: [(-1,), (-3,)]
-		}
-		if first_scale_degree == 2:
-			scale_degree_choices[1].pop()
-		chosen_scale_degress = random.choice(
-			scale_degree_choices[len(pickup_rhythm)])
+		self.chord_index = 0
+		pickup_degree_sequence = random.choice(
+			self.find_pickup_sequences(first_scale_degree))
 		current_time = rest_duration
 
 		unnested_scale_degrees = []
-		for note_index, note_rhythm in enumerate(pickup_rhythm):
-			pickup_scale_degree = first_scale_degree + chosen_scale_degress[note_index]
+		for note_index, note_rhythm in enumerate(self.pickup_rhythm):
+			pickup_scale_degree = pickup_degree_sequence[note_index]
 			note_offset = note_alterations.get(pickup_scale_degree % 7, 0)
 			midi_pitch = self.melody_range[pickup_scale_degree + 3] + note_offset
 
@@ -683,7 +691,22 @@ class Melody(Voice):
 		unnested_scale_degrees.extend(self.unnested_scale_degrees)
 		self.unnested_scale_degrees = unnested_scale_degrees
 
-		return len(pickup_rhythm)
+		return len(self.pickup_rhythm)
+
+	def find_pickup_sequences(self, centered_degree):
+		possible_degrees = Voice.chord_sequence[self.chord_index].scale_degrees
+		degree_index = possible_degrees.index(centered_degree % 7)
+
+		chord_pickup_choices = self.pickup_figurations[len(self.pickup_rhythm)]
+		possible_scale_shifts = chord_pickup_choices[degree_index]
+
+		pickup_scale_options = []
+		for chosen_scale_shifts in possible_scale_shifts:
+			pickup_scale_options.append([])
+			for degree_shift in chosen_scale_shifts:
+				pickup_scale_options[-1].append(centered_degree + degree_shift)
+
+		return pickup_scale_options
 
 	def add_midi_section(
 	  self, melody_section, chord_start_index, note_start_indices, index_shift=None):
