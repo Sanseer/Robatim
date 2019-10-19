@@ -77,7 +77,7 @@ class Melody(Voice):
 			1: lambda previous, current, slope: [[current + slope]],
 			2: lambda previous, current, slope: [[previous + slope], [current + slope]],
 			3: lambda previous, current, slope: [
-				[previous + slope], [previous + slope * 2], [current + slope]],
+				[previous + slope * 2], [current + slope]],
 			4: lambda previous, current, slope: [
 				[previous + slope * 2], [current + slope]],
 			5: lambda previous, current, slope: [
@@ -87,32 +87,22 @@ class Melody(Voice):
 
 		self.all_double_figurations = {
 			0: lambda previous, current, slope: [
-				[current - 1, current + 1], [current + 1, current - 1],
-				[current - 1, current - 1], [current + 1, current + 1],
-				[current, current]],
+				[current - 1, current + 1], [current + 1, current - 1]],
 			1: lambda previous, current, slope: [
 				[previous - slope, previous], 
-				[current + slope, current + slope], 
-				[current + slope * 2, current + slope],
-				[previous, previous], [previous, current],
+				[current + slope * 2, current + slope], 
 				[current, current + slope]],
 			2: lambda previous, current, slope: [
-				[current + slope * 2, current + slope],
-				[previous + slope, previous + slope], 
-				[current + slope, current + slope]],
+				[current + slope * 2, current + slope]],
 			3: lambda previous, current, slope: [
 				[previous + slope, previous + slope * 2], 
-				[current + slope, current + slope]],
+				[current + slope * 2, current + slope]],
 			4: lambda previous, current, slope: [
-				[previous + slope * 2, previous + slope * 3], 
-				[previous + slope, previous + slope * 3],
-				[previous + slope * 2, previous + slope * 2]],
+				[previous + slope * 2, previous + slope * 3]],
 			5: lambda previous, current, slope: [
 				[previous + slope * 2, previous + slope * 4],
-				[previous + slope * 2, previous + slope * 2],
-				[previous + slope * 3, previous + slope * 3]],
-			6: lambda previous, current, slope: [
-				[current + slope, current + slope]]
+				[current + slope * 2, current + slope]],
+			6: lambda previous, current, slope: []
 		}
 
 		self.sheet_notes = []
@@ -154,6 +144,7 @@ class Melody(Voice):
 		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
 		chord_str_sequence = []
+		# seperate forced tonic from cadence
 		# if chord_structure[0] == "TON":
 		# 	chord_str_sequence.append("0I")
 
@@ -616,9 +607,6 @@ class Melody(Voice):
 
 		print(f"Break melody: {self.break_notes}")
 
-		# slowdown ending (remove waltz on final chord) strum chord
-		# drum roll ending
-
 		self.nested_scale_degrees.pop()
 		self.add_midi_section(self.nested_scale_degrees, 0, {}, index_shift)
 
@@ -732,7 +720,9 @@ class Melody(Voice):
 					note_alterations[5] = 1 
 				else:
 					scale_group_str = "".join(str(scale_degree) for scale_degree in scale_group)
-					if "56" in scale_group_str or "65" in scale_group_str:
+					if any(
+					  str_combo in scale_group_str 
+					  for str_combo in ("56", "65", "-1-2", "-2-1")):
 						melodic_minor = True
 						note_alterations[5] = 1
 						print("Melodic minor!")
