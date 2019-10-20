@@ -79,10 +79,18 @@ class Voice:
 
 	@staticmethod
 	def has_cross_duplicates(sequence):
-		for item1, item2, item3, item4 in zip(
-			sequence, sequence[1:], sequence[2:], sequence[3:]):
-			if (item1, item2) == (item3, item4):
-				return True
+		item1 = None
+		item2 = None
+		item3 = None
+		item4 = None
+		for index, current_value in enumerate(sequence):
+			if item4 != current_value:
+				item1, item2, item3 = item2, item3, item4
+				item4 = current_value
+
+				if (item1, item2) == (item3, item4):
+					return True
+
 		return False
 
 	def set_sheet_notes(self):
