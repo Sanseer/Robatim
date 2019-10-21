@@ -71,6 +71,7 @@ class Voice:
 
 	@staticmethod
 	def calculate_slope(move_distance):
+		"""Discerns negative and positive numbers"""
 		if move_distance < 0:
 			return -1
 		elif move_distance > 0:
@@ -79,6 +80,7 @@ class Voice:
 
 	@staticmethod
 	def has_cross_duplicates(sequence):
+		"""Determines any two items of the sequence immediately repeats themselves"""
 		item1 = None
 		item2 = None
 		item3 = None
@@ -93,14 +95,29 @@ class Voice:
 
 		return False
 
+	@staticmethod
+	def get_turns(sequence):
+		"""Returns the number of times the direction of a sequence changes"""
+		search_slope = 0
+		turns = 0
+		iter_sequence = iter(sequence)
+		old_item = next(iter_sequence, None)
+		new_item = next(iter_sequence, None)
+		while new_item is not None:
+			current_slope = Voice.calculate_slope(new_item - old_item)
+
+			if 0 != current_slope != search_slope:
+				turns += 1 
+				search_slope = current_slope
+
+			old_item = new_item
+			new_item = next(iter_sequence, None)
+		return turns
+
 	def set_sheet_notes(self):
 		"""Convert midi pitches into sheet music note names"""
 
-		# self.logger.warning('=' * 40)
-		# self.logger.warning("Creating sheet notation")
-
 		tonic_letter = Voice.tonic.replace('#',"").replace('b',"")
-		# self.logger.warning(f"Tonic letter {tonic_letter}")
 		tonic_index = Voice.note_letters.index(tonic_letter)
 
 		self.logger.warning(len(self.midi_notes))
@@ -114,11 +131,9 @@ class Voice:
 				self.sheet_notes.append(None)
 				continue
 			true_midi_pitch = midi_note.pitch
-			# self.logger.warning(f"True midi pitch: {true_midi_pitch}")
 			scale_midi_pitch =  true_midi_pitch % 12
 			possible_note_names = Voice.note_names[scale_midi_pitch]
 
-			# self.logger.warning(f"Possible note names: {possible_note_names}")
 			note_letter_index = (tonic_index + scale_degree) % 7
 			note_letter = Voice.note_letters[note_letter_index]
 			octave = true_midi_pitch // 12 - 1
@@ -126,13 +141,9 @@ class Voice:
 			for possible_note_name in possible_note_names:
 				if note_letter in possible_note_name:
 					self.sheet_notes.append(f"{possible_note_name}{octave}")
-					# self.logger.warning(f"Chosen note designation: {possible_note_name}{octave}")
 					break
 
-		self.logger.warning(self.sheet_notes)
-
-		# self.logger.warning(f"Sheet notes: {self.sheet_notes}")
-
+		self.logger.warning(f"Sheet notes: {self.sheet_notes}")
 
 	def make_lily_part(self):
 		"""Write sheet music text notation for voice part"""
@@ -172,7 +183,6 @@ class Voice:
 
 				lily_part.append(lily_rest)
 				continue
-
 
 			accidental_mark = ""
 			octave_mark = ""
@@ -232,7 +242,7 @@ class Voice:
 		self.logger.warning(f"Lily part: {lily_part}")
 
 	def get_interval(self, old_pitch, new_pitch, current_pitches_dict):
-
+		"""Returns the specific interval of two pitches"""
 		pitch_diff = new_pitch - old_pitch
 		chromatic_diff = pitch_diff % 12
 

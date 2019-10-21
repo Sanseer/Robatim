@@ -433,12 +433,6 @@ class Melody(Voice):
 			self.logger.warning('*' * 30)
 			return False	
 		
-		if (self.chord_index >= 3 and self.chord_index not in self.quick_turn_indices 
-			and melodic_mvmt[self.chord_index - 2:] in {"><>", "<><"}):
-			self.logger.warning("No late melodic jukes")
-			self.logger.warning('*' * 30)
-			return False
-
 		current_move_distance = self.current_degree_choice - self.previous_degree_choice
 		abs_current_move_distance = abs(current_move_distance)
 		if abs_current_move_distance > 7:
@@ -460,20 +454,34 @@ class Melody(Voice):
 			return False
 		if len(self.unnested_scale_degrees) >= 3:
 			current_leap_direction = None
+			previous_degree_mvt = 0
 			for scale_degree0, scale_degree1 in zip(
 			  self.unnested_scale_degrees, self.unnested_scale_degrees[1:]): 
-				degree_mvmt = scale_degree1 - scale_degree0
-				current_move_slope = Voice.calculate_slope(degree_mvmt)
+				current_degree_mvmt = scale_degree1 - scale_degree0
+				current_move_slope = Voice.calculate_slope(current_degree_mvmt)
 
+				if (abs(previous_degree_mvt) > 1 and 
+				  current_leap_direction == current_move_slope):
+					return False
 				if current_leap_direction == -current_move_slope:
-					if abs(degree_mvmt) > 1:
+					if abs(current_degree_mvmt) > 1:
 						self.logger.warning("Leap should be followed by stepwise motion (full melody)")
 						self.logger.warning('*' * 30)
 						return False
 					current_leap_direction = None
-				elif abs(degree_mvmt) > 2:
+				elif abs(current_degree_mvmt) > 2:
 					current_leap_direction = current_move_slope
+
+				previous_degree_mvt = current_degree_mvmt
 		if self.chord_index >= 3:
+			if self.chord_index > 8 and Voice.get_turns(self.chosen_scale_degress[:self.chord_index + 1]) > 8:
+				return False
+			if (self.chord_index not in self.quick_turn_indices and 
+			  melodic_mvmt[self.chord_index - 2:] in {"><>", "<><"}):
+				self.logger.warning("No late melodic jukes")
+				self.logger.warning('*' * 30)
+				return False
+
 			if Voice.has_cross_duplicates(self.chosen_scale_degress[:self.chord_index + 1]):
 				self.logger.warning("Don't repeat motifs")
 				self.logger.warning('*' * 30)

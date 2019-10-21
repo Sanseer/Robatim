@@ -45,9 +45,21 @@ class MainSongMethods(unittest.TestCase):
 		self.assertTrue(Voice.has_cross_duplicates([1, 5, 5, 5, 1, 1, 5]))
 
 	def test_slopes(self):
-		self.assertEqual(Voice.calculate_slope(2), 1)
 		self.assertEqual(Voice.calculate_slope(0), 0)
+		self.assertEqual(Voice.calculate_slope(1), 1)
+		self.assertEqual(Voice.calculate_slope(-1), -1)
+		self.assertEqual(Voice.calculate_slope(5), 1)
 		self.assertEqual(Voice.calculate_slope(-3), -1)
+
+		self.assertEqual(Voice.get_turns([]), 0)
+		self.assertEqual(Voice.get_turns([1]), 0)
+		self.assertEqual(Voice.get_turns([3, 3, 3, 3, 3]), 0)
+		self.assertEqual(Voice.get_turns([5, 5, 5, 5, 6]), 1)
+		self.assertEqual(Voice.get_turns([6, 6, 6, 6, 5]), 1)
+		
+		self.assertEqual(Voice.get_turns([2, 3, 4]), 1)
+		self.assertEqual(Voice.get_turns([5, 6, 5, 4]), 2)
+		self.assertEqual(Voice.get_turns([2, 3, 3, 2, 1, 2]), 3)
 
 
 if __name__ == "__main__":
