@@ -8,7 +8,7 @@ from generate.voices.melody import Melody
 import generate.voices.chorale as chorale
 
 def make_lily_file():
-	"""Generate Lilypond file from musical piece"""
+	"""Generate Lilypond file from musical sequence"""
 
 	if Voice.mode == "ionian":
 		mode = "major"
@@ -36,15 +36,18 @@ def make_lily_file():
 	with open("new_layout.txt", 'w') as f:
 		f.write(sheet_code)
 
-	make_score_pdf(sheet_code)
+	try:
+		make_score_pdf(sheet_code)
+	except requests.exceptions.ConnectionError:
+		print("Must be connected to internet to create pdf.")
 
 def make_score_pdf(sheet_code):
-	"""Generate sheet music pdf of musical piece"""
+	"""Generate sheet music pdf from lilyPond format"""
 
 	payload = {
 		"version": "stable", "code": sheet_code, "id": ""
 	}
-	# AWS can't parse python dictionaries for json objects
+	# AWS can't parse python dictionaries
 	with open("payload.json", 'w') as f:
 		json.dump(payload, f)
 	with open("payload.json", 'rb') as f:
@@ -64,21 +67,16 @@ if __name__ == "__main__":
 	time     = 0
 	channel  = 0
 	tempo    = 60  # In BPM
-	# volume   = 100 # 0-127, as per the MIDI standard
+	# volume 0-127, as per the MIDI standard
 
-	MyMIDI = MIDIFile(5, eventtime_is_ticks=True) # One track, defaults to format 1 (tempo track
-	                     # automatically created)
+	MyMIDI = MIDIFile(5, eventtime_is_ticks=True) 
+	# defaults to format 1 (tempo track automatically created)
+
 	MyMIDI.addProgramChange(track, channel, time, 73)
-	# 77, 73! 72 71 70!
-	# choose instruments randomly?
-	# but keep adjacent voices close in midi numbers
 	MyMIDI.addProgramChange(1, 1, time, 43)
 	MyMIDI.addProgramChange(2, 2, time, 42)
 	MyMIDI.addProgramChange(3, 3, time, 41)
 	MyMIDI.addProgramChange(4, 3, time, 40)
-	# test that all selected instruments can hit the notes 
-	# of that vocal range
-	# create list of available instruments per voice
 
 	Melody().make_melody()
 	for new_note in Voice.midi_score[0]:
@@ -114,10 +112,8 @@ if __name__ == "__main__":
 		MyMIDI.addTempo(
 			0, Voice.pickup_duration + Voice.max_note_duration * measure_mark, tempo * 0.93)
 	print(f"Slow ending? {slow_ending}")
-
-
-	print(Voice.mode)
-	print(tempo)
+	print(f"Mode: {Voice.mode}")
+	print(f"Tempo: {tempo}")
 
 	with open("song0.mid", "wb")  as output_file:
 		MyMIDI.writeFile(output_file)
