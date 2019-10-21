@@ -31,8 +31,6 @@ class Melody(Voice):
 		Voice.tonic = random.choice(self.idms_mode.key_sigs)
 		print(f"{Voice.tonic} {Voice.mode}")
 
-		#chose repeated duplicated basic idea from the start
-
 		Voice.measure_length = Voice.time_sig[0]
 		Voice.beat_division = Voice.time_sig[1]
 		if Voice.beat_division == 2:
@@ -68,13 +66,14 @@ class Melody(Voice):
 
 		self.pickup_figurations = {
 			1: {
-				0: ((-1,), (-3,)), 1: ((-2,),), 2: ((-4,),), 3: ((-1,),)
+				0: ((-1,), (-3,), (0,)), 1: ((-2,), (0,)), 2: ((-4,), (0,)), 3: ((-1,), (0,))
 			}
 		}
 
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [[current - 1], [current + 1]],
-			1: lambda previous, current, slope: [[current + slope]],
+			1: lambda previous, current, slope: [
+				[previous], [current], [current + slope]],
 			2: lambda previous, current, slope: [[previous + slope], [current + slope]],
 			3: lambda previous, current, slope: [
 				[previous + slope * 2], [current + slope]],
@@ -103,6 +102,19 @@ class Melody(Voice):
 				[previous + slope * 2, previous + slope * 4],
 				[current + slope * 2, current + slope]],
 			6: lambda previous, current, slope: []
+		}
+		self.all_triple_figurations = {
+			0: lambda previous, current, slope: [],
+			1: lambda previous, current, slope: [],
+			2: lambda previous, current, slope: [],
+			3: lambda previous, current, slope: [
+				[previous + slope * 2, previous + slope, previous + slope * 2]
+			],
+			4: lambda previous, current, slope: [
+				[previous + slope, previous + slope * 2, previous + slope * 3]
+			],
+			5: lambda previous, current, slope: [],
+			6: lambda previous, current, slope: [],
 		}
 
 		self.sheet_notes = []
@@ -187,19 +199,21 @@ class Melody(Voice):
 
 		if Voice.time_sig in {(2,2), (4,2)}:
 			rhythm_mapping = {
-				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2), (4,2,2)],
-				2: [(3,3,2), (6,1,1), (4,2,2)], -2: [(4,4), (6,2)]
+				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)], 
+				2:[(3,3,2), (4,2,2), (6,1,1)],
+				-2: [(4,4), (6,2)]
 			}
 		elif Voice.time_sig in {(2,3), (4,3)}:
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (10,2), (4,2,6) ,(6,2,4)],
-				2: [(8,4), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)],
+				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (6,2,4), (10,2)], 
+				2: [(4,2,6), (4,4,4), (6,6), (6,2,4), (6,4,2), (8,4), (10, 1, 1)],
 				-2: [(6,6), (10,2)]
 			}
 		elif Voice.time_sig == (3,2):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(8,4), (10,2), (4,4,4)], 1: [(8,4), (10,2), (8,2,2), (4,2,6), (6,2,4), (4,4,4)],
-				2: [(6,6), (6,2,4), (4,2,6), (8,2,2), (10,1,1), (4,4,4)],
+				-1: [(12,)], 0: [(4,4,2,2), (8,2,2), (8,4), (10,2)], 
+				1: [(4,4,2,2), (4,4,4), (6,2,4), (8,2,2), (8,4), (10,2)], 
+				2:[(4,2,6), (4,4,2,2), (4,4,4), (6,6), (6,2,2,2), (6,2,4), (8,2,2), (10,1,1)],
 				-2: [(8,4), (10,2)]
 			}
 
@@ -262,8 +276,10 @@ class Melody(Voice):
 
 		self.chosen_scale_degress[0] = self.current_degree_choice
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
-		# designates pickup note
-		self.melodic_direction[0] = random.choice(('_', '>'))
+		if Voice.pickup:
+			self.melodic_direction[0] = '>'
+		else:
+			self.melodic_direction[0] = '_'
 		self.logger.warning(f"Melodic direction: {self.melodic_direction}" )
 
 		self.chord_index += 1
@@ -302,10 +318,13 @@ class Melody(Voice):
 		self.chord_index -= 1
 		if self.chord_index < 0:
 			raise IndexError
+
 		self.previous_degree_choice = self.chosen_scale_degress[self.chord_index - 1]
 		if not self.melody_figure_options[self.chord_index - 1]:
 			self.melodic_direction[self.chord_index] = None
 			self.chosen_scale_degress[self.chord_index] = None
+		self.nested_scale_degrees[self.chord_index] = []
+
 
 	def advance_score(self):
 		"""Progress to the next chord after current melody is validated"""
@@ -327,6 +346,7 @@ class Melody(Voice):
 		self.current_degree_choice = self.chosen_scale_degress[self.chord_index]
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
 		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
+		self.reset_unnested_melody()
 		if self.validate_melody_figure():
 			self.advance_score()
 		else:
@@ -346,6 +366,8 @@ class Melody(Voice):
 			self.melodic_direction[self.chord_index] = '>'
 		elif self.current_degree_choice < self.previous_degree_choice:
 			self.melodic_direction[self.chord_index] = '<'
+
+		self.reset_unnested_melody()
 
 		self.chosen_scale_degress[self.chord_index] = self.current_degree_choice 
 		if self.validate_base_melody() and self.validate_melody_figure():
@@ -443,8 +465,7 @@ class Melody(Voice):
 				degree_mvmt = scale_degree1 - scale_degree0
 				current_move_slope = Voice.calculate_slope(degree_mvmt)
 
-				if (current_leap_direction is not None and
-				  current_leap_direction == -current_move_slope):
+				if current_leap_direction == -current_move_slope:
 					if abs(degree_mvmt) > 1:
 						self.logger.warning("Leap should be followed by stepwise motion (full melody)")
 						self.logger.warning('*' * 30)
@@ -453,8 +474,7 @@ class Melody(Voice):
 				elif abs(degree_mvmt) > 2:
 					current_leap_direction = current_move_slope
 		if self.chord_index >= 3:
-			if (self.chosen_scale_degress[self.chord_index - 1:self.chord_index + 1] == 
-			  self.chosen_scale_degress[self.chord_index - 3:self.chord_index - 1]):
+			if Voice.has_cross_duplicates(self.chosen_scale_degress[:self.chord_index + 1]):
 				self.logger.warning("Don't repeat motifs")
 				self.logger.warning('*' * 30)
 				return False
@@ -518,6 +538,8 @@ class Melody(Voice):
 			all_figurations = self.all_single_figurations
 		elif embellish_amount == 3:
 			all_figurations = self.all_double_figurations
+		elif embellish_amount == 4:
+			all_figurations = self.all_triple_figurations
 		possible_scale_degrees = all_figurations[degree_mvmt](
 			self.previous_degree_choice, self.current_degree_choice, melody_slope)
 
@@ -535,7 +557,6 @@ class Melody(Voice):
 
 	def find_valid_figure(self):
 		valid_figure = None
-		self.reset_unnested_melody()
 		remaining_figures = self.melody_figure_options[self.chord_index - 1]
 
 		random.shuffle(remaining_figures)
