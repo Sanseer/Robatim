@@ -5,10 +5,11 @@ from generate.voices.voice import Voice
 class Chord:
 
 	chord_members = {
-		"I": (0, 2, 4), "V": (4, 6, 1), "V7": (4, 6, 1, 3), "V6":(4, 6, 1) 
+		"I": (0, 2, 4), "I6": (0, 2, 4), "V": (4, 6, 1), "V7": (4, 6, 1, 3), 
+		"V6":(4, 6, 1), "VII6": (6, 1, 3), 
 	}
 	minor_mode_alterations = {
-		"V": {6: 1}, "V7": {6: 1}, "V6": {6: 1}
+		"V": {6: 1}, "V7": {6: 1}, "V6": {6: 1}, "VII6": {6: 1}
 	}
 	major_mode_alterations = {
 		None: None,
@@ -16,7 +17,7 @@ class Chord:
 	all_pitches_to_degrees = collections.defaultdict(dict)
 	
 	bass_degrees = {
-		"I": 0, "V": 4, "V7": 4, "V6": 6
+		"I": 0, "I6": 2, "V": 4, "V7": 4, "V6": 6, "VII6": 1,
 	}
 
 	def __init__(self, chord_symbol):
