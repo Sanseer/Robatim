@@ -114,6 +114,30 @@ class Voice:
 			new_item = next(iter_sequence, None)
 		return turns
 
+	@staticmethod
+	def has_proper_leaps(sequence):
+		"""Check for contrary stepwise motion following leaps"""
+		current_leap_direction = None
+		current_move_slope = None
+		previous_degree_mvmt = 0
+		for scale_degree0, scale_degree1 in zip(sequence, sequence[1:]):
+			current_degree_mvmt = scale_degree1 - scale_degree0
+			current_move_slope = Voice.calculate_slope(current_degree_mvmt)
+
+			if (abs(previous_degree_mvmt) > 1 and
+			  current_leap_direction == current_move_slope):
+				return False
+			if current_leap_direction == -current_move_slope:
+				if abs(current_degree_mvmt) > 1:
+					return False
+				current_leap_direction = None
+			elif abs(current_degree_mvmt) > 2:
+				current_leap_direction = current_move_slope
+
+			previous_degree_mvmt = current_degree_mvmt
+
+		return True
+
 	def set_sheet_notes(self):
 		"""Convert midi pitches into sheet music note names"""
 

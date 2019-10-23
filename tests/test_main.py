@@ -51,6 +51,7 @@ class MainSongMethods(unittest.TestCase):
 		self.assertEqual(Voice.calculate_slope(5), 1)
 		self.assertEqual(Voice.calculate_slope(-3), -1)
 
+	def test_turns(self):
 		self.assertEqual(Voice.get_turns([]), 0)
 		self.assertEqual(Voice.get_turns([1]), 0)
 		self.assertEqual(Voice.get_turns([3, 3, 3, 3, 3]), 0)
@@ -60,6 +61,20 @@ class MainSongMethods(unittest.TestCase):
 		self.assertEqual(Voice.get_turns([2, 3, 4]), 1)
 		self.assertEqual(Voice.get_turns([5, 6, 5, 4]), 2)
 		self.assertEqual(Voice.get_turns([2, 3, 3, 2, 1, 2]), 3)
+
+	def test_leaps(self):
+		self.assertFalse(Voice.has_proper_leaps([7, 6, 2, 1]))
+		self.assertFalse(Voice.has_proper_leaps([0, 5, 6, 5]))
+		self.assertFalse(Voice.has_proper_leaps([2, 6, 2, 3]))
+		self.assertFalse(Voice.has_proper_leaps([7, 3, 6, 1]))
+		self.assertFalse(Voice.has_proper_leaps([4, 0, 5, 1]))
+
+		self.assertTrue(Voice.has_proper_leaps([]))
+		self.assertTrue(Voice.has_proper_leaps([1, 2, 3, 4]))
+		self.assertTrue(Voice.has_proper_leaps([0, 5, 4, 3]))
+		self.assertTrue(Voice.has_proper_leaps([5, 2, 3, 1]))
+		self.assertTrue(Voice.has_proper_leaps([8, 6, 4, 2]))
+		self.assertTrue(Voice.has_proper_leaps([1, 3, 5, 7]))
 
 
 if __name__ == "__main__":

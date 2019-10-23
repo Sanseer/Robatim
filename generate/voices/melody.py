@@ -452,27 +452,11 @@ class Melody(Voice):
 			self.logger.warning("Octave leap can only occur halfway through")
 			self.logger.warning('*' * 30)
 			return False
-		if len(self.unnested_scale_degrees) >= 3:
-			current_leap_direction = None
-			previous_degree_mvt = 0
-			for scale_degree0, scale_degree1 in zip(
-			  self.unnested_scale_degrees, self.unnested_scale_degrees[1:]): 
-				current_degree_mvmt = scale_degree1 - scale_degree0
-				current_move_slope = Voice.calculate_slope(current_degree_mvmt)
-
-				if (abs(previous_degree_mvt) > 1 and 
-				  current_leap_direction == current_move_slope):
-					return False
-				if current_leap_direction == -current_move_slope:
-					if abs(current_degree_mvmt) > 1:
-						self.logger.warning("Leap should be followed by stepwise motion (full melody)")
-						self.logger.warning('*' * 30)
-						return False
-					current_leap_direction = None
-				elif abs(current_degree_mvmt) > 2:
-					current_leap_direction = current_move_slope
-
-				previous_degree_mvt = current_degree_mvmt
+		if (len(self.unnested_scale_degrees) >= 3 and 
+		  not Voice.has_proper_leaps(self.unnested_scale_degrees)):
+			self.logger.warning("Leap should be followed by contrary stepwise motion (full melody)")
+			self.logger.warning('*' * 30)
+			return False
 		if self.chord_index >= 3:
 			if self.chord_index > 8 and Voice.get_turns(self.chosen_scale_degress[:self.chord_index + 1]) > 8:
 				return False
