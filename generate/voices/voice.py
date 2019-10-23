@@ -52,13 +52,13 @@ class Voice:
 	)
 
 	simple_beat_durations = {
-		4:"1", 3:"2.", 2:"2", 1.5:"4.", 1:"4", 0.75:"8.",
-		0.5:"8", 0.375: "16.", 0.25: "16", 0.125: "32", 
+		4: "1", 3: "2.", 2: "2", 1.5: "4.", 1: "4", 0.75: "8.",
+		0.5: "8", 0.375: "16.", 0.25: "16", 0.125: "32", 
 	}
 	compound_beat_durations = {
-		4:"1.", 2:"2.", 4 * Fraction("1/3"):"2", 1:"4.",   
-		2 * Fraction("1/3"):"4", 0.5: "8.", 1 * Fraction("1/3"): "8", 
-		0.5 * Fraction("1/3"): "16"  
+		4: "1.", Fraction("8/3"): "4", 2: "2.", Fraction("4/3"):"2", 1: "4.",   
+		Fraction("2/3"): "4", 0.5: "8.", Fraction("1/3"): "8", 
+		Fraction("1/6"): "16"  
 	}
 	beat_durations = {}
 	interval_names = {
@@ -138,6 +138,18 @@ class Voice:
 
 		return True
 
+	@staticmethod
+	def partition_rhythm(beat_durations, object_duration):
+		"""Split a complex beat duration into simpler durations"""
+		rhythm_partitions = []
+		remaining_rhythm = object_duration
+		for current_rhythm in beat_durations:
+			if current_rhythm <= remaining_rhythm:
+				rhythm_partitions.append(current_rhythm)
+				remaining_rhythm -= current_rhythm
+			if remaining_rhythm == 0:
+				return rhythm_partitions
+
 	def set_sheet_notes(self):
 		"""Convert midi pitches into sheet music note names"""
 
@@ -185,25 +197,16 @@ class Voice:
 			self.logger.warning(object_index)
 
 			object_duration = Fraction(numerator=midi_note.duration, denominator=960)
+			object_rhythm = Voice.partition_rhythm(
+				Voice.beat_durations, object_duration)
 			if sheet_note is None:
-				if object_duration in Voice.beat_durations: 
-					lily_rest = f"r{Voice.beat_durations[object_duration]}"
-				else: 
-					rest_partitions = []
-					remaining_rhythm = object_duration
-					for current_rhythm in Voice.beat_durations:
-						if current_rhythm <= remaining_rhythm:
-							rest_partitions.append(current_rhythm)
-							remaining_rhythm -= current_rhythm
-						if remaining_rhythm == 0:
-							break
-					lily_rest = ""
-					for rest_part in rest_partitions[:-1]:
-						lily_rest = "".join([
-							lily_rest, "r", Voice.beat_durations[rest_part], "~ "])
-
+				lily_rest = ""
+				for rest_part in object_rhythm[:-1]:
 					lily_rest = "".join([
-						lily_rest, "r", Voice.beat_durations[rest_partitions[-1]]])
+						lily_rest, "r", Voice.beat_durations[rest_part], " "])
+
+				lily_rest = "".join([
+					lily_rest, "r", Voice.beat_durations[object_rhythm[-1]]])
 
 				lily_part.append(lily_rest)
 				continue
@@ -235,28 +238,15 @@ class Voice:
 					accidental_amount = sheet_note.count('b')
 					accidental_mark = "es" * accidental_amount
 
-			if object_duration in Voice.beat_durations:
+			lily_note = ""
+			for beat_part in object_rhythm[:-1]:
 				lily_note = "".join([
-					note_letter, accidental_mark, octave_mark, 
-					Voice.beat_durations[object_duration]])
-			else:
-				beat_partitions = []
-				remaining_rhythm = object_duration
-				for current_rhythm in Voice.beat_durations:
-					if current_rhythm <= remaining_rhythm:
-						beat_partitions.append(current_rhythm)
-						remaining_rhythm -= current_rhythm
-					if remaining_rhythm == 0:
-						break
-				lily_note = ""
-				for beat_part in beat_partitions[:-1]:
-					lily_note = "".join([
-						lily_note, note_letter, accidental_mark, octave_mark,
-						Voice.beat_durations[beat_part], "~ "])
+					lily_note, note_letter, accidental_mark, octave_mark,
+					Voice.beat_durations[beat_part], "~ "])
 
-				lily_note = "".join([
-					lily_note, note_letter, accidental_mark, octave_mark, 
-					Voice.beat_durations[beat_partitions[-1]]])
+			lily_note = "".join([
+				lily_note, note_letter, accidental_mark, octave_mark, 
+				Voice.beat_durations[object_rhythm[-1]]])
 
 			lily_part.append(lily_note)
 			object_index += 1

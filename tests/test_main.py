@@ -1,6 +1,7 @@
 import unittest
 import json
 import time
+from fractions import Fraction
 
 import requests
 
@@ -75,6 +76,27 @@ class MainSongMethods(unittest.TestCase):
 		self.assertTrue(Voice.has_proper_leaps([5, 2, 3, 1]))
 		self.assertTrue(Voice.has_proper_leaps([8, 6, 4, 2]))
 		self.assertTrue(Voice.has_proper_leaps([1, 3, 5, 7]))
+
+	def test_partition(self):
+		simple_durations = Voice.simple_beat_durations
+		compound_durations = Voice.compound_beat_durations
+
+		self.assertEqual(Voice.partition_rhythm(simple_durations, 4), [4])
+		self.assertEqual(Voice.partition_rhythm(simple_durations, 1.5), [1.5])
+		self.assertEqual(Voice.partition_rhythm(compound_durations, 2), [2])
+		self.assertEqual(
+			Voice.partition_rhythm(compound_durations, Fraction("2/3")),
+			[Fraction("2/3")])
+
+		self.assertEqual(
+			Voice.partition_rhythm(compound_durations, Fraction("5/6")),
+			[Fraction("2/3"), Fraction("1/6")])
+		self.assertEqual(
+			Voice.partition_rhythm(compound_durations, Fraction("5/3")),
+			[Fraction("4/3"), Fraction("1/3")])
+		self.assertEqual(
+			Voice.partition_rhythm(compound_durations, Fraction("10/3")),
+			[Fraction("8/3"), Fraction("2/3")])
 
 
 if __name__ == "__main__":
