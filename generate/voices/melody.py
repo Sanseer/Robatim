@@ -19,6 +19,8 @@ class Melody(Voice):
 		melody_handler.setFormatter(melody_format)
 		self.logger.addHandler(melody_handler)
 
+		#reset, incase of repeat
+		Chord.reset_settings()
 		Voice.mode = random.choice(("ionian", "aeolian"))
 		if Voice.mode == "ionian":
 			import generate.idioms.major

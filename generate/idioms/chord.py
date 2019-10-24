@@ -54,3 +54,7 @@ class Chord:
 
 	def __str__(self):
 		return self.chord_symbol
+
+	@staticmethod
+	def reset_settings():
+		Chord.all_pitches_to_degrees = collections.defaultdict(dict)

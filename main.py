@@ -62,6 +62,19 @@ def make_score_pdf(sheet_code):
 	with open("final_score.pdf", "wb") as f:
 		f.write(pdf_response.content)
 
+def reset_score_settings():
+	"""Reset parameters to allow new score generation"""
+	Voice.chord_sequence = []
+	Voice.all_midi_pitches = []
+	Voice.midi_score = []
+	Voice.lily_score = []
+
+	bass_motion = []
+	tenor_motion = []
+	alto_motion = []
+	soprano_motion = []
+
+
 if __name__ == "__main__":
 	track    = 0
 	time     = 0
@@ -78,7 +91,15 @@ if __name__ == "__main__":
 	MyMIDI.addProgramChange(3, 3, time, 41)
 	MyMIDI.addProgramChange(4, 3, time, 40)
 
-	Melody().make_melody()
+	while True:
+		try:
+			reset_score_settings()
+			Melody().make_melody()
+			break
+		except IndexError:
+			print("Failed melody. Retrying...\n")
+			continue
+			
 	for new_note in Voice.midi_score[0]:
 		if isinstance(new_note.pitch, int):
 			MyMIDI.addNote(track, channel, *new_note, 100)
