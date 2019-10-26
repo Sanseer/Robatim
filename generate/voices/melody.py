@@ -71,39 +71,43 @@ class Melody(Voice):
 				0: ((-1,), (-3,), (0,)), 1: ((-2,), (0,)), 2: ((-4,), (0,)), 3: ((-1,), (0,))
 			}
 		}
+		self.chosen_figurations = [None for _ in range(16)]
 
 		self.all_single_figurations = {
-			0: lambda previous, current, slope: [[current - 1], [current + 1]],
+			0: lambda previous, current, slope: [
+				((current - 1,), "CN"), ((current + 1,), "CN")],
 			1: lambda previous, current, slope: [
-				[previous], [current], [current + slope]],
-			2: lambda previous, current, slope: [[previous + slope], [current + slope]],
+				((previous,), "RET"), ((current,), "ANT"), 
+				((current + slope,), "IN")],
+			2: lambda previous, current, slope: [
+				((previous + slope,), "PT"), ((current + slope,), "IN")],
 			3: lambda previous, current, slope: [
-				[previous + slope * 2], [current + slope]],
+				((previous + slope * 2,), "PT"), ((current + slope,), "IN")],
 			4: lambda previous, current, slope: [
-				[previous + slope * 2], [current + slope]],
+				((previous + slope * 2,), "PT"), ((current + slope,), "IN")],
 			5: lambda previous, current, slope: [
-				[previous + slope * 2], [previous + slope * 3]],
-			6: lambda previous, current, slope: [[current + slope]]
+				((previous + slope * 2,), "PT"), ((previous + slope * 3,), "PT")],
+			6: lambda previous, current, slope: [((current + slope,), "IN")]
 		}
 
 		self.all_double_figurations = {
 			0: lambda previous, current, slope: [
-				[current - 1, current + 1], [current + 1, current - 1],
-				[current + 2, current + 1], [current - 2, current - 1]],
+				((current - 1, current + 1), "DN"), ((current + 1, current - 1), "DN"),
+				((current + 2, current + 1), "DCN"), ((current - 2, current - 1), "DCN")],
 			1: lambda previous, current, slope: [
-				[previous - slope, previous], 
-				[current + slope * 2, current + slope], 
-				[current, current + slope]],
+				((previous - slope, previous), "DRN"), 
+				((current + slope * 2, current + slope), "DRN"), 
+				((current, current + slope), "ANT")],
 			2: lambda previous, current, slope: [
-				[current + slope * 2, current + slope]],
+				((current + slope * 2, current + slope), "DRN")],
 			3: lambda previous, current, slope: [
-				[previous + slope, previous + slope * 2], 
-				[current + slope * 2, current + slope]],
+				((previous + slope, previous + slope * 2), "PT"), 
+				((current + slope * 2, current + slope), "DRN")],
 			4: lambda previous, current, slope: [
-				[previous + slope * 2, previous + slope * 3]],
+				((previous + slope * 2, previous + slope * 3), "PT")],
 			5: lambda previous, current, slope: [
-				[previous + slope * 2, previous + slope * 4],
-				[current + slope * 2, current + slope]],
+				((previous + slope * 2, previous + slope * 4), "PT"),
+				((current + slope * 2, current + slope), "DRN")],
 			6: lambda previous, current, slope: []
 		}
 		self.all_triple_figurations = {
@@ -111,10 +115,10 @@ class Melody(Voice):
 			1: lambda previous, current, slope: [],
 			2: lambda previous, current, slope: [],
 			3: lambda previous, current, slope: [
-				[previous + slope * 2, previous + slope, previous + slope * 2]
+				((previous + slope * 2, previous + slope, previous + slope * 2), "PT")
 			],
 			4: lambda previous, current, slope: [
-				[previous + slope, previous + slope * 2, previous + slope * 3]
+				((previous + slope, previous + slope * 2, previous + slope * 3), "PT")
 			],
 			5: lambda previous, current, slope: [],
 			6: lambda previous, current, slope: [],
@@ -244,7 +248,7 @@ class Melody(Voice):
 		phrase4_start_index = 12
 		phrase2_start_index = 4
 		if str(Voice.chord_sequence[0]) == "0I":
-			self.all_scale_degree_options.append([0, 2, 4])
+			self.all_scale_degree_options.append([0, 2])
 		# separate first note to allow irregular starts e.g., major 2nd
 		for chord_index, chord_obj in enumerate(Voice.chord_sequence[1:-2], 1):
 			current_scale_degrees = chord_obj.scale_degrees
@@ -307,6 +311,7 @@ class Melody(Voice):
 		self.logger.warning(f"Nested scale degrees: {self.nested_scale_degrees}")
 		self.reset_unnested_melody()
 		self.logger.warning(f"Unnested scale degrees: {self.unnested_scale_degrees}")
+		print(f"Chosen figurations: {self.chosen_figurations}")
 
 	def backtrack_score(self):
 		"""Reverse to the previous chord to fix bad notes"""
@@ -321,6 +326,7 @@ class Melody(Voice):
 			self.melodic_direction[self.chord_index] = None
 			self.chosen_scale_degrees[self.chord_index] = None
 		self.nested_scale_degrees[self.chord_index] = []
+		self.chosen_figurations[self.chord_index - 1] = None
 
 
 	def advance_score(self):
@@ -478,14 +484,23 @@ class Melody(Voice):
 		if self.chord_index == 15 and max(section3) <= max(section4):
 			return False
 
-		if (self.chord_index >= 3 and 
-		  self.chord_index not in self.quick_turn_indices and 
-		  melodic_mvmt[self.chord_index - 2:] in {"><>", "<><"}):
-			self.logger.warning("No late melodic jukes")
-			self.logger.warning('*' * 30)
+		if self.chosen_figurations[0] == "IN":
+			return False
+
+		num_still_figures = self.chosen_figurations.count("CN")
+		num_still_figures += self.chosen_figurations.count("DN")
+		num_still_figures += self.chosen_figurations.count("DCN")
+
+		if num_still_figures > 2:
 			return False
 
 		if self.chord_index >= 3:
+			if (self.chord_index not in self.quick_turn_indices and 
+			  melodic_mvmt[self.chord_index - 2:] in {"><>", "<><"}):
+				self.logger.warning("No late melodic jukes")
+				self.logger.warning('*' * 30)
+				return False
+
 			if self.chord_index > 8 and Voice.get_turns(self.chosen_scale_degrees[:self.chord_index + 1]) > 8:
 				return False
 
@@ -582,7 +597,7 @@ class Melody(Voice):
 		random.shuffle(remaining_figures)
 		# alias has side effect but allows easier referencing
 		while remaining_figures:
-			inbetween = remaining_figures.pop()
+			inbetween, fig_type = remaining_figures.pop()
 			if min(inbetween) < -3 or max(inbetween) > 7:
 				continue
 			if self.chord_index - 1 < 11 and min(inbetween) < 0:
@@ -620,6 +635,7 @@ class Melody(Voice):
 			return False
 		self.nested_scale_degrees[self.chord_index - 1] = [
 				self.previous_degree_choice, *valid_figure]
+		self.chosen_figurations[self.chord_index - 1] = fig_type
 		self.logger.warning(f"Nested valid melody: {self.nested_scale_degrees}")
 		return True
 
@@ -700,7 +716,7 @@ class Melody(Voice):
 		self.midi_notes.append(Voice.Note("Rest", 0, rest_duration))
 
 		self.chord_index = 0
-		pickup_degree_sequence = random.choice(
+		pickup_degree_sequence, _ = random.choice(
 			self.find_pickup_sequences(first_scale_degree))
 		current_time = rest_duration
 
@@ -734,8 +750,11 @@ class Melody(Voice):
 		pickup_scale_options = []
 		for chosen_scale_shifts in possible_scale_shifts:
 			pickup_scale_options.append([])
+			pickup_scale_options[-1].append([])
 			for degree_shift in chosen_scale_shifts:
-				pickup_scale_options[-1].append(centered_degree + degree_shift)
+				pickup_scale_options[-1][0].append(centered_degree + degree_shift)
+
+			pickup_scale_options[-1].append(None)
 
 		return pickup_scale_options
 
