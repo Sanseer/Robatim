@@ -37,9 +37,9 @@ for ante_pattern in tonic_antecedents:
 			continue
 		full_pattern = ante_pattern + cons_pattern
 		if len(full_pattern) == 16 and is_divisble_by(full_pattern, 2):
-			accelerate = True
-		else:
 			accelerate = False
+		else:
+			accelerate = True
 		chord_patterns_16[full_pattern] = accelerate
 
 # 0 = rhythm1
