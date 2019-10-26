@@ -19,8 +19,8 @@ class Voice:
 	chorale_scale_degrees = []
 	dominant_harmony = {"V", "V7", "V6", "V65", "VII6", "V43", "V42"}
 
-	beat_division = []
-	measure_length = []
+	beat_division = 0
+	measure_length = 0
 	pickup_duration = 0
 	max_note_duration = 0
 	time_sig = (4, 2)

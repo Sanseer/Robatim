@@ -68,7 +68,10 @@ def reset_score_settings():
 	Voice.all_midi_pitches = []
 	Voice.midi_score = []
 	Voice.lily_score = []
+	Voice.chorale_scale_degrees = []
 
+	Voice.pickup = False
+	Voice.pickup_duration = 0
 	bass_motion = []
 	tenor_motion = []
 	alto_motion = []
