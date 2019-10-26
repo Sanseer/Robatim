@@ -81,6 +81,7 @@ class MainSongMethods(unittest.TestCase):
 		simple_durations = Voice.simple_beat_durations
 		compound_durations = Voice.compound_beat_durations
 
+		self.assertEqual(Voice.partition_rhythm(simple_durations, 0), [])
 		self.assertEqual(Voice.partition_rhythm(simple_durations, 4), [4])
 		self.assertEqual(Voice.partition_rhythm(simple_durations, 1.5), [1.5])
 		self.assertEqual(Voice.partition_rhythm(compound_durations, 2), [2])
@@ -97,6 +98,26 @@ class MainSongMethods(unittest.TestCase):
 		self.assertEqual(
 			Voice.partition_rhythm(compound_durations, Fraction("10/3")),
 			[Fraction("8/3"), Fraction("2/3")])
+
+	def test_list_merger(self):
+		self.assertEqual(Voice.merge_lists([]), [])
+		self.assertEqual(Voice.merge_lists([], [], []), [])
+		self.assertEqual(Voice.merge_lists([], [0], []), [0])
+		self.assertEqual(Voice.merge_lists([5], [], []), [5])
+		
+		self.assertEqual(Voice.merge_lists([], [], [2, 3]), [2, 3])
+		self.assertEqual(Voice.merge_lists([4], [], [9, 1, 3], []), [4, 9, 1, 3])
+		self.assertEqual(Voice.merge_lists([1,2], [3], [4,5]), [1,2,3,4,5])
+
+		list1 = [-5, -4]
+		list2 = [-3, -2]
+		list3 = Voice.merge_lists(list1, list2)
+		list3.append(0)
+		self.assertFalse(list1 == [-5, -4, 0])
+		self.assertFalse(list2 == [-3, -2, 0])
+
+		list4 = Voice.merge_lists(list1, [])
+		self.assertTrue(list1 is not list4)
 
 
 if __name__ == "__main__":

@@ -150,6 +150,15 @@ class Voice:
 			if remaining_rhythm == 0:
 				return rhythm_partitions
 
+	@staticmethod
+	def merge_lists(*args):
+	    """Shallow adding of lists"""
+	    result_list = []
+	    for selected_list in args:
+	        result_list.extend(selected_list)
+
+	    return result_list
+
 	def set_sheet_notes(self):
 		"""Convert midi pitches into sheet music note names"""
 

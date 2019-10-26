@@ -49,7 +49,7 @@ class Melody(Voice):
 		self.midi_notes = []
 
 		self.melodic_direction = [None for _ in range(16)]
-		self.chosen_scale_degress = [None for _ in range(16)]
+		self.chosen_scale_degrees = [None for _ in range(16)]
 		self.current_scale_degree_options = [[] for _ in range(16)]
 		self.melody_figure_options = [[] for _ in range(15)]
 		self.all_scale_degree_options = []
@@ -88,7 +88,8 @@ class Melody(Voice):
 
 		self.all_double_figurations = {
 			0: lambda previous, current, slope: [
-				[current - 1, current + 1], [current + 1, current - 1]],
+				[current - 1, current + 1], [current + 1, current - 1],
+				[current + 2, current + 1], [current - 2, current - 1]],
 			1: lambda previous, current, slope: [
 				[previous - slope, previous], 
 				[current + slope * 2, current + slope], 
@@ -158,9 +159,6 @@ class Melody(Voice):
 		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
 		chord_str_sequence = []
-		# seperate forced tonic from cadence
-		# if chord_structure[0] == "TON":
-		# 	chord_str_sequence.append("0I")
 
 		for chord_pattern in chord_structure:
 			if chord_pattern == "TON":
@@ -170,10 +168,7 @@ class Melody(Voice):
 			else:
 				chord_choices = Voice.idms_mode.chord_ids[chord_pattern]
 				chord_choice = random.choice(chord_choices[chord_str_sequence[-1]])
-				if isinstance(chord_choice, str): 
-					chord_str_sequence.append(chord_choice)
-				elif isinstance(chord_choice, tuple):
-					chord_str_sequence.extend(chord_choice)
+				chord_str_sequence.append(chord_choice)
 
 		self.logger.warning(f"{chord_str_sequence}")
 		self.logger.warning("")
@@ -276,7 +271,7 @@ class Melody(Voice):
 		self.logger.warning(f"Current scale degree options {self.current_scale_degree_options}")
 		self.current_degree_choice = self.current_scale_degree_options[0].pop()
 
-		self.chosen_scale_degress[0] = self.current_degree_choice
+		self.chosen_scale_degrees[0] = self.current_degree_choice
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
 		if Voice.pickup:
 			self.melodic_direction[0] = '>'
@@ -296,7 +291,7 @@ class Melody(Voice):
 		self.current_scale_degree_options[0].extend(self.all_scale_degree_options[0][:])
 		self.create_first_melody_note()
 
-		while None in self.chosen_scale_degress:
+		while None in self.chosen_scale_degrees:
 			self.logger.warning(f"Chord index: {self.chord_index}")
 			self.logger.warning(f"Current scale degree options: {self.current_scale_degree_options}")
 			if self.chord_index == 0:
@@ -316,26 +311,26 @@ class Melody(Voice):
 	def backtrack_score(self):
 		"""Reverse to the previous chord to fix bad notes"""
 		self.melodic_direction[self.chord_index] = None
-		self.chosen_scale_degress[self.chord_index] = None
+		self.chosen_scale_degrees[self.chord_index] = None
 		self.chord_index -= 1
 		if self.chord_index < 0:
 			raise IndexError
 
-		self.previous_degree_choice = self.chosen_scale_degress[self.chord_index - 1]
+		self.previous_degree_choice = self.chosen_scale_degrees[self.chord_index - 1]
 		if not self.melody_figure_options[self.chord_index - 1]:
 			self.melodic_direction[self.chord_index] = None
-			self.chosen_scale_degress[self.chord_index] = None
+			self.chosen_scale_degrees[self.chord_index] = None
 		self.nested_scale_degrees[self.chord_index] = []
 
 
 	def advance_score(self):
 		"""Progress to the next chord after current melody is validated"""
 		self.logger.warning(f"Melodic direction {self.melodic_direction}")
-		self.logger.warning(f"Chosen scale degrees: {self.chosen_scale_degress}")
+		self.logger.warning(f"Chosen scale degrees: {self.chosen_scale_degrees}")
 		self.logger.warning("")
 		self.logger.warning("")
 		self.chord_index += 1
-		if self.chord_index < len(self.chosen_scale_degress):
+		if self.chord_index < len(self.chosen_scale_degrees):
 			self.previous_degree_choice = self.current_degree_choice
 			self.current_scale_degree_options[self.chord_index] = (
 				self.all_scale_degree_options[self.chord_index][:])
@@ -345,7 +340,7 @@ class Melody(Voice):
 		self.logger.warning("Choosing from remaining figures")
 		self.logger.warning(f"Remaining melody figures: {self.melody_figure_options}")
 		# only occurs when backtracking
-		self.current_degree_choice = self.chosen_scale_degress[self.chord_index]
+		self.current_degree_choice = self.chosen_scale_degrees[self.chord_index]
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
 		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
 		self.reset_unnested_melody()
@@ -353,7 +348,7 @@ class Melody(Voice):
 			self.advance_score()
 		else:
 			self.melodic_direction[self.chord_index] = None
-			self.chosen_scale_degress[self.chord_index] = None
+			self.chosen_scale_degrees[self.chord_index] = None
 
 	def attempt_full_melody(self):
 		"""Try all possible base melodies and figurations"""
@@ -371,12 +366,12 @@ class Melody(Voice):
 
 		self.reset_unnested_melody()
 
-		self.chosen_scale_degress[self.chord_index] = self.current_degree_choice 
+		self.chosen_scale_degrees[self.chord_index] = self.current_degree_choice 
 		if self.validate_base_melody() and self.validate_melody_figure():
 			self.advance_score()
 		else:
 			self.melodic_direction[self.chord_index] = None
-			self.chosen_scale_degress[self.chord_index] = None
+			self.chosen_scale_degrees[self.chord_index] = None
 
 	def validate_base_melody(self):
 		"""Check current base melody against structural idioms"""
@@ -384,7 +379,7 @@ class Melody(Voice):
 			str(slope) for slope in self.melodic_direction[:self.chord_index + 1])
 
 		self.logger.warning(f"Attempted melodic direction: {melodic_mvmt}")
-		self.logger.warning(f"Attempted melody: {self.chosen_scale_degress}")
+		self.logger.warning(f"Attempted melody: {self.chosen_scale_degrees}")
 
 		if "_" * 3 in melodic_mvmt:
 			self.logger.warning("Long rest!")
@@ -419,18 +414,7 @@ class Melody(Voice):
 			self.logger.warning('*' * 30)
 			return False
 
-		highest_scale_degree = max(self.chosen_scale_degress[:self.chord_index + 1])
-		if (highest_scale_degree > 4 and 
-		  self.chosen_scale_degress.count(highest_scale_degree) > 1):
-			self.logger.warning("Too much climax")
-			self.logger.warning('*' * 30)
-			return False
-		if highest_scale_degree in self.chosen_scale_degress[12:]:
-			self.logger.warning("No climax at ending")
-			self.logger.warning('*' * 30)
-			return False
-
-		if self.chord_index == 1 and self.chosen_scale_degress[0:2] == [0, 0]:
+		if self.chord_index == 1 and self.chosen_scale_degrees[0:2] == [0, 0]:
 			self.logger.warning("Must move away from tonic at start")
 			self.logger.warning('*' * 30)
 			return False	
@@ -459,49 +443,86 @@ class Melody(Voice):
 			self.logger.warning("Leap should be followed by contrary stepwise motion (full melody)")
 			self.logger.warning('*' * 30)
 			return False
-		if self.chord_index >= 3:
-			if self.chord_index > 8 and Voice.get_turns(self.chosen_scale_degress[:self.chord_index + 1]) > 8:
+
+		# score divides into 4 sections, 16 items
+		# first 2 sections: antecedent
+		# last 2 sections: consequent
+		current_section = self.chord_index // 4
+		section_start_index = current_section * 4
+		section_scale_degrees = (
+			self.chosen_scale_degrees[section_start_index:section_start_index + 4])
+		end_degree = section_scale_degrees[-1]
+		while end_degree is None:
+			section_scale_degrees.pop()
+			end_degree = section_scale_degrees[-1]
+
+		section_max_degree = max(section_scale_degrees)
+		if current_section <= 2:
+			if section_scale_degrees.count(section_max_degree) > 2:
 				return False
-			if (self.chord_index not in self.quick_turn_indices and 
-			  melodic_mvmt[self.chord_index - 2:] in {"><>", "<><"}):
-				self.logger.warning("No late melodic jukes")
-				self.logger.warning('*' * 30)
+			if section_scale_degrees.count(section_max_degree) == 2:
+				for scale_degree0, scale_degree1 in zip(
+				  section_scale_degrees, section_scale_degrees[1:]):
+					if (scale_degree0 == section_max_degree 
+					  and scale_degree0 == scale_degree1):
+						break 
+				else:
+					return False 
+
+		section1 = self.chosen_scale_degrees[:4]
+		section2 = self.chosen_scale_degrees[4:8]
+		if self.chord_index == 8 and max(section1) == max(section2):
+			return False
+		section3 = self.chosen_scale_degrees[8:12]
+		section4 = self.chosen_scale_degrees[12:]
+		if self.chord_index == 15 and max(section3) <= max(section4):
+			return False
+
+		if (self.chord_index >= 3 and 
+		  self.chord_index not in self.quick_turn_indices and 
+		  melodic_mvmt[self.chord_index - 2:] in {"><>", "<><"}):
+			self.logger.warning("No late melodic jukes")
+			self.logger.warning('*' * 30)
+			return False
+
+		if self.chord_index >= 3:
+			if self.chord_index > 8 and Voice.get_turns(self.chosen_scale_degrees[:self.chord_index + 1]) > 8:
 				return False
 
-			if Voice.has_cross_duplicates(self.chosen_scale_degress[:self.chord_index + 1]):
+			if Voice.has_cross_duplicates(self.chosen_scale_degrees[:self.chord_index + 1]):
 				self.logger.warning("Don't repeat motifs")
 				self.logger.warning('*' * 30)
 				return False
-			antepenultimate_degree = self.chosen_scale_degress[self.chord_index - 2]
-			previous_move_distance = self.previous_degree_choice - antepenultimate_degree
+			# antepenultimate_degree = self.chosen_scale_degrees[self.chord_index - 2]
+			# previous_move_distance = self.previous_degree_choice - antepenultimate_degree
 
-			previous_move_slope =  Voice.calculate_slope(previous_move_distance)
-			current_move_slope = Voice.calculate_slope(current_move_distance)
+			# previous_move_slope =  Voice.calculate_slope(previous_move_distance)
+			# current_move_slope = Voice.calculate_slope(current_move_distance)
 
-			if (abs(previous_move_distance) >= 5 and 
-			  (abs_current_move_distance > 3 or previous_move_slope == current_move_slope)):
-				self.logger.warning("Leap should be followed by stepwise motion (base melody)")
-				self.logger.warning('*' * 30)
-				return False
-			if previous_move_slope == 0 and current_move_slope != 0:
-				scale_degree1 = antepenultimate_degree
-				for scale_degree0 in self.chosen_scale_degress[0:self.chord_index - 2][::-1]:
-					old_move_distance = scale_degree1 - scale_degree0
-					if  0 < abs(old_move_distance) < 5:
-						break
-					old_move_slope = Voice.calculate_slope(old_move_distance)
+			# if (abs(previous_move_distance) >= 5 and 
+			#   (abs_current_move_distance > 3 or previous_move_slope == current_move_slope)):
+			# 	self.logger.warning("Leap should be followed by stepwise motion (base melody)")
+			# 	self.logger.warning('*' * 30)
+			# 	return False
+			# if previous_move_slope == 0 and current_move_slope != 0:
+			# 	scale_degree1 = antepenultimate_degree
+			# 	for scale_degree0 in self.chosen_scale_degrees[0:self.chord_index - 2][::-1]:
+			# 		old_move_distance = scale_degree1 - scale_degree0
+			# 		if  0 < abs(old_move_distance) < 5:
+			# 			break
+			# 		old_move_slope = Voice.calculate_slope(old_move_distance)
 
-					if old_move_slope == current_move_slope:
-						self.logger.warning("Leap should be followed by contrary motion")
-						self.logger.warning('*' * 30)
-						return False
-					if old_move_slope == -current_move_slope:
-						if abs_current_move_distance > 3:
-							self.logger.warning("Leap should be followed by stepwise motion")
-							self.logger.warning('*' * 30)
-							return False
-						break
-					scale_degree1 = scale_degree0
+			# 		if old_move_slope == current_move_slope:
+			# 			self.logger.warning("Leap should be followed by contrary motion")
+			# 			self.logger.warning('*' * 30)
+			# 			return False
+			# 		if old_move_slope == -current_move_slope:
+			# 			if abs_current_move_distance > 3:
+			# 				self.logger.warning("Leap should be followed by stepwise motion")
+			# 				self.logger.warning('*' * 30)
+			# 				return False
+			# 			break
+			# 		scale_degree1 = scale_degree0
 		
 		return True
 
@@ -510,6 +531,12 @@ class Melody(Voice):
 
 		last_rhythm_symbol = self.rhythm_symbols[self.chord_index - 1]
 		if last_rhythm_symbol == -1:
+			if self.chord_index == 15:
+				section3 = Voice.merge_lists(*self.nested_scale_degrees[8:12])
+				section4 = Voice.merge_lists(*self.nested_scale_degrees[12:14])
+
+				if max(section3) <= max(section4):
+					return False
 			self.nested_scale_degrees[self.chord_index - 1] = [self.previous_degree_choice]
 			return True
 		if last_rhythm_symbol == -2:
@@ -525,7 +552,6 @@ class Melody(Voice):
 		degree_mvmt = self.current_degree_choice - self.previous_degree_choice
 		melody_slope = Voice.calculate_slope(degree_mvmt)
 		degree_mvmt = abs(degree_mvmt)
-
 
 		embellish_amount = len(self.finalized_rhythms[self.chord_index - 1])
 		if embellish_amount == 2:
@@ -570,12 +596,14 @@ class Melody(Voice):
 				self.logger.warning('*' * 30)
 				continue
 
-			highest_scale_degree = max(unnested_scalar_melody)
-			if (highest_scale_degree > 4 and 
-			  unnested_scalar_melody.count(highest_scale_degree) > 1):
-				self.logger.warning("Avoid multiple climaxes")
-				self.logger.warning('*' * 30)
+			if self.chord_index == 12 and max(unnested_scalar_melody) < 6:
 				continue
+			if self.chord_index == 8:
+				section1 = Voice.merge_lists(*self.nested_scale_degrees[:4])
+				section2 = Voice.merge_lists(*self.nested_scale_degrees[4:8])
+
+				if max(section1) == max(section2):
+					continue
 
 			if (self.restart_basic_idea and self.chord_index == 10 and 
 			  Voice.chord_sequence[0] == Voice.chord_sequence[8] and 
