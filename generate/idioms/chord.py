@@ -7,11 +7,11 @@ class Chord:
 	chord_members = {
 		"I": (0, 2, 4), "I6": (0, 2, 4), "V": (4, 6, 1), "V7": (4, 6, 1, 3), 
 		"V6":(4, 6, 1), "VII6": (6, 1, 3), "V65": (4, 6, 1, 3), 
-		"V43": (4, 6, 1, 3)
+		"V43": (4, 6, 1, 3), "V42": (4, 6, 1, 3)
 	}
 	minor_mode_alterations = {
 		"V": {6: 1}, "V7": {6: 1}, "V6": {6: 1}, "VII6": {6: 1}, "V65": {6: 1},
-		"V43": {6: 1},
+		"V43": {6: 1}, "V42": {6: 1},
 	}
 	major_mode_alterations = {
 		None: None,
@@ -20,7 +20,7 @@ class Chord:
 	
 	bass_degrees = {
 		"I": 0, "I6": 2, "V": 4, "V7": 4, "V6": 6, "VII6": 1, "V65": 6,
-		"V43": 1,
+		"V43": 1, "V42": 3
 	}
 
 	def __init__(self, chord_symbol):
@@ -55,7 +55,7 @@ class Chord:
 	def __eq__(self, other):
 		return self.chord_symbol == other.chord_symbol
 
-	def __str__(self):
+	def __repr__(self):
 		return self.chord_symbol
 
 	@staticmethod

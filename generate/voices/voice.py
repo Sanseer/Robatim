@@ -17,7 +17,7 @@ class Voice:
 	midi_score = []
 	lily_score = []
 	chorale_scale_degrees = []
-	dominant_harmony = {"V", "V7", "V6", "V65", "VII6", "V43"}
+	dominant_harmony = {"V", "V7", "V6", "V65", "VII6", "V43", "V42"}
 
 	beat_division = []
 	measure_length = []
