@@ -210,7 +210,7 @@ class Chorale(Voice):
 			return False
 		if bass_degree != degree_combo[0]:
 			return False
-		if current_chord in {"V", "V7", "V6"} and degree_combo.count(6) >= 2:
+		if current_chord in Voice.dominant_harmony and degree_combo.count(6) >= 2:
 			return False
 
 		bass_tenor_intervals = self.bass_tenor_intervals[:]

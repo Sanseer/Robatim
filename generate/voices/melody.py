@@ -763,7 +763,6 @@ class Melody(Voice):
 		"""Add selected midi notes to a sequence using scale degrees"""
 		object_index = 0
 		melodic_minor = False
-		dominant_harmony = {"V", "V7", "V6"}
 		add_rest = False
 
 		for chord_index, scale_group in enumerate(melody_section, chord_start_index):
@@ -776,7 +775,7 @@ class Melody(Voice):
 			else: 
 				note_alterations = {}
 				
-			if Voice.mode == "aeolian" and chord_name in dominant_harmony:
+			if Voice.mode == "aeolian" and chord_name in Voice.dominant_harmony:
 				# doesn't count melodic minor if between >= 2 chords
 				if melodic_minor: 
 					note_alterations[5] = 1 
