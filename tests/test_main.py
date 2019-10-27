@@ -6,6 +6,7 @@ from fractions import Fraction
 import requests
 
 from generate.voices.voice import Voice 
+from generate.idioms.basics import allows_truncation
 
 
 class MainSongMethods(unittest.TestCase):
@@ -68,7 +69,7 @@ class MainSongMethods(unittest.TestCase):
 		self.assertFalse(Voice.has_proper_leaps([0, 5, 6, 5]))
 		self.assertFalse(Voice.has_proper_leaps([2, 6, 2, 3]))
 		self.assertFalse(Voice.has_proper_leaps([4, 0, 5, 1]))
-		
+
 		self.assertFalse(Voice.has_proper_leaps([0, 5, 10, 9]))
 		self.assertFalse(Voice.has_proper_leaps([9, 5, 0, 1]))
 
@@ -114,17 +115,28 @@ class MainSongMethods(unittest.TestCase):
 		
 		self.assertEqual(Voice.merge_lists([], [], [2, 3]), [2, 3])
 		self.assertEqual(Voice.merge_lists([4], [], [9, 1, 3], []), [4, 9, 1, 3])
-		self.assertEqual(Voice.merge_lists([1,2], [3], [4,5]), [1,2,3,4,5])
+		self.assertEqual(Voice.merge_lists([1, 2], [3], [4, 5]), [1, 2, 3, 4, 5])
 
 		list1 = [-5, -4]
 		list2 = [-3, -2]
 		list3 = Voice.merge_lists(list1, list2)
 		list3.append(0)
-		self.assertFalse(list1 == [-5, -4, 0])
-		self.assertFalse(list2 == [-3, -2, 0])
+		self.assertFalse(list1[-1] == 0)
+		self.assertFalse(list2[-1] == 0)
 
 		list4 = Voice.merge_lists(list1, [])
 		self.assertTrue(list1 is not list4)
+
+	def test_truncation(self):
+
+		self.assertFalse(allows_truncation([], 0, 2))
+		self.assertFalse(allows_truncation([], 3, 0))
+		self.assertFalse(allows_truncation([1, 2, 3], 4, 4))
+		self.assertFalse(allows_truncation([2, 3, 2, 1, 2, 3], 2, 3))
+
+		self.assertTrue(allows_truncation([0, 1, 0, 1], 2, 1))
+		self.assertTrue(allows_truncation([3, 2, 1, 3, 2], 3, 1))
+		self.assertTrue(allows_truncation([5, 0, 2, 5, 1, 2, 5, 2, 2], 3, 2))
 
 
 if __name__ == "__main__":

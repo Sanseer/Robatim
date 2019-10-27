@@ -17,15 +17,17 @@ tonic_consequents = (
 	("2HC2", "RPT", "RPT", "RPT", "RPT", "PAC1", "TON", "RPT"),
 	("2HC2", "RPT", "RPT", "RPT", "PAC1", "RPT", "TON", "RPT"),
 )
-def is_divisble_by(sequence, divisor):
+def allows_truncation(sequence, divisor, repeat_value):
+	"""Check last item equality of list dividends"""
 	if divisor < 2:
-		return True
+		return False
+	if len(sequence) < divisor:
+		return False
 
-	count_index = 0
-	for current_item in sequence:
-		if count_index % divisor == 0 and current_item != "RPT":
+	for index, current_item in enumerate(sequence):
+		item_num = index + 1
+		if item_num % divisor == 0 and current_item != repeat_value:
 			return False
-		count_index += 1
 	return True
 
 chord_patterns_16 = {}
@@ -36,7 +38,7 @@ for ante_pattern in tonic_antecedents:
 		if ante_pattern[-2] == "1HC1" and cons_pattern[0] == "2HC2":
 			continue
 		full_pattern = ante_pattern + cons_pattern
-		if len(full_pattern) == 16 and is_divisble_by(full_pattern, 2):
+		if len(full_pattern) == 16 and allows_truncation(full_pattern, 2, "RPT"):
 			accelerate = False
 		else:
 			accelerate = True
