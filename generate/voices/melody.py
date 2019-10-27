@@ -769,22 +769,30 @@ class Melody(Voice):
 		melodic_minor = False
 		add_rest = False
 
-		for chord_index, scale_group in enumerate(melody_section, chord_start_index):
+		melody_section_iter = iter(melody_section)
+		next_scale_group = next(melody_section_iter, None)
+		for chord_index, current_scale_group in enumerate(melody_section, chord_start_index):
 
-			chord_name = Voice.chord_sequence[chord_index].chord_name
-			if Voice.mode == "ionian" and chord_name in Chord.major_mode_alterations:
-				note_alterations = Chord.major_mode_alterations[chord_name]
-			elif Voice.mode == "aeolian" and chord_name in Chord.minor_mode_alterations:
-				note_alterations = Chord.minor_mode_alterations[chord_name]
+			next_scale_group = next(melody_section_iter, None)
+			current_chord_name = Voice.chord_sequence[chord_index].chord_name
+			if Voice.mode == "ionian" and current_chord_name in Chord.major_mode_alterations:
+				note_alterations = Chord.major_mode_alterations[current_chord_name]
+			elif Voice.mode == "aeolian" and current_chord_name in Chord.minor_mode_alterations:
+				note_alterations = Chord.minor_mode_alterations[current_chord_name]
 			else: 
 				note_alterations = {}
 				
-			if Voice.mode == "aeolian" and chord_name in Voice.dominant_harmony:
-				# doesn't count melodic minor if between >= 2 chords
+			if Voice.mode == "aeolian" and current_chord_name in Voice.dominant_harmony:
 				if melodic_minor: 
 					note_alterations[5] = 1 
 				else:
-					scale_group_str = "".join(str(scale_degree) for scale_degree in scale_group)
+					# catch raised notes inbetween 2 chords
+					next_chord_name = Voice.chord_sequence[chord_index + 1].chord_name
+					if next_chord_name in Voice.dominant_harmony:
+						affected_scale_group = current_scale_group + next_scale_group
+					else:
+						affected_scale_group = current_scale_group
+					scale_group_str = "".join(str(scale_degree) for scale_degree in affected_scale_group)
 					if any(
 					  str_combo in scale_group_str 
 					  for str_combo in ("56", "65", "-1-2", "-2-1")):
@@ -793,7 +801,7 @@ class Melody(Voice):
 						print("Melodic minor!")
 
 			for embellish_index, scale_degree in enumerate(
-			  scale_group, note_start_indices.get(chord_index, 0)):
+			  current_scale_group, note_start_indices.get(chord_index, 0)):
 				embellish_duration = self.finalized_rhythms[chord_index][embellish_index]
 				# account for negative scale degrees
 				note_offset = note_alterations.get(scale_degree % 7, 0)
