@@ -162,7 +162,6 @@ class Melody(Voice):
 		Voice.chord_acceleration = idms_b.chord_patterns_16[chord_structure]
 		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
-		chord_str_sequence = []
 		chord_structure_iter = iter(chord_structure)
 
 		chord_pattern = next(chord_structure_iter, None)
@@ -614,9 +613,11 @@ class Melody(Voice):
 				self.logger.warning('*' * 30)
 				continue
 
-			if self.chord_index == 12 and max(unnested_scalar_melody) < 6:
+			# chord 8 and 12 are short-circuited
+			# only need to evaluate once going forward
+			if self.chord_index == 13 and max(unnested_scalar_melody) < 6:
 				continue
-			if self.chord_index == 8:
+			if self.chord_index == 9:
 				section1 = Voice.merge_lists(*self.nested_scale_degrees[:4])
 				section2 = Voice.merge_lists(*self.nested_scale_degrees[4:8])
 
