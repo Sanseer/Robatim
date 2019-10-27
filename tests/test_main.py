@@ -67,8 +67,15 @@ class MainSongMethods(unittest.TestCase):
 		self.assertFalse(Voice.has_proper_leaps([7, 6, 2, 1]))
 		self.assertFalse(Voice.has_proper_leaps([0, 5, 6, 5]))
 		self.assertFalse(Voice.has_proper_leaps([2, 6, 2, 3]))
-		self.assertFalse(Voice.has_proper_leaps([7, 3, 6, 1]))
 		self.assertFalse(Voice.has_proper_leaps([4, 0, 5, 1]))
+		
+		self.assertFalse(Voice.has_proper_leaps([0, 5, 10, 9]))
+		self.assertFalse(Voice.has_proper_leaps([9, 5, 0, 1]))
+
+		self.assertFalse(Voice.has_proper_leaps([6, 7, 2, 2, 1]))
+		self.assertFalse(Voice.has_proper_leaps([0, 5, 5, 5, 6]))
+		self.assertTrue(Voice.has_proper_leaps([1, 4, 4, 3, 2]))
+		self.assertTrue(Voice.has_proper_leaps([10, 6, 6, 7, 6]))
 
 		self.assertTrue(Voice.has_proper_leaps([]))
 		self.assertTrue(Voice.has_proper_leaps([1, 2, 3, 4]))
