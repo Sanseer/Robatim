@@ -10,12 +10,21 @@ tonic_antecedents = (
 	("TON", "RPT", "RPT", "RPT", "RPT", "RPT", "2HC1"),
 	("TON", "RPT", "RPT", "1EXTON1", "1EXTON2", "RPT", "2HC1"),
 	("TON", "RPT", "1EXTON1", "RPT", "1EXTON2", "RPT", "2HC1"),
+
+	("TON", "RPT", "RPT", "RPT", "SDOM_AT_-1", "RPT", "1HC1", "RPT"),
+	("TON", "RPT", "RPT", "RPT", "RPT", "SDOM_AF_-1", "1HC1", "RPT"),
+	("TON", "RPT", "RPT", "1EXTON1", "1EXTON2", "SDOM_AF_-1", "1HC1", "RPT"),
+	("TON", "RPT", "1EXTON1", "RPT", "1EXTON2", "SDOM_AF_-1", "1HC1", "RPT"),
 )
 tonic_consequents = (
 	("1HC2", "RPT", "RPT", "RPT", "RPT", "PAC1", "TON", "RPT"),
 	("1HC2", "RPT", "RPT", "RPT", "PAC1", "RPT", "TON", "RPT"),
 	("2HC2", "RPT", "RPT", "RPT", "RPT", "PAC1", "TON", "RPT"),
 	("2HC2", "RPT", "RPT", "RPT", "PAC1", "RPT", "TON", "RPT"),
+
+	("1HC2", "RPT", "RPT", "RPT", "SDOM_AT_-1", "PAC1", "TON", "RPT"),
+	("1HC2", "RPT", "SDOM_AT_-1", "RPT", "PAC1", "RPT", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "SDOM_AF_-1", "PAC1", "RPT", "TON", "RPT"),
 )
 def allows_truncation(sequence, divisor, repeat_value):
 	"""Check last item equality of list dividends"""
