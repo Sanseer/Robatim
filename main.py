@@ -38,6 +38,8 @@ def make_lily_file():
 
 	try:
 		make_score_pdf(sheet_code)
+	except PermissionError:
+		print("You must close out the previous pdf to overwrite it.")
 	except requests.exceptions.ConnectionError:
 		print("Must be connected to internet to create pdf.")
 
@@ -139,8 +141,11 @@ if __name__ == "__main__":
 	print(f"Mode: {Voice.mode}")
 	print(f"Tempo: {tempo}")
 
-	with open("song0.mid", "wb")  as output_file:
-		MyMIDI.writeFile(output_file)
+	try:
+		with open("song0.mid", "wb")  as output_file:
+			MyMIDI.writeFile(output_file)
+	except PermissionError:
+		print("You must close the previous midi file to overwrite it.")
 
 	make_lily_file()
 
