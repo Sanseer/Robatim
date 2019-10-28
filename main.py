@@ -101,8 +101,8 @@ if __name__ == "__main__":
 			reset_score_settings()
 			Melody().make_melody()
 			break
-		except IndexError:
-			print("Failed melody. Retrying...\n")
+		except AssertionError:
+			print("Retrying...\n")
 			continue
 			
 	for new_note in Voice.midi_score[0]:

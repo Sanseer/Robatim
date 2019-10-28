@@ -320,8 +320,15 @@ class Melody(Voice):
 		self.melodic_direction[self.chord_index] = None
 		self.chosen_scale_degrees[self.chord_index] = None
 		self.chord_index -= 1
+
+		# AssertionError singles out this scenario.
+		# it traverses the call stack to main.py before being handled.
+		# Other exceptions like IndexError can occur elsewhere in class instance
+		# and would be silenced by main.py, preventing debugging.
+
 		if self.chord_index < 0:
-			raise IndexError
+			print("Melody failed.")
+			raise AssertionError
 
 		self.previous_degree_choice = self.chosen_scale_degrees[self.chord_index - 1]
 		if not self.melody_figure_options[self.chord_index - 1]:
