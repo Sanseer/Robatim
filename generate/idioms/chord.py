@@ -9,7 +9,7 @@ class Chord:
 		"V6":(4, 6, 1), "VII6": (6, 1, 3), "V65": (4, 6, 1, 3), 
 		"V43": (4, 6, 1, 3), "V42": (4, 6, 1, 3), "II": (1, 3, 5), 
 		"II6": (1, 3, 5), "IV": (3, 5, 0), "IV_MAJOR": (3, 5, 0), 
-		"IV_MINOR": (3, 5, 0),
+		"IV_MINOR": (3, 5, 0), "I64": (0, 2, 4)
 	}
 	minor_mode_alterations = {
 		"V": {6: 1}, "V7": {6: 1}, "V6": {6: 1}, "VII6": {6: 1}, "V65": {6: 1},
@@ -23,7 +23,7 @@ class Chord:
 	bass_degrees = {
 		"I": 0, "I6": 2, "V": 4, "V7": 4, "V6": 6, "VII6": 1, "V65": 6,
 		"V43": 1, "V42": 3, "II": 1, "II6": 3, "IV": 3, "IV_MAJOR": 3, 
-		"IV_MINOR": 3
+		"IV_MINOR": 3, "I64": 4
 	}
 
 	def __init__(self, chord_symbol):

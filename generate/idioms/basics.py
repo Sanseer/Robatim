@@ -16,23 +16,41 @@ tonic_antecedents = (
 	("TON", "RPT", "RPT", "1EXTON1", "1EXTON2", "SDOM_AF_-1", "1HC1", "RPT"),
 	("TON", "RPT", "1EXTON1", "RPT", "1EXTON2", "SDOM_AF_-1", "1HC1", "RPT"),
 	("TON", "RPT", "RPT", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "1HC1", "RPT"),
+
+	("TON", "RPT", "RPT", "RPT", "RPT", "SDOM_AF_-1", "2HC1"),
+	("TON", "RPT", "RPT", "RPT", "SDOM_AT_-1", "RPT", "2HC1"),
+	("TON", "RPT", "RPT", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "2HC1"),
+	("TON", "RPT", "RPT", "1EXTON1", "1EXTON2", "SDOM_AF_-1", "2HC1"),
+	("TON", "RPT", "1EXTON1", "RPT", "1EXTON2", "SDOM_AF_-1", "2HC1"),
 )
 tonic_consequents = (
-	("1HC2", "RPT", "RPT", "RPT", "RPT", "PAC1", "TON", "RPT"),
-	("1HC2", "RPT", "RPT", "RPT", "PAC1", "RPT", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "RPT", "RPT", "PAC1", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "RPT", "PAC1", "RPT", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "RPT", "RPT", "1PAC_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "RPT", "RPT", "1PAC_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "RPT", "1PAC_EX1", "RPT", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "RPT", "1PAC_EX1", "RPT", "TON", "RPT"),
 
-	("1HC2", "RPT", "RPT", "RPT", "SDOM_AT_-1", "PAC1", "TON", "RPT"),
-	("1HC2", "RPT", "SDOM_AT_-1", "RPT", "PAC1", "RPT", "TON", "RPT"),
-	("1HC2", "RPT", "RPT", "SDOM_AF_-1", "PAC1", "RPT", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "RPT", "SDOM_AT_-1", "PAC1", "TON", "RPT"),
-	("2HC2", "RPT", "SDOM_AT_-1", "RPT", "PAC1", "RPT", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "SDOM_AF_-1", "PAC1", "RPT", "TON", "RPT"),
-	("1HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "PAC1", "RPT", "TON", "RPT"),
-	
-	("1HC2", "RPT", "3SDOM_EX1", "PAC1", "TON", "RPT"),
-	("2HC2", "RPT", "3SDOM_EX1", "PAC1", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "RPT", "SDOM_AT_-1", "1PAC_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "RPT", "SDOM_AT_-1", "1PAC_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "SDOM_AT_-1", "RPT", "1PAC_EX1", "RPT", "TON", "RPT"),
+	("2HC2", "RPT", "SDOM_AT_-1", "RPT", "1PAC_EX1", "RPT", "TON", "RPT"),
+
+	("1HC2", "RPT", "RPT", "SDOM_AF_-1", "1PAC_EX1", "RPT", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "SDOM_AF_-1", "1PAC_EX1", "RPT", "TON", "RPT"),
+	("1HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "1PAC_EX1", "RPT", "TON", "RPT"),
+	("2HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "1PAC_EX1", "RPT", "TON", "RPT"),
+
+	("1HC2", "RPT", "3SDOM_EX1", "1PAC_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "3SDOM_EX1", "1PAC_EX1", "TON", "RPT"),
+
+	("1HC2", "RPT", "RPT", "RPT", "2PAC_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "RPT", "2PAC_EX1", "TON", "RPT"),
+
+	("1HC2", "RPT", "SDOM_AT_-1", "RPT", "2PAC_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "SDOM_AT_-1", "RPT", "2PAC_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "SDOM_AF_-1", "2PAC_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "SDOM_AF_-1", "2PAC_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "2PAC_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "2PAC_EX1", "TON", "RPT"),
 )
 def allows_truncation(sequence, divisor, repeat_value):
 	"""Check last item equality of list dividends"""
@@ -65,7 +83,7 @@ for ante_pattern in tonic_antecedents:
 # 1 = rhythm2 etc.
 # -1 = sustain
 # -2 = pickup
-# duplicate patterns are use to alter selected pattern probability
+# duplicate patterns are used to alter selected pattern probability
 rhythm_patterns = (
 	((0, 0, 0, -1), (0, 0, 1, -1), (0, 1, 0, -1)), 
 	((0, 0, 0, -1), (0, 0, 1, -1), (0, 1, 0, -1), (0, 0 , 2, -1), (0, 2, 0, -1), 
