@@ -71,7 +71,7 @@ class Melody(Voice):
 				0: ((-1,), (-3,), (0,)), 1: ((-2,), (0,)), 2: ((-4,), (0,)), 3: ((-1,), (0,))
 			}
 		}
-		self.chosen_figurations = [None for _ in range(16)]
+		self.chosen_figurations = [None for _ in range(15)]
 
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [
@@ -275,8 +275,15 @@ class Melody(Voice):
 		self.chord_index = 0
 		self.logger.warning(f"Chord index: {self.chord_index}")
 		self.logger.warning(f"Current scale degree options {self.current_scale_degree_options}")
-		self.current_degree_choice = self.current_scale_degree_options[0].pop()
-
+		# AssertionError singles out this scenario.
+		# it traverses the call stack to main.py before being handled.
+		# Other exceptions like IndexError can occur elsewhere in class instance
+		# and would be silenced by main.py, preventing debugging.
+		try:
+			self.current_degree_choice = self.current_scale_degree_options[0].pop()
+		except IndexError:
+			print("Melody failed")
+			raise AssertionError
 		self.chosen_scale_degrees[0] = self.current_degree_choice
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
 		if Voice.pickup:
@@ -320,15 +327,6 @@ class Melody(Voice):
 		self.melodic_direction[self.chord_index] = None
 		self.chosen_scale_degrees[self.chord_index] = None
 		self.chord_index -= 1
-
-		# AssertionError singles out this scenario.
-		# it traverses the call stack to main.py before being handled.
-		# Other exceptions like IndexError can occur elsewhere in class instance
-		# and would be silenced by main.py, preventing debugging.
-
-		if self.chord_index < 0:
-			print("Melody failed.")
-			raise AssertionError
 
 		self.previous_degree_choice = self.chosen_scale_degrees[self.chord_index - 1]
 		if not self.melody_figure_options[self.chord_index - 1]:
@@ -484,14 +482,16 @@ class Melody(Voice):
 				else:
 					return False 
 
-		section1 = self.chosen_scale_degrees[:4]
-		section2 = self.chosen_scale_degrees[4:8]
-		if self.chord_index == 8 and max(section1) == max(section2):
-			return False
-		section3 = self.chosen_scale_degrees[8:12]
-		section4 = self.chosen_scale_degrees[12:]
-		if self.chord_index == 15 and max(section3) <= max(section4):
-			return False
+		if self.chord_index == 8: 
+			section1 = self.chosen_scale_degrees[:4]
+			section2 = self.chosen_scale_degrees[4:8]
+			if max(section1) == max(section2):
+				return False
+		if self.chord_index == 15:
+			section3 = self.chosen_scale_degrees[8:12]
+			section4 = self.chosen_scale_degrees[12:]
+			if max(section3) <= max(section4):
+				return False
 
 		if self.chosen_figurations[0] == "IN":
 			return False
