@@ -91,10 +91,10 @@ if __name__ == "__main__":
 	# defaults to format 1 (tempo track automatically created)
 
 	MyMIDI.addProgramChange(track, channel, time, 73)
-	MyMIDI.addProgramChange(1, 1, time, 43)
-	MyMIDI.addProgramChange(2, 2, time, 42)
-	MyMIDI.addProgramChange(3, 3, time, 41)
-	MyMIDI.addProgramChange(4, 3, time, 40)
+	MyMIDI.addProgramChange(1, 1, time, 32)
+	MyMIDI.addProgramChange(2, 2, time, 32)
+	MyMIDI.addProgramChange(3, 3, time, 32)
+	MyMIDI.addProgramChange(4, 3, time, 32)
 
 	while True:
 		try:
@@ -115,6 +115,18 @@ if __name__ == "__main__":
 	chorale.Alto().create_part()
 	chorale.Soprano().create_part()
 
+	strum_ending = random.choice((True, True, False))
+	print(f"Strum ending: {strum_ending}")
+	if strum_ending:
+		time_shift = 0
+		for voice_index, part in enumerate(Voice.midi_score[2:], 2):
+			time_shift += 90
+			old_midi_obj = Voice.midi_score[voice_index][-2]
+			new_midi_obj = Voice.Note(
+				old_midi_obj.pitch, old_midi_obj.time + time_shift, 
+				old_midi_obj.duration)
+			Voice.midi_score[voice_index][-2] = new_midi_obj
+
 	for voice_index, part in enumerate(Voice.midi_score[1:]):
 		track += 1
 		channel += 1
@@ -124,9 +136,9 @@ if __name__ == "__main__":
 				MyMIDI.addNote(track, channel, *new_note, volume)
 
 	if Voice.mode == "aeolian":
-		tempo = random.choice(range(80, 101))
+		tempo = random.choice(range(85, 101))
 	elif Voice.mode == "ionian":
-		tempo = random.choice(range(80, 111))
+		tempo = random.choice(range(85, 111))
 	MyMIDI.addTempo(track,time, tempo)
 
 	slow_ending = random.choice((True, False))
@@ -138,7 +150,6 @@ if __name__ == "__main__":
 		MyMIDI.addTempo(
 			0, Voice.pickup_duration + Voice.max_note_duration * measure_mark, tempo * 0.93)
 	print(f"Slow ending? {slow_ending}")
-	print(f"Mode: {Voice.mode}")
 	print(f"Tempo: {tempo}")
 
 	try:

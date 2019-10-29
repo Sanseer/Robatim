@@ -24,7 +24,7 @@ class Voice:
 	pickup_duration = 0
 	max_note_duration = 0
 	time_sig = (4, 2)
-	voice_volumes = (80, 40, 40, 40)
+	voice_volumes = (70, 50, 50, 50)
 
 	bass_motion = []
 	tenor_motion = []
