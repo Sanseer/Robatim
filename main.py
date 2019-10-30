@@ -21,7 +21,7 @@ def make_lily_file():
 		time_sig = f"{Voice.measure_length}/4"
 	title = f"Medley in {Voice.tonic} {mode}"
 
-	with open("old_layout.txt", 'r') as f:
+	with open("logs/old_layout.txt", 'r') as f:
 		sheet_code = f.read()
 
 	for lily_part in Voice.lily_score:
@@ -33,7 +33,7 @@ def make_lily_file():
 	sheet_code = sheet_code.replace("PART_SLOT", "")
 	sheet_code = sheet_code.replace("Medley", title)
 
-	with open("new_layout.txt", 'w') as f:
+	with open("logs/new_layout.txt", 'w') as f:
 		f.write(sheet_code)
 
 	try:
