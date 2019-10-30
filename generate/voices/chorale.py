@@ -35,6 +35,9 @@ class Chorale(Voice):
 
 		self.condensed_chords = []
 		self.unique_chord_indices = set()
+		self.chosen_chord_voicings = []
+		self.possible_chord_voicings = []
+		self.unsorted_pitch_combo_sequence = []
 
 		self.logger = logging.getLogger("chorale")
 		chorale_handler = logging.FileHandler("logs/chorale.log", mode='w')
@@ -64,6 +67,7 @@ class Chorale(Voice):
 
 		self.chosen_chord_voicings = [None for _ in self.condensed_chords]
 		self.possible_chord_voicings = [None for _ in self.condensed_chords]
+		self.unsorted_pitch_combo_sequence = [None for _ in self.condensed_chords]
 
 		self.possible_chord_voicings[self.chord_index] = self.populate_chord()
 
@@ -78,10 +82,8 @@ class Chorale(Voice):
 				self.chord_index -= 1
 				self.erase_last_chord()
 				self.chosen_chord_voicings[self.chord_index] = None
-				last_combo = self.chosen_chord_voicings[self.chord_index - 1]
 			else:
 				self.chosen_chord_voicings[self.chord_index] = self.combo_choice
-				last_combo = self.combo_choice
 				self.chord_index += 1
 				if self.chord_index < len(self.chosen_chord_voicings):
 					self.possible_chord_voicings[self.chord_index] = self.populate_chord()
@@ -101,25 +103,41 @@ class Chorale(Voice):
 		current_pitches_dict = current_chord_obj.pitches_to_degrees
 		self.logger.warning(f"Current pitches dict: {current_pitches_dict}")
 
-		chordal_members = current_chord_obj.scale_degrees
-		unsorted_pitch_combos = self.make_pitch_combos(current_pitches_dict)
+		current_chord_members = current_chord_obj.scale_degrees
+		if self.unsorted_pitch_combo_sequence[self.chord_index] == None:
+			# must realize full sequence to prevent iterator exhaustion
+			# faster runtime if pitch combos are only calculated once
+			unsorted_pitch_combos = tuple(self.make_pitch_combos(current_pitches_dict))
+			self.unsorted_pitch_combo_sequence[self.chord_index] = unsorted_pitch_combos
+		else:
+			unsorted_pitch_combos = self.unsorted_pitch_combo_sequence[self.chord_index]
 		current_chord = current_chord_obj.chord_name
 		chord_direction = str(current_chord_obj)[0]
 		bass_degree = current_chord_obj.bass_degree
 
 		if self.chord_index > 0:
-			previous_chord = self.condensed_chords[self.chord_index - 1].chord_name
+			previous_chord_obj = self.condensed_chords[self.chord_index - 1]
+			previous_chord = previous_chord_obj.chord_name
+			previous_pitches_dict = previous_chord_obj.pitches_to_degrees
+			previous_degree_combo = []
+			for pitch in self.chosen_chord_voicings[self.chord_index - 1]:
+				previous_degree_combo.append(previous_pitches_dict[pitch])
+			previous_chord_members = previous_chord_obj.scale_degrees
 		else:
 			previous_chord = None
+			previous_degree_combo = None
+			previous_chord_members = None
 
-		# change parameters into array corresponding to chord indices
-		# calculate only once
-		for pitch_combo in self.arrange_pitch_combos(unsorted_pitch_combos, chordal_members,current_pitches_dict):
+		# generator requires passing of parameters to prevent side effects
+		# from backtracking
+		for pitch_combo in self.arrange_pitch_combos(
+		  unsorted_pitch_combos, current_chord_members, current_pitches_dict):
 			if self.is_voice_lead(
 			  pitch_combo, current_chord, previous_chord, chord_direction, 
-			  current_pitches_dict, chordal_members, bass_degree):
+			  current_pitches_dict, previous_degree_combo, previous_chord_members ,current_chord_members, bass_degree):
 				yield pitch_combo
 
+	# turn into static function to test
 	def make_pitch_combos(self, current_pitches_dict):
 		possible_midi_pitches = [[] for _ in range(4)]
 		for midi_pitch in current_pitches_dict:
@@ -138,16 +156,17 @@ class Chorale(Voice):
 
 		return itertools.product(*possible_midi_pitches)
 
-	def arrange_pitch_combos(self, unsorted_pitch_combos, chordal_members, current_pitches_dict):
+	def arrange_pitch_combos(self, unsorted_pitch_combos, current_chord_members, current_pitches_dict):
 
-		voicing_groups = [[] for _ in chordal_members]
+		voicing_groups = [[] for _ in current_chord_members]
 
 		for pitch_combo in unsorted_pitch_combos:
 			scale_degrees_used = set()
 			for midi_pitch in pitch_combo:
 				scale_degrees_used.add(current_pitches_dict[midi_pitch])
 			scale_degree_count = len(scale_degrees_used)
-			voicing_groups[scale_degree_count - 1].append(pitch_combo)
+			if scale_degree_count > 1:
+				voicing_groups[scale_degree_count - 1].append(pitch_combo)
 
 		if self.chord_index == 0:
 			for voicing_group in reversed(voicing_groups):
@@ -171,8 +190,10 @@ class Chorale(Voice):
 
 			note_mvmts.append(note_mvmt)
 
-		sorted_voicing_group = [pitch_combo 
-			for _, pitch_combo in sorted(zip(note_mvmts, unsorted_voicing_group))]
+		sorted_voicing_group = [
+			pitch_combo 
+			for _, pitch_combo in sorted(zip(note_mvmts, unsorted_voicing_group))
+		]
 
 		return sorted_voicing_group
 
@@ -186,32 +207,36 @@ class Chorale(Voice):
 
 	def is_voice_lead(
 	  self, pitch_combo, current_chord, previous_chord, chord_direction, 
-	  current_pitches_dict, chordal_members, bass_degree):
+	  current_pitches_dict, previous_degree_combo, previous_chord_members, current_chord_members, bass_degree):
 		(b_pitch, t_pitch, a_pitch, s_pitch) = pitch_combo
 		if not b_pitch <= t_pitch <= a_pitch <= s_pitch:
 			return False 
-		if (b_pitch - t_pitch) > 24:
+		if b_pitch - t_pitch > 24:
 			return False
-		if (a_pitch - t_pitch) > 12:
+		if a_pitch - t_pitch > 12:
 			return False
-		if (s_pitch - a_pitch) > 12:
+		if s_pitch - a_pitch > 12:
 			return False
 
-		degree_combo = (current_pitches_dict[b_pitch], 
+		current_degree_combo = (current_pitches_dict[b_pitch], 
 			current_pitches_dict[t_pitch], 
 			current_pitches_dict[a_pitch],
 			current_pitches_dict[s_pitch])
 
-		if len(set(degree_combo)) == 1:
+		if current_chord_members[0] not in current_degree_combo:
 			return False
-		if chordal_members[0] not in degree_combo:
+		if current_chord_members[1] not in current_degree_combo:
 			return False
-		if chordal_members[1] not in degree_combo:
+		if len(current_chord_members) == 4:  
+			if current_degree_combo.count(current_chord_members[3]) != 1:
+				return False 
+		if bass_degree != current_degree_combo[0]:
 			return False
-		if bass_degree != degree_combo[0]:
+		if current_chord in Voice.dominant_harmony and current_degree_combo.count(6) >= 2:
 			return False
-		if current_chord in Voice.dominant_harmony and degree_combo.count(6) >= 2:
+		if current_chord == "I64" and current_degree_combo.count(0) >= 2:
 			return False
+
 
 		bass_tenor_intervals = self.bass_tenor_intervals[:]
 		bass_tenor_intervals.append(
@@ -267,6 +292,8 @@ class Chorale(Voice):
 
 		composite_motion = [tenor_motion, alto_motion, soprano_motion]
 		for voice_index, new_pitch in enumerate(pitch_combo[1:]):
+			previous_degree = previous_degree_combo[voice_index + 1]
+			current_degree = current_degree_combo[voice_index + 1]
 			old_pitch = self.chosen_chord_voicings[self.chord_index - 1][voice_index + 1] 
 			if abs(new_pitch - old_pitch) > 12:
 				self.logger.warning("Leap greater than octave")
@@ -277,6 +304,21 @@ class Chorale(Voice):
 			  composite_motion[voice_index][-1] == 
 			  composite_motion[voice_index][-2])):
 				self.logger.warning("Leaps followed by stepwise contrary motion")
+				return False
+			if (previous_chord in {"V7", "V65"} and 
+			  current_chord not in Voice.dominant_harmony and
+			  previous_degree == previous_chord_members[3] and
+			  not 1 <= new_pitch - old_pitch <= 2):
+				return False
+			if previous_chord == "V7" and previous_degree == 6:
+				if voice_index == 2:
+					if current_degree_combo[3] != 0:
+						return False 
+				else:
+					if current_degree not in {0, 4}:
+						return False
+			if (previous_chord == "I64" and 
+			  previous_degree == 0 and current_degree != 6):
 				return False
 
 		bass_tenor_motion = self.bass_tenor_motion[:]
@@ -303,11 +345,9 @@ class Chorale(Voice):
 		old_soprano_note =  self.chosen_chord_voicings[self.chord_index - 1][3] 
 		if (self.chord_index == len(self.condensed_chords) - 1 and
 		  (bass_soprano_intervals[-1] != "P8" or 
-		  abs(s_pitch - old_soprano_note) > 5)): 
+		  bass_soprano_motion[-1] != "Contrary" or 
+		  abs(s_pitch - old_soprano_note) > 4)): 
 			self.logger.warning("End on contrary motion") 
-			return False
-		if "P" in bass_soprano_intervals[-1] and "P" in bass_soprano_intervals[-2]:
-			self.logger.warning("Avoid double perfects")
 			return False
 
 		composite_intervals = [bass_tenor_intervals, bass_alto_intervals, 
@@ -323,15 +363,10 @@ class Chorale(Voice):
 			  motion_list[-1] == "Parallel"):
 				self.logger.warning("No parallel fifths or octaves")
 				return False
-			if (interval_list[-2] == "A4" and 
-			  interval_list[-1] not in {"M6", "m6"}): 
-				if current_chord == "I" and previous_chord == "V7":
-					self.logger.warning("Must properly resolve V7")
+			if previous_chord in {"VII6", "V43"} and interval_list[-2] == "d5":
+				if current_chord == "I6" and interval_list[-1] not in {"P5", "M3", "m3"}:
 					return False
-			if (interval_list[-2] == "d5" and 
-			  interval_list[-1] not in {"M3", "m3"}): 
-				if current_chord == "I" and previous_chord == "V7":
-					self.logger.warning("Must properly resolve V7")
+				if current_chord == "I" and interval_list[-1] not in {"M3", "m3"}:
 					return False
 
 		# add new parameters to official sequence
