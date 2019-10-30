@@ -6,6 +6,7 @@ import logging
 from generate.voices.voice import Voice
 from generate.idioms import basics as idms_b
 from generate.idioms.chord import Chord
+from generate.idioms.mode import Mode
 
 class Melody(Voice):
 	"""A melody constructor based on a chord progression"""
@@ -19,15 +20,10 @@ class Melody(Voice):
 		melody_handler.setFormatter(melody_format)
 		self.logger.addHandler(melody_handler)
 
-		#reset, incase of repeat
+		#reset, incase of failed melody
 		Chord.reset_settings()
 		Voice.mode = random.choice(("ionian", "aeolian"))
-		if Voice.mode == "ionian":
-			import generate.idioms.major
-			Voice.idms_mode = generate.idioms.major
-		elif Voice.mode == "aeolian":
-			import generate.idioms.minor
-			Voice.idms_mode = generate.idioms.minor
+		Voice.idms_mode = Mode(Voice.mode)
 
 		Voice.time_sig = random.choice(idms_b.time_sigs)
 		Voice.tonic = random.choice(self.idms_mode.key_sigs)
@@ -482,19 +478,19 @@ class Melody(Voice):
 				else:
 					return False 
 
-		if self.chord_index == 8: 
+		if self.chord_index == 2 and self.chosen_figurations[0] == "IN":
+			return False
+		elif self.chord_index == 8: 
 			section1 = self.chosen_scale_degrees[:4]
 			section2 = self.chosen_scale_degrees[4:8]
 			if max(section1) == max(section2):
 				return False
-		if self.chord_index == 15:
+		elif self.chord_index == 15:
 			section3 = self.chosen_scale_degrees[8:12]
 			section4 = self.chosen_scale_degrees[12:]
 			if max(section3) <= max(section4):
 				return False
 
-		if self.chosen_figurations[0] == "IN":
-			return False
 
 		num_still_figures = self.chosen_figurations.count("CN")
 		num_still_figures += self.chosen_figurations.count("DN")

@@ -24,33 +24,33 @@ tonic_antecedents = (
 	("TON", "RPT", "1EXTON1", "RPT", "1EXTON2", "SDOM_AF_-1", "2HC1"),
 )
 tonic_consequents = (
-	("1HC2", "RPT", "RPT", "RPT", "RPT", "1PAC_EX1", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "RPT", "RPT", "1PAC_EX1", "TON", "RPT"),
-	("1HC2", "RPT", "RPT", "RPT", "1PAC_EX1", "RPT", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "RPT", "1PAC_EX1", "RPT", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "RPT", "RPT", "1END_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "RPT", "RPT", "1END_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "RPT", "1END_EX1", "RPT", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "RPT", "1END_EX1", "RPT", "TON", "RPT"),
 
-	("1HC2", "RPT", "RPT", "RPT", "SDOM_AT_-1", "1PAC_EX1", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "RPT", "SDOM_AT_-1", "1PAC_EX1", "TON", "RPT"),
-	("1HC2", "RPT", "SDOM_AT_-1", "RPT", "1PAC_EX1", "RPT", "TON", "RPT"),
-	("2HC2", "RPT", "SDOM_AT_-1", "RPT", "1PAC_EX1", "RPT", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "RPT", "SDOM_AT_-1", "1END_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "RPT", "SDOM_AT_-1", "1END_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "SDOM_AT_-1", "RPT", "1END_EX1", "RPT", "TON", "RPT"),
+	("2HC2", "RPT", "SDOM_AT_-1", "RPT", "1END_EX1", "RPT", "TON", "RPT"),
 
-	("1HC2", "RPT", "RPT", "SDOM_AF_-1", "1PAC_EX1", "RPT", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "SDOM_AF_-1", "1PAC_EX1", "RPT", "TON", "RPT"),
-	("1HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "1PAC_EX1", "RPT", "TON", "RPT"),
-	("2HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "1PAC_EX1", "RPT", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "SDOM_AF_-1", "1END_EX1", "RPT", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "SDOM_AF_-1", "1END_EX1", "RPT", "TON", "RPT"),
+	("1HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "1END_EX1", "RPT", "TON", "RPT"),
+	("2HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "1END_EX1", "RPT", "TON", "RPT"),
 
-	("1HC2", "RPT", "3SDOM_EX1", "1PAC_EX1", "TON", "RPT"),
-	("2HC2", "RPT", "3SDOM_EX1", "1PAC_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "3SDOM_EX1", "1END_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "3SDOM_EX1", "1END_EX1", "TON", "RPT"),
 
-	("1HC2", "RPT", "RPT", "RPT", "2PAC_EX1", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "RPT", "2PAC_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "RPT", "2END_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "RPT", "2END_EX1", "TON", "RPT"),
 
-	("1HC2", "RPT", "SDOM_AT_-1", "RPT", "2PAC_EX1", "TON", "RPT"),
-	("2HC2", "RPT", "SDOM_AT_-1", "RPT", "2PAC_EX1", "TON", "RPT"),
-	("1HC2", "RPT", "RPT", "SDOM_AF_-1", "2PAC_EX1", "TON", "RPT"),
-	("2HC2", "RPT", "RPT", "SDOM_AF_-1", "2PAC_EX1", "TON", "RPT"),
-	("1HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "2PAC_EX1", "TON", "RPT"),
-	("2HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "2PAC_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "SDOM_AT_-1", "RPT", "2END_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "SDOM_AT_-1", "RPT", "2END_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "RPT", "SDOM_AF_-1", "2END_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "RPT", "SDOM_AF_-1", "2END_EX1", "TON", "RPT"),
+	("1HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "2END_EX1", "TON", "RPT"),
+	("2HC2", "RPT", "SDOM_AT_-2", "SDOM_AF_-1", "2END_EX1", "TON", "RPT"),
 )
 def allows_truncation(sequence, divisor, repeat_value):
 	"""Check last item equality of list dividends"""
