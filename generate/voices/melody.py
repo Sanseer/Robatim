@@ -403,20 +403,14 @@ class Melody(Voice):
 					break
 				all_rest_indices.add(rest_index)
 				start_index = rest_index + 1
-			if all_rest_indices - {3, 7}:
+			if all_rest_indices - {3, 6, 7}:
 				self.logger.warning("Triple repeats only between phrases")
 				self.logger.warning('*' * 30)
 				return False
+			if 6 in all_rest_indices and self.rhythm_symbols[6] >= 0:
+				return False
 
 		relevant_melodic_mvt = melodic_mvmt[1:]
-		if ">>>" in relevant_melodic_mvt:
-			self.logger.warning("Ascending cascade")
-			self.logger.warning('*' * 30)
-			return False
-		if melodic_mvmt.count('_') > 8:
-			self.logger.warning("Too much pause")
-			self.logger.warning('*' * 30)
-			return False
 		if (self.chord_index == 7 and 
 		  self.previous_degree_choice != self.current_degree_choice):
 			self.logger.warning("Rest halfway through")
@@ -490,7 +484,6 @@ class Melody(Voice):
 			section4 = self.chosen_scale_degrees[12:]
 			if max(section3) <= max(section4):
 				return False
-
 
 		num_still_figures = self.chosen_figurations.count("CN")
 		num_still_figures += self.chosen_figurations.count("DN")
