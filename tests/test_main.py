@@ -138,6 +138,27 @@ class MainSongMethods(unittest.TestCase):
 		self.assertTrue(allows_truncation([3, 2, 1, 3, 2], 3, 1))
 		self.assertTrue(allows_truncation([5, 0, 2, 5, 1, 2, 5, 2, 2], 3, 2))
 
+	def test_pitch_combos(self):
+		self.assertEqual(Voice.make_pitch_combos({}), tuple())
+		self.assertEqual(Voice.make_pitch_combos({40: None}), tuple())
+		self.assertEqual(Voice.make_pitch_combos({61: None}), tuple())
+		self.assertEqual(
+			Voice.make_pitch_combos({40: None, 61: None}), ((40, 61, 61, 61),))
+		self.assertEqual(
+			Voice.make_pitch_combos({59: None, 79: None}), ((59, 59, 59, 79),))
+
+		self.assertEqual(
+			Voice.make_pitch_combos({48: None, 62: None}), 
+			((48, 48, 62, 62), (48, 62, 62, 62)))
+		self.assertEqual(
+			Voice.make_pitch_combos({55: None, 61: None}), 
+			((55, 55, 55, 61), (55, 55, 61, 61), (55, 61, 55, 61), 
+				(55, 61, 61, 61)))
+
+		self.assertEqual(Voice.make_pitch_combos({82: None}), tuple())
+		self.assertEqual(Voice.make_pitch_combos({92: None,  85: None}), tuple())
+		self.assertEqual(Voice.make_pitch_combos({83: None, 100: None}), tuple())
+
 
 if __name__ == "__main__":
 	unittest.main()

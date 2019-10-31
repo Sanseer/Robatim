@@ -1,5 +1,6 @@
 import collections
 from fractions import Fraction
+import itertools
 
 class Voice:
 
@@ -180,6 +181,25 @@ class Voice:
 			split_amounts.append(total)
 
 		return split_amounts
+
+	@staticmethod
+	def make_pitch_combos(current_pitches_dict):
+		possible_midi_pitches = [[] for _ in range(4)]
+		for midi_pitch in current_pitches_dict:
+			if 40 <= midi_pitch <= 60:
+				possible_midi_pitches[0].append(midi_pitch)
+			if 48 <= midi_pitch <= 67:
+				possible_midi_pitches[1].append(midi_pitch)
+			if 55 <= midi_pitch <= 72:
+				possible_midi_pitches[2].append(midi_pitch)
+			if 60 <= midi_pitch <= 79:
+				possible_midi_pitches[3].append(midi_pitch)
+			if midi_pitch > 79:
+				break
+
+		# must realize full sequence to prevent iterator exhaustion
+		# faster runtime if pitch combos are only calculated once per chord index
+		return tuple(itertools.product(*possible_midi_pitches))
 
 	def set_sheet_notes(self):
 		"""Convert midi pitches into sheet music note names"""

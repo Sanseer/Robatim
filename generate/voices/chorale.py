@@ -58,7 +58,7 @@ class Chorale(Voice):
 		self.condensed_chords.append(current_chord_obj)
 		self.unique_chord_indices.add(0)
 		self.unsorted_pitch_combo_sequence.append(
-			self.make_pitch_combos(current_chord_obj.pitches_to_degrees))
+			Voice.make_pitch_combos(current_chord_obj.pitches_to_degrees))
 		previous_chord_obj = current_chord_obj
 
 		for original_chord_index, current_chord_obj in enumerate(Voice.chord_sequence[1:], 1):
@@ -66,7 +66,7 @@ class Chorale(Voice):
 				self.condensed_chords.append(current_chord_obj)
 				self.unique_chord_indices.add(original_chord_index)
 				self.unsorted_pitch_combo_sequence.append(
-					self.make_pitch_combos(current_chord_obj.pitches_to_degrees))
+					Voice.make_pitch_combos(current_chord_obj.pitches_to_degrees))
 			previous_chord_obj = current_chord_obj
 
 	def make_chord_voicings(self):
@@ -158,25 +158,6 @@ class Chorale(Voice):
 			  current_pitches_dict, previous_degree_combo, previous_chord_members ,current_chord_members, bass_degree):
 				yield pitch_combo
 
-	# turn into static function to test
-	def make_pitch_combos(self, current_pitches_dict):
-		possible_midi_pitches = [[] for _ in range(4)]
-		for midi_pitch in current_pitches_dict:
-			if 38 <= midi_pitch <= 62:
-				possible_midi_pitches[0].append(midi_pitch)
-			if 48 <= midi_pitch <= 69:
-				possible_midi_pitches[1].append(midi_pitch)
-			if 55 <= midi_pitch <= 74:
-				possible_midi_pitches[2].append(midi_pitch)
-			if 59 <= midi_pitch <= 81:
-				possible_midi_pitches[3].append(midi_pitch)
-			if midi_pitch > 81:
-				break
-
-		# must realize full sequence to prevent iterator exhaustion
-		# faster runtime if pitch combos are only calculated once per chord index
-		return tuple(itertools.product(*possible_midi_pitches))
-
 	def arrange_pitch_combos(self, unsorted_pitch_combos, current_chord_members, current_pitches_dict):
 
 		voicing_groups = [[] for _ in current_chord_members]
@@ -258,7 +239,6 @@ class Chorale(Voice):
 		if current_chord == "I64" and current_degree_combo.count(0) >= 2:
 			return False
 
-
 		bass_tenor_intervals = self.bass_tenor_intervals[:]
 		bass_tenor_intervals.append(
 			self.get_interval(b_pitch, t_pitch, current_pitches_dict))
@@ -311,6 +291,7 @@ class Chorale(Voice):
 		self.add_voice_motion(alto_motion, a_pitch, 2)
 		self.add_voice_motion(soprano_motion, s_pitch, 3)
 
+		# bass voice is immutable b/c chord progression
 		composite_motion = [tenor_motion, alto_motion, soprano_motion]
 		for voice_index, new_pitch in enumerate(pitch_combo[1:]):
 			previous_degree = previous_degree_combo[voice_index + 1]
@@ -333,7 +314,7 @@ class Chorale(Voice):
 				return False
 			if previous_chord == "V7" and previous_degree == 6:
 				if voice_index == 2:
-					if current_degree_combo[3] != 0:
+					if current_degree != 0:
 						return False 
 				else:
 					if current_degree not in {0, 4}:
@@ -476,20 +457,16 @@ class Chorale(Voice):
 		if chord_units_used == 0:
 			chord_units_used = 1
 		print(f"Chord units used: {chord_units_used}")
-		if chord_units_used > 1:
-			all_note_durations = [] 
-			all_voices_used = []
-			note_index = 0
-			for _ in range(chord_units_used):
-				all_note_durations.append([])
-				all_voices_used.append([])
-				while sum(all_note_durations[-1]) < Voice.max_note_duration:
-					all_note_durations[-1].append(note_durations[note_index])
-					all_voices_used[-1].append(voices_used[note_index])
-					note_index += 1
-		else:
-			all_note_durations = (note_durations,)
-			all_voices_used = (voices_used,)
+		all_note_durations = [] 
+		all_voices_used = []
+		note_index = 0
+		for _ in range(chord_units_used):
+			all_note_durations.append([])
+			all_voices_used.append([])
+			while sum(all_note_durations[-1]) < Voice.max_note_duration:
+				all_note_durations[-1].append(note_durations[note_index])
+				all_voices_used[-1].append(voices_used[note_index])
+				note_index += 1
 
 		print(f"All note durations: {all_note_durations}")
 		print(f"All voices used: {all_voices_used}")
