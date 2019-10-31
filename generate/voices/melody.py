@@ -158,7 +158,7 @@ class Melody(Voice):
 		Voice.chord_acceleration = idms_b.chord_patterns_16[chord_structure]
 		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
-		
+
 		for chord_pattern in chord_structure:
 			self.logger.warning(f"Chord pattern: {chord_pattern}")
 			if chord_pattern == "TON":
@@ -332,7 +332,6 @@ class Melody(Voice):
 		self.nested_scale_degrees[self.chord_index] = []
 		self.chosen_figurations[self.chord_index - 1] = None
 
-
 	def advance_score(self):
 		"""Progress to the next chord after current melody is validated"""
 		self.logger.warning(f"Melodic direction {self.melodic_direction}")
@@ -404,11 +403,9 @@ class Melody(Voice):
 					break
 				all_rest_indices.add(rest_index)
 				start_index = rest_index + 1
-			if all_rest_indices - {3, 6, 7}:
+			if all_rest_indices - {3, 7}:
 				self.logger.warning("Triple repeats only between phrases")
 				self.logger.warning('*' * 30)
-				return False
-			if 6 in all_rest_indices and self.rhythm_symbols[6] >= 0:
 				return False
 
 		relevant_melodic_mvt = melodic_mvmt[1:]
@@ -467,8 +464,8 @@ class Melody(Voice):
 			if section_scale_degrees.count(section_max_degree) == 2:
 				for scale_degree0, scale_degree1 in zip(
 				  section_scale_degrees, section_scale_degrees[1:]):
-					if (scale_degree0 == section_max_degree 
-					  and scale_degree0 == scale_degree1):
+					if (scale_degree0 == section_max_degree and
+					  scale_degree0 == scale_degree1):
 						break 
 				else:
 					return False 
@@ -502,41 +499,6 @@ class Melody(Voice):
 
 			if self.chord_index > 8 and Voice.get_turns(self.chosen_scale_degrees[:self.chord_index + 1]) > 8:
 				return False
-
-			if Voice.has_cross_duplicates(self.chosen_scale_degrees[:self.chord_index + 1]):
-				self.logger.warning("Don't repeat motifs")
-				self.logger.warning('*' * 30)
-				return False
-			# antepenultimate_degree = self.chosen_scale_degrees[self.chord_index - 2]
-			# previous_move_distance = self.previous_degree_choice - antepenultimate_degree
-
-			# previous_move_slope =  Voice.calculate_slope(previous_move_distance)
-			# current_move_slope = Voice.calculate_slope(current_move_distance)
-
-			# if (abs(previous_move_distance) >= 5 and 
-			#   (abs_current_move_distance > 3 or previous_move_slope == current_move_slope)):
-			# 	self.logger.warning("Leap should be followed by stepwise motion (base melody)")
-			# 	self.logger.warning('*' * 30)
-			# 	return False
-			# if previous_move_slope == 0 and current_move_slope != 0:
-			# 	scale_degree1 = antepenultimate_degree
-			# 	for scale_degree0 in self.chosen_scale_degrees[0:self.chord_index - 2][::-1]:
-			# 		old_move_distance = scale_degree1 - scale_degree0
-			# 		if  0 < abs(old_move_distance) < 5:
-			# 			break
-			# 		old_move_slope = Voice.calculate_slope(old_move_distance)
-
-			# 		if old_move_slope == current_move_slope:
-			# 			self.logger.warning("Leap should be followed by contrary motion")
-			# 			self.logger.warning('*' * 30)
-			# 			return False
-			# 		if old_move_slope == -current_move_slope:
-			# 			if abs_current_move_distance > 3:
-			# 				self.logger.warning("Leap should be followed by stepwise motion")
-			# 				self.logger.warning('*' * 30)
-			# 				return False
-			# 			break
-			# 		scale_degree1 = scale_degree0
 		
 		return True
 
@@ -605,10 +567,6 @@ class Melody(Voice):
 			unnested_scalar_melody = self.unnested_scale_degrees[:]
 			unnested_scalar_melody.extend(inbetween)
 			self.logger.warning(f"Unnested valid melody: {unnested_scalar_melody}")
-			if Voice.has_cross_duplicates(unnested_scalar_melody):
-				self.logger.warning("Cross duplicates not allowed!")
-				self.logger.warning('*' * 30)
-				continue
 
 			# chord 8 and 12 are short-circuited
 			# only need to evaluate once going forward
@@ -848,17 +806,4 @@ class Melody(Voice):
 		self.unnested_scale_degrees = unnested_scale_degrees
 		self.logger.warning(f"Final unnested melody: {self.unnested_scale_degrees}")
 		self.logger.warning(f"Final nested melody: {self.nested_scale_degrees}")
-
-
-
-
-
-
-
-
-
-
-
-
-
 

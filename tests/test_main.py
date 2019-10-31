@@ -7,7 +7,7 @@ import requests
 
 from generate.voices.voice import Voice 
 from generate.idioms.basics import allows_truncation
-
+import tests.melody_frame as mf
 
 class MainSongMethods(unittest.TestCase):
 
@@ -15,11 +15,12 @@ class MainSongMethods(unittest.TestCase):
 		payload = {
 			"version": "stable", "code": "{ c d e }", "id": ""
 		}
-		# AWS can't parse python dictionaries
+		# AWS can't parse python dictionaries?
 		sheet_music_response = requests.post(
 			"https://7icpm9qr6a.execute-api.us-west-2.amazonaws.com/prod/prepare_preview/stable", data=payload)
 		self.assertFalse(sheet_music_response.status_code == 200)
 
+		# sending too many requests is bad for server?
 		time.sleep(1)
 
 		with open("payload.json", 'w') as f:
@@ -158,6 +159,20 @@ class MainSongMethods(unittest.TestCase):
 		self.assertEqual(Voice.make_pitch_combos({82: None}), tuple())
 		self.assertEqual(Voice.make_pitch_combos({92: None,  85: None}), tuple())
 		self.assertEqual(Voice.make_pitch_combos({83: None, 100: None}), tuple())
+
+	def test_melody(self):
+
+		melody_rules = (
+			mf.test_long_rest, mf.test_halfway_pause, mf.test_move_from_tonic, 
+			mf.test_leaps_within_octave, mf.test_end_leap, 
+			mf.test_predominant_descent, mf.test_octave_leap, 
+			mf.test_nested_climaxes, mf.test_late_melodic_jukes, mf.test_turns,
+			mf.test_true_climax, mf.test_unnested_climaxes
+		)
+
+		for melody_obj in mf.melodies:
+			for test_melody_rule in melody_rules:
+				self.assertTrue(test_melody_rule(melody_obj))
 
 
 if __name__ == "__main__":
