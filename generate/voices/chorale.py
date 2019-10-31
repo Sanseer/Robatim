@@ -2,6 +2,8 @@ import itertools
 import random
 import logging
 
+from tqdm import tqdm
+
 from generate.voices.voice import Voice
 
 class Chorale(Voice):
@@ -55,38 +57,64 @@ class Chorale(Voice):
 		current_chord_obj = Voice.chord_sequence[0]
 		self.condensed_chords.append(current_chord_obj)
 		self.unique_chord_indices.add(0)
+		self.unsorted_pitch_combo_sequence.append(
+			self.make_pitch_combos(current_chord_obj.pitches_to_degrees))
 		previous_chord_obj = current_chord_obj
 
 		for original_chord_index, current_chord_obj in enumerate(Voice.chord_sequence[1:], 1):
 			if current_chord_obj != previous_chord_obj:
 				self.condensed_chords.append(current_chord_obj)
 				self.unique_chord_indices.add(original_chord_index)
+				self.unsorted_pitch_combo_sequence.append(
+					self.make_pitch_combos(current_chord_obj.pitches_to_degrees))
 			previous_chord_obj = current_chord_obj
 
 	def make_chord_voicings(self):
 
 		self.chosen_chord_voicings = [None for _ in self.condensed_chords]
 		self.possible_chord_voicings = [None for _ in self.condensed_chords]
-		self.unsorted_pitch_combo_sequence = [None for _ in self.condensed_chords]
-
 		self.possible_chord_voicings[self.chord_index] = self.populate_chord()
 
-		while None in self.chosen_chord_voicings:
-			self.logger.warning(f"Chord index: {self.chord_index}")
-			self.combo_choice = next(
-				self.possible_chord_voicings[self.chord_index], None)
-			if self.combo_choice is None:
-				self.possible_chord_voicings[self.chord_index] = None
-				if self.chord_index <= 0:
-					raise IndexError
-				self.chord_index -= 1
-				self.erase_last_chord()
-				self.chosen_chord_voicings[self.chord_index] = None
-			else:
-				self.chosen_chord_voicings[self.chord_index] = self.combo_choice
-				self.chord_index += 1
-				if self.chord_index < len(self.chosen_chord_voicings):
-					self.possible_chord_voicings[self.chord_index] = self.populate_chord()
+		combo_amounts = Voice.get_item_lengths(self.unsorted_pitch_combo_sequence)
+		combo_total = Voice.accumulate_product(combo_amounts)
+		remaining_combo_count = combo_total
+		split_combo_amounts = Voice.split_combo_amounts(combo_amounts)
+		used_combos_tally = [0 for _ in self.condensed_chords]
+		with tqdm(total=combo_total) as pbar:
+			while None in self.chosen_chord_voicings:
+				self.logger.warning(f"Chord index: {self.chord_index}")
+				self.combo_choice = next(
+					self.possible_chord_voicings[self.chord_index], None)
+				if self.combo_choice is None:
+					self.possible_chord_voicings[self.chord_index] = None
+
+					# tracks negative progress of maze algorithm
+					# you don't know how soon to success but you know
+					# how soon to complete failure
+					used_combos_count = used_combos_tally[self.chord_index]
+					used_combos_tally[self.chord_index] = 0
+					if self.chord_index <= 0:
+						pbar.update(remaining_combo_count)
+						remaining_combo_count -= remaining_combo_count
+						raise IndexError
+
+					self.chord_index -= 1
+					invalid_combo_count = split_combo_amounts[self.chord_index]
+					combo_change = invalid_combo_count - used_combos_count
+					# pbar might not be able to make huge jumps
+					# creates new bar starting from updated position
+					pbar.update(combo_change)
+					remaining_combo_count -= combo_change
+					self.logger.warning(f"Remaining combo count: {remaining_combo_count}")
+					used_combos_tally[self.chord_index] += invalid_combo_count
+
+					self.erase_last_chord()
+					self.chosen_chord_voicings[self.chord_index] = None
+				else:
+					self.chosen_chord_voicings[self.chord_index] = self.combo_choice
+					self.chord_index += 1
+					if self.chord_index < len(self.chosen_chord_voicings):
+						self.possible_chord_voicings[self.chord_index] = self.populate_chord()
 
 	def erase_last_chord(self):
 		if self.bass_motion:
@@ -101,16 +129,9 @@ class Chorale(Voice):
 	def populate_chord(self):
 		current_chord_obj = self.condensed_chords[self.chord_index]
 		current_pitches_dict = current_chord_obj.pitches_to_degrees
-		self.logger.warning(f"Current pitches dict: {current_pitches_dict}")
 
 		current_chord_members = current_chord_obj.scale_degrees
-		if self.unsorted_pitch_combo_sequence[self.chord_index] == None:
-			# must realize full sequence to prevent iterator exhaustion
-			# faster runtime if pitch combos are only calculated once
-			unsorted_pitch_combos = tuple(self.make_pitch_combos(current_pitches_dict))
-			self.unsorted_pitch_combo_sequence[self.chord_index] = unsorted_pitch_combos
-		else:
-			unsorted_pitch_combos = self.unsorted_pitch_combo_sequence[self.chord_index]
+		unsorted_pitch_combos = self.unsorted_pitch_combo_sequence[self.chord_index]
 		current_chord = current_chord_obj.chord_name
 		chord_direction = str(current_chord_obj)[0]
 		bass_degree = current_chord_obj.bass_degree
@@ -152,9 +173,9 @@ class Chorale(Voice):
 			if midi_pitch > 81:
 				break
 
-		self.logger.warning(f"Possible midi pitches: {possible_midi_pitches}")
-
-		return itertools.product(*possible_midi_pitches)
+		# must realize full sequence to prevent iterator exhaustion
+		# faster runtime if pitch combos are only calculated once per chord index
+		return tuple(itertools.product(*possible_midi_pitches))
 
 	def arrange_pitch_combos(self, unsorted_pitch_combos, current_chord_members, current_pitches_dict):
 
@@ -401,37 +422,48 @@ class Chorale(Voice):
 			for _ in range(4):
 				Voice.midi_score.append([])
 				Voice.chorale_scale_degrees.append([])
-		# start off with nested structures instead of creating them
-		# handle asynchronous notes (strum)
+
 		chord_accompaniments = {
 			(2,2): [
-				((960, 960), ({0,1,2,3}, {})),
-				((960 * 3 // 2, 480), ({0,1,2,3}, {})),
-				((480, 480, 480, 480), ({0,1,2,3}, {}, {0,1,2,3}, {})),
-				((480, 240, 480, 240, 480), ({0,1,2}, {}, {0,1,2,3}, {}, {0,1,2})),
+				((960, 960), ({0, 1, 2, 3}, {})),
+				((960 * 3 // 2, 480), ({0, 1, 2, 3}, {})),
+				((480, 480, 480, 480), ({0, 1, 2, 3}, {}, {0, 1, 2, 3}, {})),
+				(
+					(480, 240, 480, 240, 480), 
+					({0, 1, 2, 3}, {}, {0, 1, 2, 3}, {}, {0, 1, 2, 3})
+				),
 			], (2,3): [
-				((960, 960), ({0,1,2,3}, {})),
-				((960 * 10 // 6, 960 * 2 // 6), ({0,1,2,3}, {})), 
-				((960 * 2 // 3, 320, 960 * 2 // 3, 320), ({0,1,2,3}, {}, {0,1,2,3}, {}))
+				((960, 960), ({0, 1, 2, 3}, {})),
+				((960 * 10 // 6, 960 * 2 // 6), ({0, 1, 2, 3}, {})), 
+				(
+					(960 * 2 // 3, 320, 960 * 2 // 3, 320), 
+					({0, 1, 2, 3}, {}, {0, 1, 2, 3}, {})
+				),
 			], (3,2): [
-				((960, 960 * 2), ({0,1,2,3}, {})),
-				((960 * 2, 960), ({0,1,2,3}, {})),
-				((480, 480, 480, 480, 480, 480), ({0,1,2,3}, {}, {0,1,2,3}, {}, {0,1,2,3}, {}))
+				((960, 960 * 2), ({0, 1, 2, 3}, {})),
+				((960 * 2, 960), ({0, 1, 2, 3}, {})),
+				(
+					(480, 480, 480, 480, 480, 480), 
+					({0, 1, 2, 3}, {}, {0, 1, 2, 3}, {}, {0, 1, 2, 3}, {})
+				),
 			], (4,2): [
-				((960, 960), ({0,1,2,3}, {})),
-				((960 * 3 // 2, 480), ({0,1,2,3}, {})),
-				((480, 480, 480, 480), ({0,1,2,3}, {}, {0,1,2,3}, {})),
-				((480, 240, 480, 240, 480), ({0,1,2}, {}, {0,1,2,3}, {}, {0,1,2})),
-				((960 * 2, 960 * 2), ({0,1,2,3}, {}))
+				((960, 960), ({0, 1, 2, 3}, {})),
+				((960 * 3 // 2, 480), ({0, 1, 2, 3}, {})),
+				((480, 480, 480, 480), ({0, 1, 2, 3}, {}, {0, 1, 2, 3}, {})),
+				(
+					(480, 240, 480, 240, 480), 
+					({0, 1, 2, 3}, {}, {0, 1, 2, 3}, {}, {0, 1, 2, 3})
+				), ((960 * 2, 960 * 2), ({0, 1, 2, 3}, {})),
 			], (4,3): [
-				((960, 960), ({0,1,2,3}, {})),
-				((960 * 10 // 6, 960 * 2 // 6), ({0,1,2,3}, {})), 
-				((960 * 2 // 3, 320, 960 * 2 // 3, 320), ({0,1,2,3}, {}, {0,1,2,3}, {})),
-				((960 * 2, 960 * 2), ({0,1,2,3}, {}))
+				((960, 960), ({0, 1, 2, 3}, {})),
+				((960 * 10 // 6, 960 * 2 // 6), ({0, 1, 2, 3}, {})), 
+				(
+					(960 * 2 // 3, 320, 960 * 2 // 3, 320), 
+					({0, 1, 2, 3}, {}, {0, 1, 2, 3}, {})
+				), ((960 * 2, 960 * 2), ({0, 1, 2, 3}, {}))
 			]
 		}
 
-		# add 3rd parameter for volume
 		chord_accompaniment = chord_accompaniments[Voice.time_sig]
 
 		if Voice.time_sig[0] == 4:
@@ -517,7 +549,6 @@ class Chorale(Voice):
 								Voice.Note("Rest", note_time, note_duration))
 							Voice.chorale_scale_degrees[voice_index].append(None)
 						note_time += note_duration
-					# last_pitch_combo.append(current_pitch)
 					self.logger.warning(
 						f"Added notes: {Voice.midi_score[voice_index + 1][-len(note_durations):]}")
 			else:

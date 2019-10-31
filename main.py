@@ -1,6 +1,7 @@
 import random
 import json
 import requests
+import time
 
 from generate.midi_export import MIDIFile
 from generate.voices.voice import Voice
@@ -56,6 +57,7 @@ def make_score_pdf(sheet_code):
 		sheet_music_response = requests.post(
 			"https://7icpm9qr6a.execute-api.us-west-2.amazonaws.com/prod/prepare_preview/stable", data=f)
 
+	time.sleep(1)
 	response_id = sheet_music_response.json()["id"]
 
 	pdf_response = requests.get(
@@ -81,20 +83,20 @@ def reset_score_settings():
 
 
 if __name__ == "__main__":
-	track    = 0
-	time     = 0
-	channel  = 0
-	tempo    = 60  # In BPM
+	track = 0
+	current_time = 0
+	channel = 0
+	tempo = 60  # In BPM
 	# volume 0-127, as per the MIDI standard
 
 	MyMIDI = MIDIFile(5, eventtime_is_ticks=True) 
 	# defaults to format 1 (tempo track automatically created)
 
-	MyMIDI.addProgramChange(track, channel, time, 73)
-	MyMIDI.addProgramChange(1, 1, time, 32)
-	MyMIDI.addProgramChange(2, 2, time, 32)
-	MyMIDI.addProgramChange(3, 3, time, 32)
-	MyMIDI.addProgramChange(4, 3, time, 32)
+	MyMIDI.addProgramChange(track, channel, current_time, 73)
+	MyMIDI.addProgramChange(1, 1, current_time, 32)
+	MyMIDI.addProgramChange(2, 2, current_time, 32)
+	MyMIDI.addProgramChange(3, 3, current_time, 32)
+	MyMIDI.addProgramChange(4, 3, current_time, 32)
 
 	while True:
 		try:
@@ -139,7 +141,7 @@ if __name__ == "__main__":
 		tempo = random.choice(range(85, 101))
 	elif Voice.mode == "ionian":
 		tempo = random.choice(range(85, 111))
-	MyMIDI.addTempo(track,time, tempo)
+	MyMIDI.addTempo(track, current_time, tempo)
 
 	slow_ending = random.choice((True, False))
 	if slow_ending:
