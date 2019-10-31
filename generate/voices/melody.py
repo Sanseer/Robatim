@@ -158,10 +158,9 @@ class Melody(Voice):
 		Voice.chord_acceleration = idms_b.chord_patterns_16[chord_structure]
 		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
-		chord_structure_iter = iter(chord_structure)
-
-		chord_pattern = next(chord_structure_iter, None)
-		while chord_pattern is not None:
+		
+		for chord_pattern in chord_structure:
+			self.logger.warning(f"Chord pattern: {chord_pattern}")
 			if chord_pattern == "TON":
 				Voice.chord_sequence.append(Chord("0I"))
 			elif chord_pattern == "RPT":
@@ -169,14 +168,16 @@ class Melody(Voice):
 					Chord(Voice.chord_sequence[-1].chord_symbol))
 			else:
 				chord_seq_choices = Voice.idms_mode.chord_ids[chord_pattern]
+				self.logger.warning(f"Chord sequence choices: {chord_seq_choices}")
 				chord_seq_choice = random.choice(
 					chord_seq_choices[Voice.chord_sequence[-1].chord_symbol])
+				self.logger.warning(f"Chord sequence choice: {chord_seq_choice}")
 				if isinstance(chord_seq_choice, str):
 					Voice.chord_sequence.append(Chord(chord_seq_choice))
 				elif isinstance(chord_seq_choice, tuple):
 					for chord_choice in chord_seq_choice:
 						Voice.chord_sequence.append(Chord(chord_choice))
-			chord_pattern = next(chord_structure_iter, None)
+				self.logger.warning("-"*30)
 
 		print(f"Chord sequence: {Voice.chord_sequence}")
 
