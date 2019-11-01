@@ -167,7 +167,8 @@ class MainSongMethods(unittest.TestCase):
 			mf.test_leaps_within_octave, mf.test_end_leap, 
 			mf.test_predominant_descent, mf.test_octave_leap, 
 			mf.test_nested_climaxes, mf.test_late_melodic_jukes, mf.test_turns,
-			mf.test_true_climax, mf.test_unnested_climaxes
+			mf.test_true_climax, mf.test_unnested_climaxes,
+			mf.test_double_repeat
 		)
 
 		for melody_obj in mf.melodies:

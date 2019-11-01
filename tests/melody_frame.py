@@ -67,9 +67,22 @@ def test_triple_repeat(obj):
 		all_rest_indices.add(rest_index)
 		start_index = rest_index + 1
 		# index 6 is only allowed if rhythm symbol -1 on index 6
-		# not common enough to make a rule
+		# not common enough to make a rule for your implementation
 	if all_rest_indices - {3, 6, 7}:
 		return False
+	return True
+
+def test_double_repeat(obj):
+	# same thing with index 6
+	bad_single_rest_indices = {10, 13, 14}
+	start_index = 0
+	while True:
+		rest_index = obj.melodic_mvmt.find("_", start_index)
+		if rest_index in bad_single_rest_indices:
+			return False
+		if rest_index == -1:
+			break
+		start_index = rest_index + 1
 	return True
 
 

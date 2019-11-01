@@ -38,6 +38,9 @@ class Melody(Voice):
 		print(f"{Voice.measure_length} beats divided by {Voice.beat_division}")
 
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
+		self.good_double_rest_indices = {3, 7}
+		self.bad_single_rest_indices = {6, 10, 13, 14}
+
 		self.rhythm_symbols = [None for _ in range(16)]
 		self.finalized_rhythms = {}
 		self.nested_scale_degrees = [[] for _ in range(16)]
@@ -403,10 +406,20 @@ class Melody(Voice):
 					break
 				all_rest_indices.add(rest_index)
 				start_index = rest_index + 1
-			if all_rest_indices - {3, 7}:
+			if all_rest_indices - self.good_double_rest_indices:
 				self.logger.warning("Triple repeats only between phrases")
 				self.logger.warning('*' * 30)
 				return False
+
+		start_index = 0
+		while True:
+			rest_index = melodic_mvmt.find("_", start_index)
+
+			if rest_index in self.bad_single_rest_indices:
+				return False
+			if rest_index == -1:
+				break
+			start_index = rest_index + 1
 
 		relevant_melodic_mvt = melodic_mvmt[1:]
 		if (self.chord_index == 7 and 
