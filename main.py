@@ -102,20 +102,20 @@ if __name__ == "__main__":
 		try:
 			reset_score_settings()
 			Melody().make_melody()
+			chorale.Chorale().create_parts()
+			chorale.Bass().create_part()
+			chorale.Tenor().create_part()
+			chorale.Alto().create_part()
+			chorale.Soprano().create_part()
 			break
 		except AssertionError:
-			print("Retrying...\n")
+			print("Restarting...\n")
 			continue
 			
 	for new_note in Voice.midi_score[0]:
 		if isinstance(new_note.pitch, int):
 			MyMIDI.addNote(track, channel, *new_note, 100)
 
-	chorale.Chorale().create_parts()
-	chorale.Bass().create_part()
-	chorale.Tenor().create_part()
-	chorale.Alto().create_part()
-	chorale.Soprano().create_part()
 
 	strum_ending = random.choice((True, True, False))
 	print(f"Strum ending: {strum_ending}")

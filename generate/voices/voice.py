@@ -161,28 +161,6 @@ class Voice:
 	    return result_list
 
 	@staticmethod
-	def get_item_lengths(sequence):
-		return [len(item) for item in sequence]
-
-	@staticmethod
-	def accumulate_product(sequence):
-		total = 1
-		for amount in sequence:
-			total *= amount
-		return total
-
-	@staticmethod
-	def split_combo_amounts(sequence):
-		split_amounts = []
-		for item_index, outer_num in enumerate(sequence[:-1]):
-			total = 1
-			for inner_count in sequence[item_index + 1:]:
-				total *= inner_count
-			split_amounts.append(total)
-
-		return split_amounts
-
-	@staticmethod
 	def make_pitch_combos(current_pitches_dict):
 		possible_midi_pitches = [[] for _ in range(4)]
 		for midi_pitch in current_pitches_dict:

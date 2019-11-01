@@ -2,6 +2,7 @@ import itertools
 import random
 from fractions import Fraction
 import logging
+import time
 
 from generate.voices.voice import Voice
 from generate.idioms import basics as idms_b
@@ -64,6 +65,9 @@ class Melody(Voice):
 		self.unit_length = 0
 		self.current_time = 0
 		self.pickup_rhythm = []
+
+		self.time0 = 0
+		self.time1 = 0
 
 		self.pickup_figurations = {
 			1: {
@@ -304,6 +308,7 @@ class Melody(Voice):
 		self.current_scale_degree_options[0].extend(self.all_scale_degree_options[0][:])
 		self.create_first_melody_note()
 
+		self.time0 = time.time()
 		while None in self.chosen_scale_degrees:
 			self.logger.warning(f"Chord index: {self.chord_index}")
 			self.logger.warning(f"Current scale degree options: {self.current_scale_degree_options}")
@@ -327,6 +332,15 @@ class Melody(Voice):
 		self.melodic_direction[self.chord_index] = None
 		self.chosen_scale_degrees[self.chord_index] = None
 		self.chord_index -= 1
+
+		self.time1 = time.time()
+		if self.time1 - self.time0 > 15:
+			print("Melody takiing too long.")
+			raise AssertionError
+
+		# can't track negative progress because figuration 
+		# (as opposed to base melody) determines possible combos.
+		# figurations are calculated at the time of validation
 
 		self.previous_degree_choice = self.chosen_scale_degrees[self.chord_index - 1]
 		if not self.melody_figure_options[self.chord_index - 1]:

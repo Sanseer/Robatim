@@ -1,8 +1,7 @@
 import itertools
 import random
 import logging
-
-from tqdm import tqdm
+import time
 
 from generate.voices.voice import Voice
 
@@ -11,6 +10,9 @@ class Chorale(Voice):
 	def __init__(self):
 		self.chord_index = 0
 		self.root_pitch = None
+		self.aug2_set = {5, 6}
+		self.time0 = 0
+		self.time1 = 0
 
 		self.bass_tenor_intervals = []
 		self.bass_alto_intervals = []
@@ -75,46 +77,37 @@ class Chorale(Voice):
 		self.possible_chord_voicings = [None for _ in self.condensed_chords]
 		self.possible_chord_voicings[self.chord_index] = self.populate_chord()
 
-		combo_amounts = Voice.get_item_lengths(self.unsorted_pitch_combo_sequence)
-		combo_total = Voice.accumulate_product(combo_amounts)
-		remaining_combo_count = combo_total
-		split_combo_amounts = Voice.split_combo_amounts(combo_amounts)
-		used_combos_tally = [0 for _ in self.condensed_chords]
-		with tqdm(total=combo_total) as pbar:
-			while None in self.chosen_chord_voicings:
-				self.logger.warning(f"Chord index: {self.chord_index}")
-				self.combo_choice = next(
-					self.possible_chord_voicings[self.chord_index], None)
-				if self.combo_choice is None:
-					self.possible_chord_voicings[self.chord_index] = None
+		self.time0 = time.time()
+		while None in self.chosen_chord_voicings:
+			self.logger.warning(f"Chord index: {self.chord_index}")
+			self.combo_choice = next(
+				self.possible_chord_voicings[self.chord_index], None)
+			if self.combo_choice is None:
+				self.possible_chord_voicings[self.chord_index] = None
 
-					# tracks negative progress of maze algorithm
-					# you don't know how soon to success but you know
-					# how soon to complete failure
-					used_combos_count = used_combos_tally[self.chord_index]
-					used_combos_tally[self.chord_index] = 0
-					if self.chord_index <= 0:
-						pbar.update(remaining_combo_count)
-						remaining_combo_count -= remaining_combo_count
-						raise IndexError
+				# cannot track positive progress of maze algorithm
+				# you don't know how soon to success but you know
+				# how soon to complete failure
+				# not useful to negative track because ≈ 10^21 combinations
+				# means most cases are solved within a few seconds or
+				# have a very long wait time
+				if self.chord_index <= 0:
+					print("Harmony failed")
+					raise AssertionError
 
-					self.chord_index -= 1
-					invalid_combo_count = split_combo_amounts[self.chord_index]
-					combo_change = invalid_combo_count - used_combos_count
-					# pbar might not be able to make huge jumps
-					# creates new bar starting from updated position
-					pbar.update(combo_change)
-					remaining_combo_count -= combo_change
-					self.logger.warning(f"Remaining combo count: {remaining_combo_count}")
-					used_combos_tally[self.chord_index] += invalid_combo_count
+				self.time1 = time.time()
+				if self.time1 - self.time0 > 15:
+					print("Harmony taking too long.")
+					raise AssertionError
 
-					self.erase_last_chord()
-					self.chosen_chord_voicings[self.chord_index] = None
-				else:
-					self.chosen_chord_voicings[self.chord_index] = self.combo_choice
-					self.chord_index += 1
-					if self.chord_index < len(self.chosen_chord_voicings):
-						self.possible_chord_voicings[self.chord_index] = self.populate_chord()
+				self.chord_index -= 1
+				self.erase_last_chord()
+				self.chosen_chord_voicings[self.chord_index] = None
+			else:
+				self.chosen_chord_voicings[self.chord_index] = self.combo_choice
+				self.chord_index += 1
+				if self.chord_index < len(self.chosen_chord_voicings):
+					self.possible_chord_voicings[self.chord_index] = self.populate_chord()
 
 	def erase_last_chord(self):
 		if self.bass_motion:
@@ -321,6 +314,11 @@ class Chorale(Voice):
 						return False
 			if (previous_chord == "I64" and 
 			  previous_degree == 0 and current_degree != 6):
+				return False
+			if (Voice.mode == "aeolian" and 
+			  current_degree in self.aug2_set and 
+			  previous_degree in self.aug2_set and 
+			  abs(current_degree - previous_degree) == 3):
 				return False
 
 		bass_tenor_motion = self.bass_tenor_motion[:]
