@@ -6,7 +6,6 @@ class Voice:
 
 	chord_sequence = []
 	mode = None
-	idms_mode = None
 	tonic = None
 	pickup = False
 	repeat_ending = False
@@ -19,6 +18,7 @@ class Voice:
 	lily_score = []
 	chorale_scale_degrees = []
 	dominant_harmony = {"V", "V7", "V6", "V65", "VII6", "V43", "V42"}
+	subdom_sevenths = {"II7", "II65", "II43", "II42"}
 
 	beat_division = 0
 	measure_length = 0

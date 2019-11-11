@@ -7,7 +7,7 @@ import time
 from generate.voices.voice import Voice
 from generate.idioms import basics as idms_b
 from generate.idioms.chord import Chord
-from generate.idioms.mode import Mode
+from generate.idioms.score import Score
 
 class Melody(Voice):
 	"""A melody constructor based on a chord progression"""
@@ -23,11 +23,11 @@ class Melody(Voice):
 
 		#reset, incase of failed melody
 		Chord.reset_settings()
-		Voice.mode = random.choice(("ionian", "aeolian"))
-		Voice.idms_mode = Mode(Voice.mode)
+		self.score_obj = Score()
+		Voice.mode = self.score_obj.mode
 
-		Voice.time_sig = random.choice(idms_b.time_sigs)
-		Voice.tonic = random.choice(self.idms_mode.key_sigs)
+		Voice.time_sig = random.choice(self.score_obj.time_sigs)
+		Voice.tonic = random.choice(self.score_obj.key_sigs)
 		print(f"{Voice.tonic} {Voice.mode}")
 
 		Voice.measure_length = Voice.time_sig[0]
@@ -161,30 +161,20 @@ class Melody(Voice):
 
 	def make_chord_progression(self):
 		"""Make a chord progression using common practice idioms"""
-		chord_structure = random.choice(tuple(idms_b.chord_patterns_16))
-		Voice.chord_acceleration = idms_b.chord_patterns_16[chord_structure]
+		chord_structure, Voice.chord_acceleration = self.score_obj.choose_progression_type()
 		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
 
 		for chord_pattern in chord_structure:
 			self.logger.warning(f"Chord pattern: {chord_pattern}")
-			if chord_pattern == "TON":
-				Voice.chord_sequence.append(Chord("0I"))
-			elif chord_pattern == "RPT":
-				Voice.chord_sequence.append(
-					Chord(Voice.chord_sequence[-1].chord_symbol))
-			else:
-				chord_seq_choices = Voice.idms_mode.chord_ids[chord_pattern]
-				self.logger.warning(f"Chord sequence choices: {chord_seq_choices}")
-				chord_seq_choice = random.choice(
-					chord_seq_choices[Voice.chord_sequence[-1].chord_symbol])
-				self.logger.warning(f"Chord sequence choice: {chord_seq_choice}")
-				if isinstance(chord_seq_choice, str):
-					Voice.chord_sequence.append(Chord(chord_seq_choice))
-				elif isinstance(chord_seq_choice, tuple):
-					for chord_choice in chord_seq_choice:
-						Voice.chord_sequence.append(Chord(chord_choice))
-				self.logger.warning("-"*30)
+			chord_seq_choice = self.score_obj.add_chord_pattern(chord_pattern)
+			self.logger.warning(f"Chord sequence choice: {chord_seq_choice}")
+			if isinstance(chord_seq_choice, str):
+				Voice.chord_sequence.append(Chord(chord_seq_choice))
+			elif isinstance(chord_seq_choice, list):
+				for chord_choice in chord_seq_choice:
+					Voice.chord_sequence.append(Chord(chord_choice))
+			self.logger.warning("-"*30)
 
 		print(f"Chord sequence: {Voice.chord_sequence}")
 
@@ -192,7 +182,7 @@ class Melody(Voice):
 		"""Choose a rhythm for the melody with basic/contrasting ideas"""
 
 		raw_rhythm_symbols = []
-		for phrase_options in idms_b.rhythm_patterns:
+		for phrase_options in self.score_obj.rhythm_patterns:
 			raw_rhythm_symbols.extend(random.choice(phrase_options))
 		if 2 in raw_rhythm_symbols and 1 not in raw_rhythm_symbols:
 			for index, rhythm_num in enumerate(raw_rhythm_symbols):

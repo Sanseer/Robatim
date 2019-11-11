@@ -225,9 +225,13 @@ class Chorale(Voice):
 		if len(current_chord_members) == 4:  
 			if current_degree_combo.count(current_chord_members[3]) != 1:
 				return False 
+			if (current_chord in Voice.subdom_sevenths and 
+			  current_chord != "II7" and 
+			  current_chord_members[2] not in current_degree_combo):
+				return False
 		if bass_degree != current_degree_combo[0]:
 			return False
-		if current_chord in Voice.dominant_harmony and current_degree_combo.count(6) >= 2:
+		if current_degree_combo.count(6) >= 2:
 			return False
 		if current_chord == "I64" and current_degree_combo.count(0) >= 2:
 			return False
@@ -254,7 +258,6 @@ class Chorale(Voice):
 
 		if self.chord_index == 0:
 			if bass_soprano_intervals[-1] not in {"P5", "P8", "M3", "m3"}:
-				self.logger.warning("Soprano starts on proper note")
 				return False
 			self.bass_tenor_intervals.append(bass_tenor_intervals[-1]) 
 			self.bass_alto_intervals.append(bass_alto_intervals[-1]) 
@@ -264,7 +267,6 @@ class Chorale(Voice):
 			self.alto_soprano_intervals.append(alto_soprano_intervals[-1])
 
 			self.root_pitch = b_pitch 
-			self.logger.warning(f"Root pitch: {self.root_pitch}")
 			return True
 
 		if chord_direction == "+" and b_pitch not in self.octave_above:
@@ -291,19 +293,17 @@ class Chorale(Voice):
 			current_degree = current_degree_combo[voice_index + 1]
 			old_pitch = self.chosen_chord_voicings[self.chord_index - 1][voice_index + 1] 
 			if abs(new_pitch - old_pitch) > 12:
-				self.logger.warning("Leap greater than octave")
 				return False
 			if (self.chord_index > 1 and
 			  abs(old_pitch - self.chosen_chord_voicings[self.chord_index - 2][voice_index + 1]) > 5
 			  and (abs(new_pitch - old_pitch) > 2 or
 			  composite_motion[voice_index][-1] == 
 			  composite_motion[voice_index][-2])):
-				self.logger.warning("Leaps followed by stepwise contrary motion")
 				return False
-			if (previous_chord in {"V7", "V65"} and 
+			if (previous_chord in {"V7", "V65", "V42"} and 
 			  current_chord not in Voice.dominant_harmony and
 			  previous_degree == previous_chord_members[3] and
-			  not 1 <= new_pitch - old_pitch <= 2):
+			  not 1 <= old_pitch - new_pitch <= 2):
 				return False
 			if previous_chord == "V7" and previous_degree == 6:
 				if voice_index == 2:
@@ -315,10 +315,18 @@ class Chorale(Voice):
 			if (previous_chord == "I64" and 
 			  previous_degree == 0 and current_degree != 6):
 				return False
+			if (previous_chord in Voice.subdom_sevenths and 
+			  previous_degree == previous_chord_members[3] and 
+			  not 0 <= old_pitch - new_pitch <= 2):
+				return False
+			if (current_chord in Voice.subdom_sevenths and
+			  current_degree == current_chord_members[3] and
+			  abs(new_pitch - old_pitch) > 2):
+				return False
 			if (Voice.mode == "aeolian" and 
 			  current_degree in self.aug2_set and 
 			  previous_degree in self.aug2_set and 
-			  abs(current_degree - previous_degree) == 3):
+			  abs(new_pitch - old_pitch) == 3):
 				return False
 
 		bass_tenor_motion = self.bass_tenor_motion[:]
@@ -347,7 +355,6 @@ class Chorale(Voice):
 		  (bass_soprano_intervals[-1] != "P8" or 
 		  bass_soprano_motion[-1] != "Contrary" or 
 		  abs(s_pitch - old_soprano_note) > 4)): 
-			self.logger.warning("End on contrary motion") 
 			return False
 
 		composite_intervals = [bass_tenor_intervals, bass_alto_intervals, 
@@ -361,7 +368,6 @@ class Chorale(Voice):
 		  composite_intervals, composite_mvmts):
 			if (interval_list[-1] in {"P5", "P8"} and 
 			  motion_list[-1] == "Parallel"):
-				self.logger.warning("No parallel fifths or octaves")
 				return False
 			if previous_chord in {"VII6", "V43"} and interval_list[-2] == "d5":
 				if current_chord == "I6" and interval_list[-1] not in {"P5", "M3", "m3"}:
@@ -524,8 +530,6 @@ class Chorale(Voice):
 								Voice.Note("Rest", note_time, note_duration))
 							Voice.chorale_scale_degrees[voice_index].append(None)
 						note_time += note_duration
-					self.logger.warning(
-						f"Added notes: {Voice.midi_score[voice_index + 1][-len(note_durations):]}")
 			else:
 				self.logger.warning(f"Last pitch combo: {last_pitch_combo}")
 				for voice_index, last_pitch in enumerate(last_pitch_combo):
@@ -541,8 +545,6 @@ class Chorale(Voice):
 								Voice.Note("Rest", note_time, note_duration))
 							Voice.chorale_scale_degrees[voice_index].append(None)
 						note_time += note_duration
-					self.logger.warning(
-						f"Added notes: {Voice.midi_score[voice_index + 1][-len(note_durations):]}")
 
 			self.current_time += Voice.max_note_duration
 
