@@ -76,10 +76,10 @@ def reset_score_settings():
 
 	Voice.pickup = False
 	Voice.pickup_duration = 0
-	bass_motion = []
-	tenor_motion = []
-	alto_motion = []
-	soprano_motion = []
+	Voice.bass_motion = []
+	Voice.tenor_motion = []
+	Voice.alto_motion = []
+	Voice.soprano_motion = []
 
 
 if __name__ == "__main__":
