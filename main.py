@@ -27,9 +27,11 @@ def make_lily_file():
 
 	for lily_part in Voice.lily_score:
 		sheet_code = sheet_code.replace(
-			"PART_SLOT", " ".join(["\\key", 
-			Voice.tonic.replace('#','is').replace('b',"es").lower(),
-			f"\\{mode} \\time {time_sig} {lily_part}"]), 1)
+			"PART_SLOT", " ".join([
+				"\\key", Voice.tonic.replace('#','is').replace('b',"es").lower(),
+				f"\\{mode} \\time {time_sig} {lily_part}",
+			]), 1
+		)
 
 	sheet_code = sheet_code.replace("PART_SLOT", "")
 	sheet_code = sheet_code.replace("Medley", title)
@@ -42,7 +44,9 @@ def make_lily_file():
 	except PermissionError:
 		print("You must close out the previous pdf to overwrite it.")
 	except requests.exceptions.ConnectionError:
-		print("Must be connected to internet to create pdf.")
+		rejection_message = "An error occured with the API and/or internet connection. " 
+		rejection_message += "Check your internet connection and try again."
+		print(rejection_message)
 
 def make_score_pdf(sheet_code):
 	"""Generate sheet music pdf from lilyPond format"""
@@ -61,13 +65,14 @@ def make_score_pdf(sheet_code):
 	response_id = sheet_music_response.json()["id"]
 
 	pdf_response = requests.get(
-		f"https://s3-us-west-2.amazonaws.com/lilybin-scores/{response_id}.pdf")
+		f"https://s3-us-west-2.amazonaws.com/lilybin-scores/{response_id}.pdf"
+	)
 
 	with open("final_score.pdf", "wb") as f:
 		f.write(pdf_response.content)
 
 def reset_score_settings():
-	"""Reset parameters to allow new score generation"""
+	"""Reset parameters of score to allow creation of a new piece"""
 	Voice.chord_sequence = []
 	Voice.all_midi_pitches = []
 	Voice.midi_score = []
@@ -117,7 +122,7 @@ if __name__ == "__main__":
 			MyMIDI.addNote(track, channel, *new_note, 100)
 
 
-	strum_ending = random.choice((True, True, False))
+	strum_ending = random.choice((True, True, True, False))
 	print(f"Strum ending: {strum_ending}")
 	if strum_ending:
 		time_shift = 0
@@ -126,7 +131,8 @@ if __name__ == "__main__":
 			old_midi_obj = Voice.midi_score[voice_index][-2]
 			new_midi_obj = Voice.Note(
 				old_midi_obj.pitch, old_midi_obj.time + time_shift, 
-				old_midi_obj.duration)
+				old_midi_obj.duration,
+			)
 			Voice.midi_score[voice_index][-2] = new_midi_obj
 
 	for voice_index, part in enumerate(Voice.midi_score[1:]):
@@ -150,7 +156,9 @@ if __name__ == "__main__":
 		else:
 			measure_mark = 13
 		MyMIDI.addTempo(
-			0, Voice.pickup_duration + Voice.max_note_duration * measure_mark, tempo * 0.93)
+			0, Voice.pickup_duration + Voice.max_note_duration * measure_mark, 
+			tempo * 0.93
+		)
 	print(f"Slow ending? {slow_ending}")
 	print(f"Tempo: {tempo}")
 
@@ -159,7 +167,6 @@ if __name__ == "__main__":
 			MyMIDI.writeFile(output_file)
 	except PermissionError:
 		print("You must close the previous midi file to overwrite it.")
-
 	make_lily_file()
 
 

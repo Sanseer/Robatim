@@ -3,6 +3,7 @@ import collections
 from generate.voices.voice import Voice
 
 class Chord:
+	"""A grouping of scale degrees and corresponding pitches"""
 
 	chord_members = {
 		"I": (0, 2, 4), "I6": (0, 2, 4), "V": (4, 6, 1), "V7": (4, 6, 1, 3), 
@@ -10,7 +11,7 @@ class Chord:
 		"V43": (4, 6, 1, 3), "V42": (4, 6, 1, 3), "II": (1, 3, 5), 
 		"II6": (1, 3, 5), "IV": (3, 5, 0), "IV_MAJOR": (3, 5, 0), 
 		"IV_MINOR": (3, 5, 0), "I64": (0, 2, 4), "VI": (5, 0, 2), 
-		"IV6": (3, 5, 0), "IV6_MAJOR": (3, 5, 0)
+		"IV6": (3, 5, 0), "IV6_MAJOR": (3, 5, 0),
 	}
 	minor_mode_alterations = {
 		"V": {6: 1}, "V7": {6: 1}, "V6": {6: 1}, "VII6": {6: 1}, "V65": {6: 1},
@@ -20,7 +21,6 @@ class Chord:
 		"IV_MINOR": {5: -1},
 	}
 	all_pitches_to_degrees = collections.defaultdict(dict)
-	
 	bass_degrees = {
 		"I": 0, "I6": 2, "V": 4, "V7": 4, "V6": 6, "VII6": 1, "V65": 6,
 		"V43": 1, "V42": 3, "II": 1, "II6": 3, "IV": 3, "IV_MAJOR": 3, 
@@ -30,18 +30,18 @@ class Chord:
 	def __init__(self, chord_symbol):
 		self.chord_name = chord_symbol[1:] 
 		self.chord_symbol = chord_symbol
-		self.scale_degrees = Chord.chord_members[self.chord_name]
-		self.bass_degree = Chord.bass_degrees[self.chord_name]
+		self.scale_degrees = self.chord_members[self.chord_name]
+		self.bass_degree = self.bass_degrees[self.chord_name]
 
-		if self.chord_name not in Chord.all_pitches_to_degrees:
+		if self.chord_name not in self.all_pitches_to_degrees:
 			current_pitch = -12
 			root_pitch = current_pitch + Voice.tonics[Voice.tonic]
 			scale_sequence = Voice.mode_notes[Voice.mode]
 
-			if Voice.mode == "ionian" and self.chord_name in Chord.major_mode_alterations:
-				note_alterations = Chord.major_mode_alterations[self.chord_name]
-			elif Voice.mode == "aeolian" and self.chord_name in Chord.minor_mode_alterations:
-				note_alterations = Chord.minor_mode_alterations[self.chord_name]
+			if Voice.mode == "ionian" and self.chord_name in self.major_mode_alterations:
+				note_alterations = self.major_mode_alterations[self.chord_name]
+			elif Voice.mode == "aeolian" and self.chord_name in self.minor_mode_alterations:
+				note_alterations = self.minor_mode_alterations[self.chord_name]
 			else:
 				note_alterations = {}	
 
@@ -51,10 +51,10 @@ class Chord:
 					chromatic_shift = scale_sequence[scale_degree] + note_shift
 					current_pitch = root_pitch + chromatic_shift
 					if 0 <= current_pitch <= 127:
-						Chord.all_pitches_to_degrees[self.chord_name][current_pitch] = scale_degree
+						self.all_pitches_to_degrees[self.chord_name][current_pitch] = scale_degree
 				root_pitch += 12
 
-		self.pitches_to_degrees = Chord.all_pitches_to_degrees[self.chord_name]
+		self.pitches_to_degrees = self.all_pitches_to_degrees[self.chord_name]
 
 	def __eq__(self, other):
 		return self.chord_symbol == other.chord_symbol
@@ -64,4 +64,5 @@ class Chord:
 
 	@staticmethod
 	def reset_settings():
+		"""Removes all pitch-to-scale degree assignments"""
 		Chord.all_pitches_to_degrees = collections.defaultdict(dict)

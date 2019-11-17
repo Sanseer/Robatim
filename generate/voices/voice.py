@@ -64,11 +64,12 @@ class Voice:
 	}
 	beat_durations = {}
 	interval_names = {
-		(0,0): "P8", (0,1): "d2", (1,0): "A1", (1,1): "m2", (2,1): "M2", (2,2): "d3",
-		(3,1): "A2", (3,2): "m3", (4,2): "M3", (4,3): "d4", (5,2): "A3", (5,3): "P4",
-		(6,3): "A4", (6,4): "d5", (7,4): "P5", (7,5): "d6", (8,4): "A5", (8,5): "m6",
-		(9,5): "M6", (9,6): "d7", (10,5): "A6", (10,6): "m7", (11,6): "M7", 
-		(11,7): "d8", (0,6): "A7", (11,0): "d8"
+		(0,0): "P8", (0,1): "d2", (1,0): "A1", (1,1): "m2", (2,1): "M2", 
+		(2,2): "d3", (3,1): "A2", (3,2): "m3", (4,2): "M3", (4,3): "d4", 
+		(5,2): "A3", (5,3): "P4", (6,3): "A4", (6,4): "d5", (7,4): "P5", 
+		(7,5): "d6", (8,4): "A5", (8,5): "m6", (9,5): "M6", (9,6): "d7", 
+		(10,5): "A6", (10,6): "m7", (11,6): "M7", (11,7): "d8", (0,6): "A7", 
+		(11,0): "d8",
 	}
 
 	@staticmethod
@@ -162,6 +163,7 @@ class Voice:
 
 	@staticmethod
 	def make_pitch_combos(current_pitches_dict):
+		"""Generates voicing combinations for a given chord"""
 		possible_midi_pitches = [[] for _ in range(4)]
 		for midi_pitch in current_pitches_dict:
 			if 40 <= midi_pitch <= 60:
@@ -271,11 +273,13 @@ class Voice:
 			for beat_part in object_rhythm[:-1]:
 				lily_note = "".join([
 					lily_note, note_letter, accidental_mark, octave_mark,
-					Voice.beat_durations[beat_part], "~ "])
+					Voice.beat_durations[beat_part], "~ "
+				])
 
 			lily_note = "".join([
 				lily_note, note_letter, accidental_mark, octave_mark, 
-				Voice.beat_durations[object_rhythm[-1]]])
+				Voice.beat_durations[object_rhythm[-1]]
+			])
 
 			lily_part.append(lily_note)
 			object_index += 1
@@ -284,7 +288,8 @@ class Voice:
 		Voice.lily_score.append(lily_string)
 		self.logger.warning(f"Lily part: {lily_part}")
 
-	def get_interval(self, old_pitch, new_pitch, current_pitches_dict):
+	@staticmethod
+	def get_interval(old_pitch, new_pitch, current_pitches_dict):
 		"""Returns the specific interval of two pitches"""
 		pitch_diff = new_pitch - old_pitch
 		chromatic_diff = pitch_diff % 12
@@ -299,6 +304,7 @@ class Voice:
 		return Voice.interval_names[(chromatic_diff, generic_interval)]
 
 	def add_voice_motion(self, voice_motion, new_pitch, voice_index):
+		"""Appends the next voice motion to a sequence"""
 		old_pitch = self.chosen_chord_voicings[self.chord_index - 1][voice_index]
 		if new_pitch < old_pitch:
 			voice_motion.append(-1)
@@ -308,6 +314,7 @@ class Voice:
 			voice_motion.append(0)
 
 	def add_motion_type(self, old_motion, new_motion, movements, intervals):
+		"""Appends the next voice motion type to a sequence"""
 		old_move = old_motion[-1]
 		new_move = new_motion[-1]
 		if (old_move == new_move and old_move != 0 and 

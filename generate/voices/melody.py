@@ -5,12 +5,11 @@ import logging
 import time
 
 from generate.voices.voice import Voice
-from generate.idioms import basics as idms_b
 from generate.idioms.chord import Chord
 from generate.idioms.score import Score
 
 class Melody(Voice):
-	"""A melody constructor based on a chord progression"""
+	"""A chord-based melody builder"""
 
 	def __init__(self):
 
@@ -54,7 +53,6 @@ class Melody(Voice):
 		self.melody_figure_options = [[] for _ in range(15)]
 		self.all_scale_degree_options = []
 
-		self.chordal_voice = False
 		self.break_notes = random.choice((True, False))
 		self.restart_basic_idea = random.choice((True, False, False))
 		Voice.repeat_ending = random.choice((True, False))
@@ -64,6 +62,7 @@ class Melody(Voice):
 		self.melody_range = []
 		self.unit_length = 0
 		self.current_time = 0
+		self.chord_index = 0
 		self.pickup_rhythm = []
 
 		self.time0 = 0
@@ -71,47 +70,62 @@ class Melody(Voice):
 
 		self.pickup_figurations = {
 			1: {
-				0: ((-1,), (-3,), (0,)), 1: ((-2,), (0,)), 2: ((-4,), (0,)), 3: ((-1,), (0,))
+				0: ((-1,), (-3,), (0,)), 1: ((-2,), (0,)), 2: ((-4,), (0,)), 
+				3: ((-1,), (0,)),
 			}
 		}
 		self.chosen_figurations = [None for _ in range(15)]
 
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [
-				((current - 1,), "CN"), ((current + 1,), "CN")],
+				((current - 1,), "CN"), ((current + 1,), "CN")
+			],
 			1: lambda previous, current, slope: [
 				((previous,), "RET"), ((current,), "ANT"), 
-				((current + slope,), "IN")],
+				((current + slope,), "IN")
+			],
 			2: lambda previous, current, slope: [
-				((previous + slope,), "PT"), ((current + slope,), "IN")],
+				((previous + slope,), "PT"), ((current + slope,), "IN")
+			],
 			3: lambda previous, current, slope: [
-				((previous + slope * 2,), "PT"), ((current + slope,), "IN")],
+				((previous + slope * 2,), "PT"), ((current + slope,), "IN")
+			],
 			4: lambda previous, current, slope: [
-				((previous + slope * 2,), "PT"), ((current + slope,), "IN")],
+				((previous + slope * 2,), "PT"), ((current + slope,), "IN")
+			],
 			5: lambda previous, current, slope: [
-				((previous + slope * 2,), "PT"), ((previous + slope * 3,), "PT")],
-			6: lambda previous, current, slope: [((current + slope,), "IN")]
+				((previous + slope * 2,), "PT"), ((previous + slope * 3,), "PT")
+			],
+			6: lambda previous, current, slope: [((current + slope,), "IN")],
 		}
 
 		self.all_double_figurations = {
 			0: lambda previous, current, slope: [
-				((current - 1, current + 1), "DN"), ((current + 1, current - 1), "DN"),
-				((current + 2, current + 1), "DCN"), ((current - 2, current - 1), "DCN")],
+				((current - 1, current + 1), "DN"), 
+				((current + 1, current - 1), "DN"),
+				((current + 2, current + 1), "DCN"), 
+				((current - 2, current - 1), "DCN"),
+			],
 			1: lambda previous, current, slope: [
 				((previous - slope, previous), "DRN"), 
 				((current + slope * 2, current + slope), "DRN"), 
-				((current, current + slope), "ANT")],
+				((current, current + slope), "ANT")
+			],
 			2: lambda previous, current, slope: [
-				((current + slope * 2, current + slope), "DRN")],
+				((current + slope * 2, current + slope), "DRN")
+			],
 			3: lambda previous, current, slope: [
 				((previous + slope, previous + slope * 2), "PT"), 
-				((current + slope * 2, current + slope), "DRN")],
+				((current + slope * 2, current + slope), "DRN")
+			],
 			4: lambda previous, current, slope: [
-				((previous + slope * 2, previous + slope * 3), "PT")],
+				((previous + slope * 2, previous + slope * 3), "PT")
+			],
 			5: lambda previous, current, slope: [
 				((previous + slope * 2, previous + slope * 4), "PT"),
-				((current + slope * 2, current + slope), "DRN")],
-			6: lambda previous, current, slope: []
+				((current + slope * 2, current + slope), "DRN")
+			],
+			6: lambda previous, current, slope: [],
 		}
 		self.all_triple_figurations = {
 			0: lambda previous, current, slope: [],
@@ -130,7 +144,7 @@ class Melody(Voice):
 		self.sheet_notes = []
 
 	def make_melody(self):
-		"""Make a random melody from a randomly selected chord progression and rhythm"""
+		"""Make a random melody"""
 		self.set_scale_midi_pitches()
 		self.make_chord_progression()
 		self.create_rhythm()
@@ -198,20 +212,20 @@ class Melody(Voice):
 			rhythm_mapping = {
 				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)], 
 				2:[(3,3,2), (4,2,2), (6,1,1)],
-				-2: [(4,4), (6,2)]
+				-2: [(4,4), (6,2)],
 			}
 		elif Voice.time_sig in {(2,3), (4,3)}:
 			rhythm_mapping = {
 				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (6,2,4), (10,2)], 
 				2: [(4,2,6), (4,4,4), (6,6), (6,2,4), (6,4,2), (8,4), (10, 1, 1)],
-				-2: [(6,6), (10,2)]
+				-2: [(6,6), (10,2)],
 			}
 		elif Voice.time_sig == (3,2):
 			rhythm_mapping = {
 				-1: [(12,)], 0: [(4,4,2,2), (8,2,2), (8,4), (10,2)], 
 				1: [(4,4,2,2), (4,4,4), (6,2,4), (8,2,2), (8,4), (10,2)], 
 				2:[(4,2,6), (4,4,2,2), (4,4,4), (6,6), (6,2,2,2), (6,2,4), (8,2,2), (10,1,1)],
-				-2: [(8,4), (10,2)]
+				-2: [(8,4), (10,2)],
 			}
 
 		chosen_rhythms = {}
@@ -231,7 +245,8 @@ class Melody(Voice):
 		print(f"Chosen rhythms: {chosen_rhythms}")
 
 		self.finalized_rhythms = [
-			chosen_rhythms[rhythm_symbol] for rhythm_symbol in self.rhythm_symbols]
+			chosen_rhythms[rhythm_symbol] for rhythm_symbol in self.rhythm_symbols
+		]
 		self.pickup_rhythm = self.finalized_rhythms[7][1:]
 
 		self.logger.warning(f"Finalized rhythms: {self.finalized_rhythms}")
@@ -239,10 +254,10 @@ class Melody(Voice):
 		self.logger.warning("")
 
 	def create_melody_options(self):
-		"""Use chord progression to layout possible base melody combinations"""
+		"""Use chord progression to layout possible base melody scale degrees"""
 
-		phrase4_start_index = 12
 		phrase2_start_index = 4
+		phrase4_start_index = 12
 		if str(Voice.chord_sequence[0]) == "0I":
 			self.all_scale_degree_options.append([0, 2])
 		# separate first note to allow irregular starts e.g., major 2nd
@@ -265,8 +280,8 @@ class Melody(Voice):
 		self.all_scale_degree_options.extend([[0], [0]])
 
 	def create_first_melody_note(self):
-		"""Setup the tonic starting note"""
-		self.chord_index = 0
+		"""Reset the first melody note of the sequence"""
+
 		self.logger.warning(f"Chord index: {self.chord_index}")
 		self.logger.warning(f"Current scale degree options {self.current_scale_degree_options}")
 		# AssertionError singles out this scenario.
@@ -293,7 +308,7 @@ class Melody(Voice):
 		self.logger.warning("")
 
 	def realize_melody(self):
-		"""Map out a validated melody while tracking parameters"""
+		"""Create and validate a melody sequence"""
 		self.create_melody_options()
 		self.current_scale_degree_options[0].extend(self.all_scale_degree_options[0][:])
 		self.create_first_melody_note()
@@ -301,7 +316,9 @@ class Melody(Voice):
 		self.time0 = time.time()
 		while None in self.chosen_scale_degrees:
 			self.logger.warning(f"Chord index: {self.chord_index}")
-			self.logger.warning(f"Current scale degree options: {self.current_scale_degree_options}")
+			self.logger.warning(
+				f"Current scale degree options: {self.current_scale_degree_options}"
+			)
 			if self.chord_index == 0:
 				self.create_first_melody_note()
 			if self.melody_figure_options[self.chord_index - 1]:
@@ -318,7 +335,7 @@ class Melody(Voice):
 		print(f"Chosen figurations: {self.chosen_figurations}")
 
 	def backtrack_score(self):
-		"""Reverse to the previous chord to fix bad notes"""
+		"""Returns to the previous chord position to fix bad melody notes"""
 		self.melodic_direction[self.chord_index] = None
 		self.chosen_scale_degrees[self.chord_index] = None
 		self.chord_index -= 1
@@ -328,8 +345,8 @@ class Melody(Voice):
 			print("Melody takiing too long.")
 			raise AssertionError
 
-		# can't track negative progress because figuration 
-		# (as opposed to base melody) determines possible combos.
+		# can't track negative progress because figuration options
+		# (as opposed to base melody options) determines # of possible combos.
 		# figurations are calculated at the time of validation
 
 		self.previous_degree_choice = self.chosen_scale_degrees[self.chord_index - 1]
@@ -340,7 +357,8 @@ class Melody(Voice):
 		self.chosen_figurations[self.chord_index - 1] = None
 
 	def advance_score(self):
-		"""Progress to the next chord after current melody is validated"""
+		"""Progress to the next chord position after current melody is validated"""
+
 		self.logger.warning(f"Melodic direction {self.melodic_direction}")
 		self.logger.warning(f"Chosen scale degrees: {self.chosen_scale_degrees}")
 		self.logger.warning("")
@@ -349,10 +367,12 @@ class Melody(Voice):
 		if self.chord_index < len(self.chosen_scale_degrees):
 			self.previous_degree_choice = self.current_degree_choice
 			self.current_scale_degree_options[self.chord_index] = (
-				self.all_scale_degree_options[self.chord_index][:])
+				self.all_scale_degree_options[self.chord_index][:]
+			)
 
 	def attempt_melody_figure(self):
-		"""Try all remaining melody figures against current base melody"""
+		"""Try the next melody figure using the validated base melody"""
+
 		self.logger.warning("Choosing from remaining figures")
 		self.logger.warning(f"Remaining melody figures: {self.melody_figure_options}")
 		# only occurs when backtracking
@@ -360,16 +380,19 @@ class Melody(Voice):
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
 		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
 		self.reset_unnested_melody()
-		if self.validate_melody_figure():
+		if self.has_melody_figure():
 			self.advance_score()
 		else:
 			self.melodic_direction[self.chord_index] = None
 			self.chosen_scale_degrees[self.chord_index] = None
 
 	def attempt_full_melody(self):
-		"""Try all possible base melodies and figurations"""
+		"""Try the next base melody +/- figuration at current chord position"""
+
 		self.logger.warning("Choosing base note")
-		self.current_degree_choice = self.current_scale_degree_options[self.chord_index].pop()
+		self.current_degree_choice = (
+			self.current_scale_degree_options[self.chord_index].pop()
+		)
 		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
 		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
 
@@ -381,18 +404,18 @@ class Melody(Voice):
 			self.melodic_direction[self.chord_index] = '<'
 
 		self.reset_unnested_melody()
-
 		self.chosen_scale_degrees[self.chord_index] = self.current_degree_choice 
-		if self.validate_base_melody() and self.validate_melody_figure():
+		if self.validate_base_melody() and self.has_melody_figure():
 			self.advance_score()
 		else:
 			self.melodic_direction[self.chord_index] = None
 			self.chosen_scale_degrees[self.chord_index] = None
 
 	def validate_base_melody(self):
-		"""Check current base melody against structural idioms"""
+		"""Check current base melody with idioms"""
 		melodic_mvmt = "".join(
-			str(slope) for slope in self.melodic_direction[:self.chord_index + 1])
+			str(slope) for slope in self.melodic_direction[:self.chord_index + 1]
+		)
 
 		self.logger.warning(f"Attempted melodic direction: {melodic_mvmt}")
 		self.logger.warning(f"Attempted melody: {self.chosen_scale_degrees}")
@@ -458,7 +481,9 @@ class Melody(Voice):
 			return False
 		if (len(self.unnested_scale_degrees) >= 3 and 
 		  not Voice.has_proper_leaps(self.unnested_scale_degrees)):
-			self.logger.warning("Leap should be followed by contrary stepwise motion (full melody)")
+			self.logger.warning(
+				"Leap should be followed by contrary stepwise motion (full melody)"
+			)
 			self.logger.warning('*' * 30)
 			return False
 
@@ -519,7 +544,7 @@ class Melody(Voice):
 		
 		return True
 
-	def validate_melody_figure(self):
+	def has_melody_figure(self):
 		"""Check specific melody against figuration options"""
 
 		last_rhythm_symbol = self.rhythm_symbols[self.chord_index - 1]
@@ -534,13 +559,14 @@ class Melody(Voice):
 			return True
 		if last_rhythm_symbol == -2:
 			self.melody_figure_options[self.chord_index - 1] = (
-				self.find_pickup_sequences(self.current_degree_choice))
-			return self.find_valid_figure()
+				self.get_pickup_sequences(self.current_degree_choice)
+			)
+			return self.add_valid_figure()
 
 		remaining_figures = self.melody_figure_options[self.chord_index - 1]
 		if remaining_figures:
 			self.logger.warning(f"Remaining melody figures: {remaining_figures}")
-			return self.find_valid_figure()
+			return self.add_valid_figure()
 
 		degree_mvmt = self.current_degree_choice - self.previous_degree_choice
 		melody_slope = Voice.calculate_slope(degree_mvmt)
@@ -558,7 +584,7 @@ class Melody(Voice):
 
 		self.logger.warning(f"Possible scale degrees: {possible_scale_degrees}")
 		self.melody_figure_options[self.chord_index - 1] = possible_scale_degrees
-		return self.find_valid_figure()
+		return self.add_valid_figure()
 
 	def reset_unnested_melody(self):
 		"""Create a unnested sequence of the currently approved melody"""
@@ -568,7 +594,8 @@ class Melody(Voice):
 				self.unnested_scale_degrees.append(melody_note)
 		self.unnested_scale_degrees.append(self.previous_degree_choice)
 
-	def find_valid_figure(self):
+	def add_valid_figure(self):
+		"""Find and add specific figuration of base melody using idioms"""
 		valid_figure = None
 		remaining_figures = self.melody_figure_options[self.chord_index - 1]
 
@@ -616,7 +643,7 @@ class Melody(Voice):
 		return True
 
 	def add_midi_score(self):
-		"""Transform scale degrees into midi pitches"""
+		"""Transform a scale degree sequence into a midi pitch sequence"""
 		
 		fifth_degree_pitch = 7 + Voice.tonics[Voice.tonic]
 		while fifth_degree_pitch < 45:
@@ -641,7 +668,6 @@ class Melody(Voice):
 		self.current_time = Voice.pickup_duration
 
 		print(f"Break melody: {self.break_notes}")
-
 		self.nested_scale_degrees.pop()
 		self.add_midi_section(self.nested_scale_degrees, 0, {}, index_shift)
 
@@ -656,13 +682,17 @@ class Melody(Voice):
 			return
 
 		second_pickup_fraction = Fraction(
-			numerator=sum(self.finalized_rhythms[-5][1:]), denominator=self.unit_length)
+			numerator=sum(self.finalized_rhythms[-5][1:]), 
+			denominator=self.unit_length
+		)
 		second_pickup_duration = int(
-			Voice.max_note_duration * second_pickup_fraction)  
+			Voice.max_note_duration * second_pickup_fraction
+		)  
 
 		ending_duration = Voice.max_note_duration - second_pickup_duration
 		self.midi_notes.append(
-			Voice.Note("Rest", self.current_time, ending_duration))
+			Voice.Note("Rest", self.current_time, ending_duration)
+		)
 
 		self.current_time += ending_duration
 
@@ -671,15 +701,18 @@ class Melody(Voice):
 
 		end_notes_num = self.add_midi_section(remaining_melody, -5, {-5: 1})
 		self.unnested_scale_degrees.extend(
-			self.unnested_scale_degrees[-end_notes_num:])
+			self.unnested_scale_degrees[-end_notes_num:]
+		)
 
 		self.midi_notes.append(
-			Voice.Note("Rest", self.current_time, Voice.max_note_duration))
+			Voice.Note("Rest", self.current_time, Voice.max_note_duration)
+		)
 		self.current_time += Voice.max_note_duration
 		self.add_rest_placeholders()
 
 	def add_pickup_notes(self):
-		"""Adds pick up notes to beginning and returns the number of added objects"""
+		"""Adds pickup notes to beginning of the piece"""
+
 		rest_rhythm = self.finalized_rhythms[7][0]
 		Voice.pickup_duration = Voice.max_note_duration
 		first_scale_degree = self.unnested_scale_degrees[0]
@@ -687,13 +720,15 @@ class Melody(Voice):
 		note_alterations = {}
 
 		rest_fraction = Fraction(
-			numerator=rest_rhythm, denominator=self.unit_length)
+			numerator=rest_rhythm, denominator=self.unit_length
+		)
 		rest_duration = int(Voice.pickup_duration * rest_fraction)
 		self.midi_notes.append(Voice.Note("Rest", 0, rest_duration))
 
 		self.chord_index = 0
 		pickup_degree_sequence, _ = random.choice(
-			self.find_pickup_sequences(first_scale_degree))
+			self.get_pickup_sequences(first_scale_degree)
+		)
 		current_time = rest_duration
 
 		unnested_scale_degrees = []
@@ -703,10 +738,12 @@ class Melody(Voice):
 			midi_pitch = self.melody_range[pickup_scale_degree + 3] + note_offset
 
 			embellish_fraction = Fraction(
-				numerator=note_rhythm, denominator=self.unit_length)
+				numerator=note_rhythm, denominator=self.unit_length
+			)
 			note_duration = int(Voice.pickup_duration * embellish_fraction)
 			self.midi_notes.append(
-				Voice.Note(midi_pitch, current_time, note_duration))
+				Voice.Note(midi_pitch, current_time, note_duration)
+			)
 			unnested_scale_degrees.append(pickup_scale_degree)
 
 			current_time += note_duration
@@ -716,10 +753,11 @@ class Melody(Voice):
 
 		return len(self.pickup_rhythm)
 
-	def find_pickup_sequences(self, centered_degree):
+	def get_pickup_sequences(self, centered_degree):
+		"""Create pickup sequences using a reference scale degree"""
+
 		possible_degrees = Voice.chord_sequence[self.chord_index].scale_degrees
 		degree_index = possible_degrees.index(centered_degree % 7)
-
 		chord_pickup_choices = self.pickup_figurations[len(self.pickup_rhythm)]
 		possible_scale_shifts = chord_pickup_choices[degree_index]
 
@@ -730,13 +768,16 @@ class Melody(Voice):
 			for degree_shift in chosen_scale_shifts:
 				pickup_scale_options[-1][0].append(centered_degree + degree_shift)
 
+			# accounts for melodic figuration type
 			pickup_scale_options[-1].append(None)
 
 		return pickup_scale_options
 
 	def add_midi_section(
-	  self, melody_section, chord_start_index, note_start_indices, index_shift=None):
-		"""Add selected midi notes to a sequence using scale degrees"""
+	  self, melody_section, chord_start_index, note_start_indices, 
+	  index_shift=None):
+		"""Add midi notes to the pitch sequence using scale degrees"""
+
 		object_index = 0
 		melodic_minor = False
 		add_rest = False
@@ -764,7 +805,9 @@ class Melody(Voice):
 						affected_scale_group = current_scale_group + next_scale_group
 					else:
 						affected_scale_group = current_scale_group
-					scale_group_str = "".join(str(scale_degree) for scale_degree in affected_scale_group)
+					scale_group_str = "".join(
+						str(scale_degree) for scale_degree in affected_scale_group
+					)
 					if any(
 					  str_combo in scale_group_str 
 					  for str_combo in ("56", "65", "-1-2", "-2-1")):
@@ -777,7 +820,9 @@ class Melody(Voice):
 				embellish_duration = self.finalized_rhythms[chord_index][embellish_index]
 				# account for negative scale degrees
 				note_offset = note_alterations.get(scale_degree % 7, 0)
-				embellish_fraction = Fraction(numerator=embellish_duration, denominator=self.unit_length)
+				embellish_fraction = Fraction(
+					numerator=embellish_duration, denominator=self.unit_length
+				)
 
 				raw_note_duration = int(
 					Voice.max_note_duration * embellish_fraction)
@@ -793,15 +838,18 @@ class Melody(Voice):
 				midi_pitch = self.melody_range[scale_degree + 3] + note_offset
 				if chord_index == 7 and embellish_index == 0 and self.rhythm_symbols[6] == -1:
 					self.midi_notes.append(
-						Voice.Note("Rest", self.current_time, fixed_note_duration))
+						Voice.Note("Rest", self.current_time, fixed_note_duration)
+					)
 					# needed all numbers in unnested sequence for validation
 					self.unnested_scale_degrees.pop(object_index + index_shift)
 				else:
 					self.midi_notes.append(
-						Voice.Note(midi_pitch, self.current_time, fixed_note_duration))
+						Voice.Note(midi_pitch, self.current_time, fixed_note_duration)
+					)
 					if add_rest:
 						self.midi_notes.append(
-							Voice.Note("Rest", self.current_time + 960, extra_duration))
+							Voice.Note("Rest", self.current_time + 960, extra_duration)
+						)
 
 				self.current_time += raw_note_duration
 				add_rest = False
@@ -810,6 +858,8 @@ class Melody(Voice):
 		return object_index
 
 	def add_rest_placeholders(self):
+		"""Modify scale degree sequence to match midi note sequence"""
+
 		unnested_scale_degrees = []
 		unnested_melody_iter = iter(self.unnested_scale_degrees)
 
