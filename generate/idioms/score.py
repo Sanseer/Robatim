@@ -3,7 +3,6 @@ import collections
 import logging
 
 class Score:
-
 	"""Overarching model of a musical piece"""
 
 	ScoreNode = collections.namedtuple("ScoreNode", ["value", "stipulations"])
@@ -51,61 +50,94 @@ class Score:
 		# subdoms can come from other subdoms and tonics
 		# dominants can come from tonics and subtonics
 		NULL_I = Score.ScoreNode(
-			"0I", (lambda: self.previous_chord not in ("+V42", "0I"),)
+			"0I", (lambda: self.previous_chord not in ("+V42",),)
 		)
-		PLUS_I6 = Score.ScoreNode("+I6", ( 
-			lambda: self.previous_chord in ("VII6", "+V43", "+V42", "0I"),)
+		PLUS_I6 = Score.ScoreNode(
+			"+I6", (lambda: self.previous_chord in ("+VII6", "+V43", "+V42", "0I"),)
 		)
 
 		from_positive_chord = lambda: self.previous_chord[0] in ("0", "+")
 		from_negative_chord = lambda: self.previous_chord[0] == "-"
-		validate_before_V = (
+		validate_minus_V7 = (
 			lambda: self.previous_chord in (
-				"0I", "-II", "-II6", "-IV", "-IV6", "-IV6_MAJOR", "-VI"
+				"0I", "-II", "-II7", "-II6", "-II65", "-IV", "-IV_MAJOR", 
+				"-VI", "-IV6", "-IV6_MAJOR", "-IV7"
 			)
 		)
-		validate_before_V6 = (
-			lambda: self.previous_chord in ("0I", "+I6", "-IV6", "-IV6_MAJOR")
+		validate_minus_V6 = (
+			lambda: self.previous_chord in (
+				"0I", "+I6", "+II", "+II6", "+IV", "-IV6", "-IV6_MAJOR", 
+				"-IV65", "-IV65_MAJOR", "+II7", "+II65", "0II42", 
+			)
 		)
 		prevent_a2_with_V6 = (
-			lambda: self.mode == "ionian" or self.previous_chord != "-IV6"
+			lambda: self.mode == "ionian" or self.previous_chord not in ("-IV6", "-IV65")
 		)
 
-		PLUS_V = Score.ScoreNode("+V", (from_positive_chord,))
-		MINUS_V = Score.ScoreNode("-V", (validate_before_V,)) 
-		PLUS_V7 = Score.ScoreNode("+V7", (from_positive_chord,))
-		MINUS_V7 = Score.ScoreNode("-V7", (validate_before_V,))
-		MINUS_V6 = Score.ScoreNode(
-			"-V6", (validate_before_V6, prevent_a2_with_V6)
-		)
+		not_plus_II7 = lambda: self.previous_chord != "+II7"
+		not_minus_II7 = lambda: self.previous_chord != "-II7"
+		not_II42 = lambda: self.previous_chord != "+II42"
+		PLUS_V = Score.ScoreNode("+V", (from_positive_chord, not_plus_II7, not_II42))
+		MINUS_V = Score.ScoreNode("-V", (validate_minus_V7, not_minus_II7)) 
+		PLUS_V7 = Score.ScoreNode("+V7", (from_positive_chord, not_II42))
+		MINUS_V7 = Score.ScoreNode("-V7", (validate_minus_V7,))
+		MINUS_V6 = Score.ScoreNode("-V6", (validate_minus_V6, prevent_a2_with_V6))
 
-		MINUS_V65 = Score.ScoreNode(
-			"-V65", (validate_before_V6, prevent_a2_with_V6)
+		MINUS_V65 = Score.ScoreNode("-V65", (validate_minus_V6, prevent_a2_with_V6))
+		PLUS_VII6 = Score.ScoreNode("+VII6", (from_positive_chord, not_II42)
 		)
-		PLUS_VII6 = Score.ScoreNode("+VII6", (from_positive_chord,))
-		PLUS_V43 = Score.ScoreNode("+V43", (from_positive_chord,))
-		PLUS_V42 = Score.ScoreNode("+V42", (from_positive_chord,))
+		PLUS_V43 = Score.ScoreNode("+V43", (from_positive_chord, not_II42)
+		)
+		PLUS_V42 = Score.ScoreNode("+V42", (from_positive_chord, not_II42)
+		)
 
 		proper_subdom_order = (
-			lambda: self.previous_chord not in ("+II", "+II6", "-II", "-II6")
+			lambda: self.previous_chord not in (
+				"+II", "-II", "+II6", "-II6", "+II65", "-II65", "+II7", "-II7", 
+				"0II42", 
+			)
 		)
+
 		no_major_mode_shift = lambda: self.previous_chord[-5:] != "MAJOR"
 		no_minor_mode_shift = lambda: self.previous_chord[-5:] != "MINOR"
 		major_mode_only = lambda: self.mode == "ionian"
 		minor_mode_only = lambda: self.mode == "aeolian"
+
+		maintain_seventh_tension = (
+			lambda: self.previous_chord[-2:] not in ("65", "43", "42"),
+			lambda: self.previous_chord[-1] != "7",
+		)
 		PLUS_II = Score.ScoreNode(
 			"+II", (
 				lambda: self.mode == "ionian" or self.chord_index % 2 == 1 and 
-				self.previous_chord in ("+II6", "+IV"), from_positive_chord,
+					self.previous_chord in ("+II6", "+IV"), 
+				from_positive_chord, *maintain_seventh_tension
 			)
 		)
-		PLUS_II6 = Score.ScoreNode("+II6", (from_positive_chord,))
+		PLUS_II6 = Score.ScoreNode(
+			"+II6", (from_positive_chord, *maintain_seventh_tension)
+		)
 		PLUS_IV = Score.ScoreNode(
-			"+IV", (proper_subdom_order, from_positive_chord)
+			"+IV", (
+				proper_subdom_order, from_positive_chord, no_minor_mode_shift,
+				*maintain_seventh_tension,
+			)
 		)
 		PLUS_IVMAJOR = Score.ScoreNode(
 			"+IV_MAJOR", (
 				minor_mode_only, proper_subdom_order, from_positive_chord,
+				*maintain_seventh_tension, lambda: self.previous_chord != "+IV",
+			)
+		)
+		MINUS_IVMAJOR = Score.ScoreNode(
+			"-IV_MAJOR", (
+				minor_mode_only, proper_subdom_order, from_negative_chord, 
+				*maintain_seventh_tension, lambda: self.previous_chord != "-IV",
+			)
+		)
+		PLUS_IVMINOR = Score.ScoreNode(
+			"+IV_MINOR", (
+				major_mode_only, lambda: self.previous_chord ==  "+IV",
 			)
 		)
 		MINUS_VI = Score.ScoreNode("-VI", (from_root_tonic,))
@@ -113,28 +145,74 @@ class Score:
 			"-II", (
 				lambda: self.mode == "ionian" or self.chord_index % 2 == 1 and 
 					self.previous_chord in ("-II6", "-IV"),
-				from_negative_chord,
+				from_negative_chord, *maintain_seventh_tension,
 			)
 		)
-		MINUS_II6 = Score.ScoreNode("-II6", (from_negative_chord,)) 
+		MINUS_II6 = Score.ScoreNode(
+			"-II6", (from_negative_chord, *maintain_seventh_tension)
+		) 
 		MINUS_IV = Score.ScoreNode(
-			"-IV", (from_negative_chord, proper_subdom_order)
+			"-IV", (
+				from_negative_chord, proper_subdom_order, *maintain_seventh_tension
+			)
 		)
 
-		validate_before_IV6 = lambda: self.previous_chord in ("0I", "-VI")
-		MINUS_IV6 = Score.ScoreNode("-IV6", (validate_before_IV6,))
+		validate_IV6 = lambda: self.previous_chord in ("0I", "-VI")
+		MINUS_IV6 = Score.ScoreNode("-IV6", (validate_IV6,))
 		MINUS_IV6MAJOR = Score.ScoreNode(
-			"-IV6_MAJOR", (minor_mode_only, validate_before_IV6)
+			"-IV6_MAJOR", (minor_mode_only, validate_IV6)
 		)
 
-		PLUS_I64 = Score.ScoreNode("+I64", (from_positive_chord,))
+		PLUS_II65 = Score.ScoreNode(
+			"+II65", (
+				from_positive_chord, lambda: self.previous_chord != "+II6",
+			)
+		)
+		MINUS_II65 = Score.ScoreNode(
+			"-II65",(
+				from_negative_chord, lambda: self.previous_chord != "-II6",
+			)
+		)
+		PLUS_II7 = Score.ScoreNode(
+			"+II7", (
+				from_positive_chord, lambda: self.previous_chord != "+II",
+			)
+		)
+		MINUS_II7 = Score.ScoreNode(
+			"-II7", (
+				from_negative_chord, lambda: self.previous_chord != "-II",
+			)
+		)
+		ante_subdom_end_only = lambda: self.chord_index == 5
+		NULL_II42 = Score.ScoreNode(
+			"0II42", (from_positive_chord, ante_subdom_end_only)
+		)
+		PLUS_IV7 = Score.ScoreNode(
+			"+IV7", (
+				from_positive_chord, proper_subdom_order,
+				lambda: self.previous_chord != "+IV", 	
+			)
+		)
+		MINUS_IV7 = Score.ScoreNode(
+			"-IV7", (
+				from_negative_chord, proper_subdom_order,
+				lambda: self.previous_chord != "-IV",
+			)
+		)
+		MINUS_IV65 = Score.ScoreNode(
+			"-IV65", (major_mode_only, validate_IV6, ante_subdom_end_only)
+		)
+		MINUS_IV65MAJOR = Score.ScoreNode(
+			"-IV65_MAJOR", (minor_mode_only, validate_IV6, ante_subdom_end_only)
+		)
+		PLUS_I64 = Score.ScoreNode("+I64", (from_positive_chord, not_II42))
 
 		# patterns ignore individual chord rules
 		PATTERN_EXTEND5_DOUBLE01 = Score.ScoreNode(
-			(MINUS_V, MINUS_V6, NULL_I), (from_root_tonic,)
+			(MINUS_V, MINUS_V6, NULL_I), (validate_minus_V7, not_minus_II7)
 		)
 		PATTERN_EXTEND5_DOUBLE02 = Score.ScoreNode(
-			(MINUS_V6, MINUS_V, NULL_I), (from_root_tonic,)
+			(MINUS_V6, MINUS_V, NULL_I), (validate_minus_V6, prevent_a2_with_V6)
 		)
 		PATTERN_EXTEND5_DOUBLE03 = Score.ScoreNode(
 			((MINUS_V6, MINUS_V65), (PLUS_V43, PLUS_VII6), NULL_I), 
@@ -144,7 +222,9 @@ class Score:
 			(PLUS_V43, MINUS_V65, NULL_I), (from_root_tonic,)
 		)
 		PATTERN_EXTEND5_DOUBLE05 = Score.ScoreNode(
-			(PLUS_V, PLUS_V42, PLUS_I6), (from_positive_chord,)
+			(PLUS_V, PLUS_V42, PLUS_I6), (
+				from_positive_chord, not_plus_II7, not_II42
+			)
 		)
 		PATTERN_EXTEND5_DOUBLE06 = Score.ScoreNode(
 			((PLUS_VII6, PLUS_V43), PLUS_V42, PLUS_I6), (from_root_tonic,)
@@ -158,19 +238,25 @@ class Score:
 		)
 
 		PATTERN_EXTEND5_DOUBLE10 = Score.ScoreNode(
-			(PLUS_I64, PLUS_V, NULL_I), (from_positive_chord,)
+			(PLUS_I64, PLUS_V, NULL_I), (from_positive_chord, not_II42)
 		)
 		PATTERN_EXTEND5_DOUBLE11 = Score.ScoreNode(
-			(PLUS_I64, MINUS_V, NULL_I), (from_positive_chord,)
+			(PLUS_I64, MINUS_V, NULL_I), (from_positive_chord, not_II42)
 		)
 		PATTERN_EXTEND5_DOUBLE12 = Score.ScoreNode(
-			(PLUS_I64, PLUS_V42, PLUS_I6), (from_positive_chord,)
+			(PLUS_I64, PLUS_V42, PLUS_I6), (from_positive_chord, not_II42)
 		)
 		PATTERN_EXTEND5_DOUBLE13 = Score.ScoreNode(
-			(PLUS_I64, PLUS_V7, NULL_I), (from_positive_chord,)
+			(PLUS_I64, PLUS_V7, NULL_I), (from_positive_chord, not_II42)
 		)
 		PATTERN_EXTEND5_DOUBLE14 = Score.ScoreNode(
-			(PLUS_I64, MINUS_V7, NULL_I), (from_positive_chord,)
+			(PLUS_I64, MINUS_V7, NULL_I), (from_positive_chord, not_II42)
+		)
+		PATTERN_EXTEND5_DOUBLE15 = Score.ScoreNode(
+			(PLUS_IV, PLUS_IVMINOR, NULL_I), (
+				major_mode_only, no_minor_mode_shift, proper_subdom_order, 
+				from_positive_chord, *maintain_seventh_tension
+			)
 		)
 
 		PATTERN_EXTEND2_DOUBLE01 = Score.ScoreNode(
@@ -185,6 +271,12 @@ class Score:
 		PATTERN_EXTEND2_DOUBLE04 = Score.ScoreNode(
 			(NULL_I, MINUS_VI, MINUS_II), (major_mode_only,)
 		)
+		PATTERN_EXTEND2_DOUBLE05 = Score.ScoreNode(
+			(PLUS_II65, PLUS_I6, PLUS_II7), empty_tuple
+		)
+		PATTERN_EXTEND2_DOUBLE06 = Score.ScoreNode(
+			(PLUS_II7, PLUS_I6, PLUS_II65), empty_tuple
+		)
 
 		self.tonic_chords_single = (NULL_I, PLUS_I6) 
 		self.ante_ending_single = (
@@ -195,7 +287,7 @@ class Score:
 			(MINUS_V6, MINUS_V65), (PLUS_V43, PLUS_VII6), PLUS_V42,
 		)
 		self.cons_ending_single = (
-			PLUS_V, MINUS_V, PLUS_V7, MINUS_V7,
+			PLUS_V, MINUS_V, PLUS_V7, MINUS_V7, PLUS_IVMINOR, PLUS_IV,
 		)
 		self.ante_ending_triple = (
 			PATTERN_EXTEND5_DOUBLE01, PATTERN_EXTEND5_DOUBLE02,
@@ -204,22 +296,29 @@ class Score:
 			PATTERN_EXTEND5_DOUBLE07, PATTERN_EXTEND5_DOUBLE08
 		)
 		self.subdominant_single_minus1 = (
-			PLUS_II, PLUS_II6, PLUS_IV, PLUS_IVMAJOR, MINUS_VI, MINUS_II, 
+			PLUS_II, PLUS_II6, PLUS_IV, PLUS_IVMAJOR, MINUS_IVMAJOR, MINUS_VI, MINUS_II, 
 			MINUS_II6, MINUS_IV, MINUS_VI, MINUS_IV6, MINUS_IV6MAJOR,
+			PLUS_II7, PLUS_II65, MINUS_II7, MINUS_II65, NULL_II42,
+			PLUS_IV7, MINUS_IV7, MINUS_IV65, MINUS_IV65MAJOR,
 		)
 		self.subdominant_single_minus2 = (
 			PLUS_II, PLUS_II6, PLUS_IV, MINUS_VI, MINUS_II, MINUS_II6, MINUS_IV,
-			MINUS_VI, MINUS_IV6
+			MINUS_VI, MINUS_IV6, PLUS_II7, PLUS_II65, MINUS_II7, MINUS_II65,
 		)
 		self.subdominant_triple = (
 			PATTERN_EXTEND2_DOUBLE01, PATTERN_EXTEND2_DOUBLE02,
 			PATTERN_EXTEND2_DOUBLE03, PATTERN_EXTEND2_DOUBLE04,
+			PATTERN_EXTEND2_DOUBLE05, PATTERN_EXTEND2_DOUBLE06,
 		)
 		self.ante_plus1_64 = (
 			PATTERN_EXTEND5_DOUBLE10, PATTERN_EXTEND5_DOUBLE11, 
 			PATTERN_EXTEND5_DOUBLE12,
 		)
-		self.cons_plus1_64 = (PATTERN_EXTEND5_DOUBLE13, PATTERN_EXTEND5_DOUBLE14) 
+		self.cons_plus1_64 = (
+			PATTERN_EXTEND5_DOUBLE10, PATTERN_EXTEND5_DOUBLE11, 
+			PATTERN_EXTEND5_DOUBLE13, PATTERN_EXTEND5_DOUBLE14,
+		) 
+		self.cons_ending_triple = (PATTERN_EXTEND5_DOUBLE15,)
 
 		# starting chord is based on reverse membership testing of I and I6
 		self.previous_chord = None
@@ -267,7 +366,7 @@ class Score:
 				self.subdominant_single_minus1, self.subdominant_triple,
 			), "2END_EX1": (
 				empty_tuple, self.cons_ending_single, self.tonic_chords_single,
-				self.cons_plus1_64
+				self.cons_ending_triple, self.cons_plus1_64
 			),
 		}
 		chord_adder = chord_pattern_functions[chord_pattern]
@@ -307,6 +406,7 @@ class Score:
 		for chord_group in args:
 			valid_chord_sequences = []
 			for chord_sequence in chord_group:
+				self.logger.warning(chord_sequence)
 				if all(stipulation() for stipulation in chord_sequence.stipulations):
 					valid_chord_sequences.append(chord_sequence.value)
 
@@ -323,10 +423,12 @@ class Score:
 				self.chord_index = temp_chord_index
 				if not isinstance(chord_double, Score.ScoreNode):
 					chord_double = random.choice(chord_double)
+					self.logger.warning(chord_double)
 				if all(stipulation() for stipulation in chord_double.stipulations):
 					self.previous_chord = chord_double.value
 					self.chord_index += 2
 					for chord_single in chord_doublers2:
+						self.logger.warning(chord_single)
 						if all(stipulation() for stipulation in chord_single.stipulations):
 							valid_chord_sequences.append(
 								(chord_double, chord_double, chord_single)
@@ -340,6 +442,7 @@ class Score:
 				for chord_single in chord_singlers:
 					if not isinstance(chord_single, Score.ScoreNode):
 						chord_single = random.choice(chord_single)
+					self.logger(chord_single)
 					if all(stipulation() for stipulation in chord_single.stipulations):
 						valid_chord_sequences.append(
 							(chord_single, chord_single, chord_single)
