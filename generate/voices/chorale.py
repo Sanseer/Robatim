@@ -228,15 +228,6 @@ class Chorale(Voice):
 		"""Check voice-leading of current chord progression"""
 
 		(b_pitch, t_pitch, a_pitch, s_pitch) = pitch_combo
-		if not b_pitch <= t_pitch <= a_pitch <= s_pitch:
-			return False 
-		if b_pitch - t_pitch > 24:
-			return False
-		if a_pitch - t_pitch > 12:
-			return False
-		if s_pitch - a_pitch > 12:
-			return False
-
 		current_degree_combo = (current_pitches_dict[b_pitch], 
 			current_pitches_dict[t_pitch], 
 			current_pitches_dict[a_pitch],

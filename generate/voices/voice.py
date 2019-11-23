@@ -179,7 +179,20 @@ class Voice:
 
 		# must realize full sequence to prevent iterator exhaustion
 		# faster runtime if pitch combos are only calculated once per chord index
-		return tuple(itertools.product(*possible_midi_pitches))
+		validated_pitch_combos = []
+		for chord_combo in itertools.product(*possible_midi_pitches):
+			(b_pitch, t_pitch, a_pitch, s_pitch) = chord_combo
+			if not b_pitch <= t_pitch <= a_pitch <= s_pitch:
+				continue 
+			if b_pitch - t_pitch > 24:
+				continue
+			if a_pitch - t_pitch > 12:
+				continue
+			if s_pitch - a_pitch > 12:
+				continue
+			validated_pitch_combos.append(chord_combo)
+
+		return validated_pitch_combos
 
 	def set_sheet_notes(self):
 		"""Convert midi pitches into sheet music note names"""
