@@ -76,7 +76,7 @@ class Score:
 
 		not_plus_II7 = lambda: self.previous_chord != "+II7"
 		not_minus_II7 = lambda: self.previous_chord != "-II7"
-		not_II42 = lambda: self.previous_chord != "+II42"
+		not_II42 = lambda: self.previous_chord != "0II42"
 		PLUS_V = Score.ScoreNode("+V", (from_positive_chord, not_plus_II7, not_II42))
 		MINUS_V = Score.ScoreNode("-V", (validate_minus_V7, not_minus_II7)) 
 		PLUS_V7 = Score.ScoreNode("+V7", (from_positive_chord, not_II42))
