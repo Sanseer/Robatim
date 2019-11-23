@@ -68,13 +68,14 @@ def test_triple_repeat(obj):
 		start_index = rest_index + 1
 		# index 6 is only allowed if rhythm symbol -1 on index 6
 		# not common enough to make a rule for your implementation
-	if all_rest_indices - {3, 6, 7}:
+	if all_rest_indices - {3, 7}:
 		return False
 	return True
 
+
 def test_double_repeat(obj):
 	# same thing with index 6
-	bad_single_rest_indices = {10, 13, 14}
+	bad_single_rest_indices = {6, 10, 14}
 	start_index = 0
 	while True:
 		rest_index = obj.melodic_mvmt.find("_", start_index)
@@ -83,18 +84,6 @@ def test_double_repeat(obj):
 		if rest_index == -1:
 			break
 		start_index = rest_index + 1
-	return True
-
-
-def test_halfway_pause(obj):
-	if obj.chosen_scale_degrees[6] != obj.chosen_scale_degrees[7]:
-		return False
-	return True
-
-
-def test_move_from_tonic(obj):
-	if obj.chosen_scale_degrees[0] == obj.chosen_scale_degrees[1]:
-		return False
 	return True
 
 
@@ -133,9 +122,11 @@ def test_octave_leap(obj):
 
 def test_proper_leaps(obj):
 	# breaking this rule is too advanced for you
-	if not Voice.has_proper_leaps(obj.unnested_scale_degrees):
-		return False
-	return True
+	unnested_antecedent = Voice.merge_lists(*obj.nested_scale_degrees[:8])
+	unnested_consequent = Voice.merge_lists(*obj.nested_scale_degrees[8:])
+	proper_antecedent_leaps = Voice.has_proper_leaps(unnested_antecedent)
+	proper_consequent_leaps = Voice.has_proper_leaps(unnested_consequent)
+	return proper_antecedent_leaps and proper_consequent_leaps
 
 
 def test_nested_climaxes(obj):
@@ -147,7 +138,8 @@ def test_nested_climaxes(obj):
 
 	relevant_sections = (
 		section1_scale_degrees, section2_scale_degrees, 
-		section3_scale_degrees)
+		section3_scale_degrees
+	)
 
 	for section_scale_degrees in relevant_sections:
 		section_max_degree = max(section_scale_degrees)
@@ -179,9 +171,18 @@ def test_late_melodic_jukes(obj):
 			return False
 	return True
 
+# def test_turns(obj):
+# 	return Voice.get_turns(obj.chosen_scale_degrees) <= 8
 
-def test_turns(obj):
-	return Voice.get_turns(obj.chosen_scale_degrees) <= 8
+# def test_halfway_pause(obj):
+# 	if obj.chosen_scale_degrees[6] != obj.chosen_scale_degrees[7]:
+# 		return False
+# 	return True
+
+# def test_move_from_tonic(obj):
+# 	if obj.chosen_scale_degrees[0] == obj.chosen_scale_degrees[1]:
+# 		return False
+# 	return True
 
 # think of a way to handle these cross_duplicates
 # def test_cross_duplicates(obj):
@@ -190,9 +191,8 @@ def test_turns(obj):
 # def test_unnested_cross_duplicates(obj):
 # 	return not Voice.has_cross_duplicates(obj.unnested_scale_degrees)
 
-def test_true_climax(obj):
-	return max(obj.unnested_scale_degrees) >= 6
-
+# def test_true_climax(obj):
+# 	return max(obj.unnested_scale_degrees) >= 6
 
 def test_unnested_climaxes(obj):
 	section1 = Voice.merge_lists(*obj.nested_scale_degrees[:4])
@@ -206,7 +206,6 @@ def test_unnested_climaxes(obj):
 		return False
 	return True
 
-
 melodies = [
 	MelodyFrame([
 		[0, 1], [2, 3], [4, 6, 5], [4], 
@@ -219,14 +218,26 @@ melodies = [
 		[7, 6], [4, 2], [3, 2], [0, -1],
 		[0, 0], [-1, -1], [0], [0]
 	], True), MelodyFrame([
-		[0, 0], [4, 4], [1, 2, 1], [0],
-		[7, 6], [4, 5, 3], [4,], [4],
-		[7, 7], [6, 4], [4, 3, 2], [1],
-		[3, 2], [1, 0, -1], [0,], [0]
-	], False), MelodyFrame([
-		[0, 2], [3, 2], [3, 2], [0],
-		[3, 4], [6, 4, 3], [4], [4],
+		[0, 2], [3, 2], [3, 2, 0], [0, 2],
+		[3, 4], [6, 4, 3], [4], [4, 3],
 		[4, 6], [7, 6], [4, 3, 2], [0, -1],
 		[0, 2], [-1, -1], [0], [0],
+	], True), MelodyFrame([
+		[2, 3], [4, 5, 4], [3, 1], [-1, 0, 1], 
+		[2, 0], [0, -1, 0], [1, -1], [-3, 0], 
+		[2, 3], [4, 5, 4], [3, 1], [-1, 0, 1],
+		[2, 1, 0], [-1, -2, -1], [0], [0] 
+	], True), MelodyFrame([
+		[0, 1], [2, 3], [4], [4, 4], 
+		[3, 4], [5, 3], [4], [4, 4],
+		[3, 4], [5, 3], [4, 5, 4], [3, 2],
+		[1, 2], [1, 0], [0], [0]
 	], True)
 ]
+
+# MelodyFrame([
+# 		[0, 0], [4, 4], [1, 2, 1], [0],
+# 		[7, 6], [4, 5, 3], [4,], [4],
+# 		[7, 7], [6, 4], [4, 3, 2], [1],
+# 		[3, 2], [1, 0, -1], [0,], [0]
+# 	], False)

@@ -7,9 +7,8 @@ import requests
 
 from generate.voices.voice import Voice 
 from generate.idioms.score import Score
-import tests.melody_frame as mf
 
-class MainSongMethods(unittest.TestCase):
+class MainScoreMethods(unittest.TestCase):
 
 	def test_output_pdf(self):
 		payload = {
@@ -159,21 +158,6 @@ class MainSongMethods(unittest.TestCase):
 		self.assertEqual(Voice.make_pitch_combos({82: None}), tuple())
 		self.assertEqual(Voice.make_pitch_combos({92: None,  85: None}), tuple())
 		self.assertEqual(Voice.make_pitch_combos({83: None, 100: None}), tuple())
-
-	def test_melody(self):
-
-		melody_rules = (
-			mf.test_long_rest, mf.test_halfway_pause, mf.test_move_from_tonic, 
-			mf.test_leaps_within_octave, mf.test_end_leap, 
-			mf.test_predominant_descent, mf.test_octave_leap, 
-			mf.test_nested_climaxes, mf.test_late_melodic_jukes, mf.test_turns,
-			mf.test_true_climax, mf.test_unnested_climaxes,
-			mf.test_double_repeat
-		)
-
-		for melody_obj in mf.melodies:
-			for test_melody_rule in melody_rules:
-				self.assertTrue(test_melody_rule(melody_obj))
 
 
 if __name__ == "__main__":

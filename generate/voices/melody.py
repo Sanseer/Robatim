@@ -39,7 +39,7 @@ class Melody(Voice):
 
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
 		self.good_double_rest_indices = {3, 7}
-		self.bad_single_rest_indices = {6, 10, 13, 14}
+		self.bad_single_rest_indices = {6, 10, 14}
 
 		self.rhythm_symbols = [None for _ in range(16)]
 		self.finalized_rhythms = {}
@@ -269,7 +269,7 @@ class Melody(Voice):
 			if phrase2_start_index <= chord_index < phrase4_start_index:
 				if 0 in self.all_scale_degree_options[-1]:
 					self.all_scale_degree_options[-1].append(7)
-			elif chord_index >= phrase4_start_index: 
+			elif chord_index >= 3: 
 				for scale_degree in current_scale_degrees:
 					if scale_degree >= 4:
 						self.all_scale_degree_options[-1].append(scale_degree - 7)
@@ -421,8 +421,7 @@ class Melody(Voice):
 		self.logger.warning(f"Attempted melody: {self.chosen_scale_degrees}")
 
 		if "_" * 3 in melodic_mvmt:
-			self.logger.warning("Long rest!")
-			self.logger.warning('*' * 30)
+			# Avoid long rests
 			return False
 		if "_" * 2 in melodic_mvmt:
 			all_rest_indices = set()
@@ -434,8 +433,7 @@ class Melody(Voice):
 				all_rest_indices.add(rest_index)
 				start_index = rest_index + 1
 			if all_rest_indices - self.good_double_rest_indices:
-				self.logger.warning("Triple repeats only between phrases")
-				self.logger.warning('*' * 30)
+				# Avoid triple repeats only between phrases")
 				return False
 
 		start_index = 0
@@ -448,44 +446,32 @@ class Melody(Voice):
 				break
 			start_index = rest_index + 1
 
-		relevant_melodic_mvt = melodic_mvmt[1:]
-		if (self.chord_index == 7 and 
-		  self.previous_degree_choice != self.current_degree_choice):
-			self.logger.warning("Rest halfway through")
-			self.logger.warning('*' * 30)
-			return False
-
-		if self.chord_index == 1 and self.chosen_scale_degrees[0:2] == [0, 0]:
-			self.logger.warning("Must move away from tonic at start")
-			self.logger.warning('*' * 30)
-			return False	
+		relevant_melodic_mvt = melodic_mvmt[1:]	
 		
 		current_move_distance = self.current_degree_choice - self.previous_degree_choice
 		abs_current_move_distance = abs(current_move_distance)
 		if abs_current_move_distance > 7:
-			self.logger.warning("Leaps within octave")
-			self.logger.warning('*' * 30)
+			# Keep leaps within octave
 			return False
 		if self.chord_index == 14:
 			if abs_current_move_distance > 4:
-				self.logger.warning("Don't end with a leap")
-				self.logger.warning('*' * 30)
+				# Don't end with a large leap
 				return False
 			if relevant_melodic_mvt.count('>') > relevant_melodic_mvt.count('<'):
-				self.logger.warning("Descending motion should predominate")
-				self.logger.warning('*' * 30)
+				# Descending motion should predominate
 				return False
 		if abs_current_move_distance == 7 and self.chord_index not in {4, 8}:
-			self.logger.warning("Octave leap can only occur halfway through")
-			self.logger.warning('*' * 30)
+			# Octave leap can only occur halfway through
 			return False
-		if (len(self.unnested_scale_degrees) >= 3 and 
-		  not Voice.has_proper_leaps(self.unnested_scale_degrees)):
-			self.logger.warning(
-				"Leap should be followed by contrary stepwise motion (full melody)"
-			)
-			self.logger.warning('*' * 30)
-			return False
+		if len(self.unnested_scale_degrees) >= 3: 
+			if self.chord_index < 9:
+				nested_part_half = self.nested_scale_degrees[:8]
+			else: 
+				nested_part_half = self.nested_scale_degrees[8:]
+			unnested_part_half = Voice.merge_lists(*nested_part_half)
+			if not Voice.has_proper_leaps(unnested_part_half):
+				# "Leap should be followed by contrary stepwise motion (full melody)"
+				return False
 
 		# score divides into 4 sections, 16 items
 		# first 2 sections: antecedent
@@ -535,11 +521,7 @@ class Melody(Voice):
 		if self.chord_index >= 3:
 			if (self.chord_index not in self.quick_turn_indices and 
 			  melodic_mvmt[self.chord_index - 2:] in {"><>", "<><"}):
-				self.logger.warning("No late melodic jukes")
-				self.logger.warning('*' * 30)
-				return False
-
-			if self.chord_index > 8 and Voice.get_turns(self.chosen_scale_degrees[:self.chord_index + 1]) > 8:
+				# No late melodic jukes
 				return False
 		
 		return True
@@ -605,7 +587,7 @@ class Melody(Voice):
 			inbetween, fig_type = remaining_figures.pop()
 			if min(inbetween) < -3 or max(inbetween) > 7:
 				continue
-			if self.chord_index - 1 < 11 and min(inbetween) < 0:
+			if self.chord_index - 1 < 3 and min(inbetween) < 0:
 				continue
 
 			unnested_scalar_melody = self.unnested_scale_degrees[:]
