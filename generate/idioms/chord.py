@@ -13,12 +13,13 @@ class Chord:
 		"IV_MINOR": (3, 5, 0), "I64": (0, 2, 4), "VI": (5, 0, 2), 
 		"IV6": (3, 5, 0), "IV6_MAJOR": (3, 5, 0), "II7": (1, 3, 5, 0), 
 		"II65": (1, 3, 5, 0), "II43": (1, 3, 5, 0), "II42": (1, 3, 5, 0),
-		"IV7": (3, 5, 0, 2), "IV65": (3, 5, 0, 2), "IV65_MAJOR": (3, 5, 0, 2) 
+		"IV7": (3, 5, 0, 2), "IV65": (3, 5, 0, 2), "IV65_MAJOR": (3, 5, 0, 2),
+		"I_MAJOR": (0, 2, 4),
 	}
 	minor_mode_alterations = {
 		"V": {6: 1}, "V7": {6: 1}, "V6": {6: 1}, "VII6": {6: 1}, "V65": {6: 1},
 		"V43": {6: 1}, "V42": {6: 1}, "IV_MAJOR": {5: 1}, "IV6_MAJOR": {5: 1},
-		"IV65_MAJOR": {6: 1},
+		"IV65_MAJOR": {6: 1}, "I_MAJOR": {2: 1},
 	}
 	major_mode_alterations = {
 		"IV_MINOR": {5: -1},
@@ -29,6 +30,7 @@ class Chord:
 		"V43": 1, "V42": 3, "II": 1, "II6": 3, "IV": 3, "IV_MAJOR": 3, 
 		"IV_MINOR": 3, "I64": 4, "VI": 5, "IV6": 5, "IV6_MAJOR": 5, "II7": 1,
 		"II65": 3, "II43": 5, "II42": 0, "IV7": 3, "IV65": 5, "IV65_MAJOR": 5,
+		"I_MAJOR": 0,
 	}
 
 	def __init__(self, chord_symbol):

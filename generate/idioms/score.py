@@ -47,6 +47,8 @@ class Score:
 		# save memory
 		empty_tuple = tuple()
 		from_root_tonic = lambda: self.previous_chord == "0I"
+		major_mode_only = lambda: self.mode == "ionian"
+		minor_mode_only = lambda: self.mode == "aeolian"
 		
 		# can't store unhashable type (set) in hashable type tuple
 		# tonic can come from other tonics and dominants
@@ -54,6 +56,11 @@ class Score:
 		# dominants can come from tonics and subtonics
 		NULL_I = Score.ScoreNode(
 			"0I", (lambda: self.previous_chord not in ("+V42",),)
+		)
+		NULL_I_MAJOR = Score.ScoreNode(
+			"0I_MAJOR", (
+				minor_mode_only, lambda: self.chord_index == 14, 
+			)
 		)
 		PLUS_I6 = Score.ScoreNode(
 			"+I6", (lambda: self.previous_chord in ("+VII6", "+V43", "+V42", "0I"),)
@@ -103,8 +110,6 @@ class Score:
 
 		no_major_mode_shift = lambda: self.previous_chord[-5:] != "MAJOR"
 		no_minor_mode_shift = lambda: self.previous_chord[-5:] != "MINOR"
-		major_mode_only = lambda: self.mode == "ionian"
-		minor_mode_only = lambda: self.mode == "aeolian"
 
 		maintain_seventh_tension = (
 			lambda: self.previous_chord[-2:] not in ("65", "43", "42"),
@@ -281,7 +286,7 @@ class Score:
 			(PLUS_II7, PLUS_I6, PLUS_II65), empty_tuple
 		)
 
-		self.tonic_chords_single = (NULL_I, PLUS_I6) 
+		self.tonic_chords_single = (NULL_I, PLUS_I6, NULL_I_MAJOR) 
 		self.ante_ending_single = (
 			PLUS_V, MINUS_V, (MINUS_V6, MINUS_V65), (PLUS_V43, PLUS_VII6), 
 			PLUS_V42,
