@@ -9,9 +9,10 @@ class MakeSongMethods(unittest.TestCase):
 		melody_rules = (
 			mf.test_long_rest, mf.test_triple_repeat, mf.test_double_repeat, 
 			mf.test_leaps_within_octave, mf.test_end_leap, 
-			mf.test_predominant_descent, mf.test_octave_leap, mf.test_proper_leaps,
-			mf.test_nested_climaxes, mf.test_late_melodic_jukes, 
-			mf.test_unnested_climaxes
+			mf.test_predominant_descent, mf.test_proper_leaps,
+			mf.test_large_leap_unnested, mf.test_large_leap_nested,
+			mf.test_nested_climaxes, mf.test_unnested_climaxes, 
+			mf.test_late_melodic_jukes, 
 		)
 
 		for melody_obj in mf.melodies:

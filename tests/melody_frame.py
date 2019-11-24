@@ -109,14 +109,25 @@ def test_predominant_descent(obj):
 	return True
 
 
-def test_octave_leap(obj):
+def test_large_leap_unnested(obj):
 	chord_index = 1
 	for current_degree, next_degree in zip(
 	  obj.chosen_scale_degrees, obj.chosen_scale_degrees[1:]):
-		if (abs(next_degree - current_degree) == 7 and 
+		if (abs(next_degree - current_degree) > 4 and 
 		  chord_index not in {4, 8}):
 			return False
 		chord_index += 1
+	return True
+
+
+def test_large_leap_nested(obj):
+	previous_melody_note = obj.nested_scale_degrees[0][0]
+	for chord_index, melody_group in enumerate(obj.nested_scale_degrees):
+		for fig_index, current_melody_note in enumerate(melody_group):
+			if (abs(current_melody_note - previous_melody_note) > 4 and 
+			  (fig_index != 0 or chord_index not in {4, 8})):
+				return False
+			previous_melody_note = current_melody_note
 	return True
 
 

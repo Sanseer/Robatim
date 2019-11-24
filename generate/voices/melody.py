@@ -40,6 +40,7 @@ class Melody(Voice):
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
 		self.good_double_rest_indices = {3, 7}
 		self.bad_single_rest_indices = {6, 10, 14}
+		self.valid_leap_indices = {4, 8}
 
 		self.rhythm_symbols = [None for _ in range(16)]
 		self.finalized_rhythms = {}
@@ -180,15 +181,12 @@ class Melody(Voice):
 		self.logger.warning(f"{chord_structure}")
 
 		for chord_pattern in chord_structure:
-			self.logger.warning(f"Chord pattern: {chord_pattern}")
 			chord_seq_choice = self.score_obj.add_chord_pattern(chord_pattern)
-			self.logger.warning(f"Chord sequence choice: {chord_seq_choice}")
 			if isinstance(chord_seq_choice, str):
 				Voice.chord_sequence.append(Chord(chord_seq_choice))
 			elif isinstance(chord_seq_choice, list):
 				for chord_choice in chord_seq_choice:
 					Voice.chord_sequence.append(Chord(chord_choice))
-			self.logger.warning("-"*30)
 
 		print(f"Chord sequence: {Voice.chord_sequence}")
 
@@ -283,7 +281,6 @@ class Melody(Voice):
 		"""Reset the first melody note of the sequence"""
 
 		self.logger.warning(f"Chord index: {self.chord_index}")
-		self.logger.warning(f"Current scale degree options {self.current_scale_degree_options}")
 		# AssertionError singles out this scenario.
 		# it traverses the call stack to main.py before being handled.
 		# Other exceptions like IndexError can occur elsewhere in class instance
@@ -294,12 +291,10 @@ class Melody(Voice):
 			print("Melody failed")
 			raise AssertionError
 		self.chosen_scale_degrees[0] = self.current_degree_choice
-		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
 		if Voice.pickup:
 			self.melodic_direction[0] = '>'
 		else:
 			self.melodic_direction[0] = '_'
-		self.logger.warning(f"Melodic direction: {self.melodic_direction}" )
 
 		self.chord_index += 1
 		self.current_scale_degree_options[1] = self.all_scale_degree_options[1][:]
@@ -316,9 +311,6 @@ class Melody(Voice):
 		self.time0 = time.time()
 		while None in self.chosen_scale_degrees:
 			self.logger.warning(f"Chord index: {self.chord_index}")
-			self.logger.warning(
-				f"Current scale degree options: {self.current_scale_degree_options}"
-			)
 			if self.chord_index == 0:
 				self.create_first_melody_note()
 			if self.melody_figure_options[self.chord_index - 1]:
@@ -374,11 +366,8 @@ class Melody(Voice):
 		"""Try the next melody figure using the validated base melody"""
 
 		self.logger.warning("Choosing from remaining figures")
-		self.logger.warning(f"Remaining melody figures: {self.melody_figure_options}")
 		# only occurs when backtracking
 		self.current_degree_choice = self.chosen_scale_degrees[self.chord_index]
-		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
-		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
 		self.reset_unnested_melody()
 		if self.has_melody_figure():
 			self.advance_score()
@@ -393,8 +382,6 @@ class Melody(Voice):
 		self.current_degree_choice = (
 			self.current_scale_degree_options[self.chord_index].pop()
 		)
-		self.logger.warning(f"Chosen scale degree: {self.current_degree_choice}")
-		self.logger.warning(f"Previous scale degree: {self.previous_degree_choice}")
 
 		if self.current_degree_choice == self.previous_degree_choice:
 			self.melodic_direction[self.chord_index] = '_'
@@ -416,9 +403,6 @@ class Melody(Voice):
 		melodic_mvmt = "".join(
 			str(slope) for slope in self.melodic_direction[:self.chord_index + 1]
 		)
-
-		self.logger.warning(f"Attempted melodic direction: {melodic_mvmt}")
-		self.logger.warning(f"Attempted melody: {self.chosen_scale_degrees}")
 
 		if "_" * 3 in melodic_mvmt:
 			# Avoid long rests
@@ -460,8 +444,8 @@ class Melody(Voice):
 			if relevant_melodic_mvt.count('>') > relevant_melodic_mvt.count('<'):
 				# Descending motion should predominate
 				return False
-		if abs_current_move_distance == 7 and self.chord_index not in {4, 8}:
-			# Octave leap can only occur halfway through
+		if abs_current_move_distance > 4 and self.chord_index not in self.valid_leap_indices:
+			# Large leap can only occur halfway through
 			return False
 		if len(self.unnested_scale_degrees) >= 3: 
 			if self.chord_index < 9:
@@ -500,7 +484,18 @@ class Melody(Voice):
 
 		if self.chord_index == 2 and self.chosen_figurations[0] == "IN":
 			return False
-		elif self.chord_index == 8: 
+		if self.chord_index >= 3:
+			previous_melody_note = self.chosen_scale_degrees[self.chord_index - 3]
+			for chord_index, melody_group in enumerate(
+			  self.nested_scale_degrees[self.chord_index - 3:self.chord_index - 1],
+			  self.chord_index - 3):
+				for fig_index, current_melody_note in enumerate(melody_group):
+					if (abs(current_melody_note - previous_melody_note) > 4 and
+					  (fig_index != 0 or chord_index not in self.valid_leap_indices)):
+						return False
+					previous_melody_note = current_melody_note
+
+		if self.chord_index == 8: 
 			section1 = self.chosen_scale_degrees[:4]
 			section2 = self.chosen_scale_degrees[4:8]
 			if max(section1) == max(section2):
@@ -509,6 +504,8 @@ class Melody(Voice):
 			section3 = self.chosen_scale_degrees[8:12]
 			section4 = self.chosen_scale_degrees[12:]
 			if max(section3) <= max(section4):
+				return False
+			if self.nested_scale_degrees[13][-1] - 0 > 4:
 				return False
 
 		num_still_figures = self.chosen_figurations.count("CN")
@@ -547,7 +544,6 @@ class Melody(Voice):
 
 		remaining_figures = self.melody_figure_options[self.chord_index - 1]
 		if remaining_figures:
-			self.logger.warning(f"Remaining melody figures: {remaining_figures}")
 			return self.add_valid_figure()
 
 		degree_mvmt = self.current_degree_choice - self.previous_degree_choice
@@ -564,7 +560,6 @@ class Melody(Voice):
 		possible_scale_degrees = all_figurations[degree_mvmt](
 			self.previous_degree_choice, self.current_degree_choice, melody_slope)
 
-		self.logger.warning(f"Possible scale degrees: {possible_scale_degrees}")
 		self.melody_figure_options[self.chord_index - 1] = possible_scale_degrees
 		return self.add_valid_figure()
 
@@ -592,7 +587,6 @@ class Melody(Voice):
 
 			unnested_scalar_melody = self.unnested_scale_degrees[:]
 			unnested_scalar_melody.extend(inbetween)
-			self.logger.warning(f"Unnested valid melody: {unnested_scalar_melody}")
 
 			# chord 8 and 12 are short-circuited
 			# only need to evaluate once going forward
@@ -608,8 +602,7 @@ class Melody(Voice):
 			if (self.restart_basic_idea and self.chord_index == 10 and 
 			  Voice.chord_sequence[0] == Voice.chord_sequence[8] and 
 			  self.nested_scale_degrees[0] != self.nested_scale_degrees[8]):
-				self.logger.warning("Must force restart")
-				self.logger.warning('*' * 30)
+				# Must force restart
 				continue
 
 			valid_figure = inbetween
