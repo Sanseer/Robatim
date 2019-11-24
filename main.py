@@ -143,10 +143,16 @@ if __name__ == "__main__":
 			if isinstance(new_note.pitch, int): 
 				MyMIDI.addNote(track, channel, *new_note, volume)
 
+	# 3/4 time sig feels slower at same tempo because 
+	# beats are in groups of 3 instead of 2
+	if Voice.time_sig == (3, 2):
+		MOD_SPEED = 1.5
+	else: 
+		MOD_SPEED = 1
 	if Voice.mode == "aeolian":
-		tempo = random.choice(range(85, 101))
+		tempo = random.choice(range(85, 101)) * MOD_SPEED
 	elif Voice.mode == "ionian":
-		tempo = random.choice(range(85, 111))
+		tempo = random.choice(range(85, 111)) * MOD_SPEED
 	MyMIDI.addTempo(track, current_time, tempo)
 
 	slow_ending = random.choice((True, False))

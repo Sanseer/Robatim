@@ -16,6 +16,9 @@ class Score:
 		score_handler.setFormatter(score_format)
 		self.logger.addHandler(score_handler)
 
+		# exclude 9/8 because of uneven divisions
+		# 2/4, 3/4, 6/8, 4/4, 12/8
+		# the difference between duple and quadruple meter is semantic
 		self.time_sigs = ((2,2), (3,2), (2,3), (4,2), (3,2), (4,3))
 
 		# 0 = rhythm1
