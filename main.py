@@ -4,6 +4,7 @@ import requests
 import time
 
 from generate.midi_export import MIDIFile
+from generate.idioms.score import Score
 from generate.voices.voice import Voice
 from generate.voices.melody import Melody
 import generate.voices.chorale as chorale
@@ -73,6 +74,7 @@ def make_score_pdf(sheet_code):
 
 def reset_score_settings():
 	"""Reset parameters of score to allow creation of a new piece"""
+	Score.reset()
 	Voice.chord_sequence = []
 	Voice.all_midi_pitches = []
 	Voice.midi_score = []

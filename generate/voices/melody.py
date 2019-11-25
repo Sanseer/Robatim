@@ -6,7 +6,7 @@ import time
 
 from generate.voices.voice import Voice
 from generate.idioms.chord import Chord
-from generate.idioms.score import Score
+from generate.idioms.progression import Progression
 
 class Melody(Voice):
 	"""A chord-based melody builder"""
@@ -22,20 +22,9 @@ class Melody(Voice):
 
 		#reset, incase of failed melody
 		Chord.reset_settings()
-		self.score_obj = Score()
-		Voice.mode = self.score_obj.mode
-
-		Voice.time_sig = random.choice(self.score_obj.time_sigs)
-		Voice.tonic = random.choice(self.score_obj.key_sigs)
-		print(f"{Voice.tonic} {Voice.mode}")
-
-		Voice.measure_length = Voice.time_sig[0]
-		Voice.beat_division = Voice.time_sig[1]
-		if Voice.beat_division == 2:
-			Voice.beat_durations = Voice.simple_beat_durations
-		elif Voice.beat_division == 3:
-			Voice.beat_durations = Voice.compound_beat_durations
-		print(f"{Voice.measure_length} beats divided by {Voice.beat_division}")
+		self.progression_obj = Progression()
+		print(f"{self.tonic} {self.mode}")
+		print(f"{self.measure_length} beats divided by {self.beat_division}")
 
 		self.quick_turn_indices = {2, 5, 6, 9, 10, 13}
 		self.good_double_rest_indices = {3, 7}
@@ -56,8 +45,7 @@ class Melody(Voice):
 
 		self.break_notes = random.choice((True, False))
 		self.restart_basic_idea = random.choice((True, False, False))
-		Voice.repeat_ending = random.choice((True, False))
-		print(f"Repeat ending: {Voice.repeat_ending}")
+		print(f"Repeat ending: {self.repeat_ending}")
 		print(f"Repeat basic idea: {self.restart_basic_idea}")
 
 		self.melody_range = []
@@ -160,8 +148,8 @@ class Melody(Voice):
 	def set_scale_midi_pitches(self):
 		"""Choose all midi pitches that are diatonic to the key signature"""
 		current_pitch = -12
-		root_pitch = current_pitch + Voice.tonics[Voice.tonic]
-		scale_sequence = Voice.mode_notes[Voice.mode]
+		root_pitch = current_pitch + self.tonics[self.tonic]
+		scale_sequence = self.mode_notes[self.mode]
 
 		all_midi_pitches = []
 		while root_pitch < 128:
@@ -176,12 +164,12 @@ class Melody(Voice):
 
 	def make_chord_progression(self):
 		"""Make a chord progression using common practice idioms"""
-		chord_structure, Voice.chord_acceleration = self.score_obj.choose_progression_type()
+		chord_structure, Voice.chord_acceleration = self.progression_obj.choose_progression_type()
 		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
 
 		for chord_pattern in chord_structure:
-			chord_seq_choice = self.score_obj.add_chord_pattern(chord_pattern)
+			chord_seq_choice = self.progression_obj.add_chord_pattern(chord_pattern)
 			if isinstance(chord_seq_choice, str):
 				Voice.chord_sequence.append(Chord(chord_seq_choice))
 			elif isinstance(chord_seq_choice, list):
@@ -194,7 +182,7 @@ class Melody(Voice):
 		"""Choose a rhythm for the melody with basic/contrasting ideas"""
 
 		raw_rhythm_symbols = []
-		for phrase_options in self.score_obj.rhythm_patterns:
+		for phrase_options in self.rhythm_patterns:
 			raw_rhythm_symbols.extend(random.choice(phrase_options))
 		if 2 in raw_rhythm_symbols and 1 not in raw_rhythm_symbols:
 			for index, rhythm_num in enumerate(raw_rhythm_symbols):
@@ -206,19 +194,19 @@ class Melody(Voice):
 			self.rhythm_symbols = raw_rhythm_symbols
 		print(f"Rhythm symbols: {self.rhythm_symbols}")
 
-		if Voice.time_sig in {(2,2), (4,2)}:
+		if self.time_sig in {(2,2), (4,2)}:
 			rhythm_mapping = {
 				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)], 
 				2:[(3,3,2), (4,2,2), (6,1,1)],
 				-2: [(4,4), (6,2)],
 			}
-		elif Voice.time_sig in {(2,3), (4,3)}:
+		elif self.time_sig in {(2,3), (4,3)}:
 			rhythm_mapping = {
 				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (6,2,4), (10,2)], 
 				2: [(4,2,6), (4,4,4), (6,6), (6,2,4), (6,4,2), (8,4), (10, 1, 1)],
 				-2: [(6,6), (10,2)],
 			}
-		elif Voice.time_sig == (3,2):
+		elif self.time_sig == (3,2):
 			rhythm_mapping = {
 				-1: [(12,)], 0: [(4,4,2,2), (8,2,2), (8,4), (10,2)], 
 				1: [(4,4,2,2), (4,4,4), (6,2,4), (8,2,2), (8,4), (10,2)], 
@@ -620,7 +608,7 @@ class Melody(Voice):
 	def add_midi_score(self):
 		"""Transform a scale degree sequence into a midi pitch sequence"""
 		
-		fifth_degree_pitch = 7 + Voice.tonics[Voice.tonic]
+		fifth_degree_pitch = 7 + self.tonics[self.tonic]
 		while fifth_degree_pitch < 45:
 			fifth_degree_pitch += 12
 		start_index = Voice.all_midi_pitches.index(fifth_degree_pitch)
@@ -628,10 +616,10 @@ class Melody(Voice):
 		self.logger.warning(f"Melody range: {self.melody_range}")
 
 		self.unit_length = sum(self.finalized_rhythms[0])
-		if Voice.time_sig in {(4,3), (4,2)}:
-			chord_quarter_length = Voice.measure_length // 2
+		if self.time_sig in {(4,3), (4,2)}:
+			chord_quarter_length = self.measure_length // 2
 		else:
-			chord_quarter_length = Voice.measure_length
+			chord_quarter_length = self.measure_length
 		self.logger.warning(f"Unit length: {self.unit_length}")
 		self.logger.warning(f"Chord quarter length: {chord_quarter_length}")
 
@@ -649,7 +637,7 @@ class Melody(Voice):
 		self.logger.warning(f"Midi melody: {self.midi_notes}")
 		self.unnested_scale_degrees.pop()
 
-		if not Voice.repeat_ending:
+		if not self.repeat_ending:
 			self.midi_notes.append(
 				Voice.Note("Rest", self.current_time, Voice.max_note_duration))
 			self.current_time += Voice.max_note_duration
@@ -763,14 +751,14 @@ class Melody(Voice):
 
 			next_scale_group = next(melody_section_iter, None)
 			current_chord_name = Voice.chord_sequence[chord_index].chord_name
-			if Voice.mode == "ionian" and current_chord_name in Chord.major_mode_alterations:
+			if self.mode == "ionian" and current_chord_name in Chord.major_mode_alterations:
 				note_alterations = Chord.major_mode_alterations[current_chord_name]
-			elif Voice.mode == "aeolian" and current_chord_name in Chord.minor_mode_alterations:
+			elif self.mode == "aeolian" and current_chord_name in Chord.minor_mode_alterations:
 				note_alterations = Chord.minor_mode_alterations[current_chord_name]
 			else: 
 				note_alterations = {}
 				
-			if Voice.mode == "aeolian" and current_chord_name in Voice.dominant_harmony:
+			if self.mode == "aeolian" and current_chord_name in Voice.dominant_harmony:
 				if melodic_minor: 
 					note_alterations[5] = 1 
 				else:

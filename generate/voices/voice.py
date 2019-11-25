@@ -2,13 +2,12 @@ import collections
 from fractions import Fraction
 import itertools
 
-class Voice:
+from generate.idioms.score import Score
+
+class Voice(Score):
 
 	chord_sequence = []
-	mode = None
-	tonic = None
 	pickup = False
-	repeat_ending = False
 	all_midi_pitches = []
 
 	chord_acceleration = False
@@ -20,11 +19,8 @@ class Voice:
 	dominant_harmony = {"V", "V7", "V6", "V65", "VII6", "V43", "V42"}
 	subdom_sevenths = {"II7", "II65", "II43", "II42"}
 
-	beat_division = 0
-	measure_length = 0
 	pickup_duration = 0
 	max_note_duration = 0
-	time_sig = (4, 2)
 	voice_volumes = (70, 50, 50, 50)
 
 	bass_motion = []
@@ -32,37 +28,12 @@ class Voice:
 	alto_motion = []
 	soprano_motion = []
 
-	mode_notes = {
-		"lydian": (0, 2, 4, 6, 7, 9, 11),
-		"ionian": (0, 2, 4, 5, 7, 9, 11),
-		"mixo": (0, 2, 4, 5, 7, 9, 10),
-		"dorian": (0, 2, 3, 5, 7, 9, 10),
-		"aeolian": (0, 2, 3, 5, 7, 8, 10),
-		"phryg": (0, 1, 3, 5, 7, 8, 10) 
-	}
-	tonics = {
-		"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4,"F": 5, "F#": 6, 
-		"Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B":11
-	}
-
 	note_letters = ("C","D","E","F","G","A","B")
-
 	note_names = (
 		("B#","C","Dbb"), ("B##","C#", "Db"), ("C##", "D", "Ebb"), ("D#","Eb"),
 		("D##","E","Fb"), ("E#","F","Gbb"), ("E##","F#", "Gb"), ("F##","G","Abb"), 
 		("G#", "Ab"), ("G##","A","Bbb"), ("A#","Bb","Cbb"), ("A##","B","Cb"), 
 	)
-
-	simple_beat_durations = {
-		4: "1", 3: "2.", 2: "2", 1.5: "4.", 1: "4", 0.75: "8.",
-		0.5: "8", 0.375: "16.", 0.25: "16", 0.125: "32", 
-	}
-	compound_beat_durations = {
-		4: "1.", Fraction("8/3"): "4", 2: "2.", Fraction("4/3"):"2", 1: "4.",   
-		Fraction("2/3"): "4", 0.5: "8.", Fraction("1/3"): "8", 
-		Fraction("1/6"): "16"  
-	}
-	beat_durations = {}
 	interval_names = {
 		(0,0): "P8", (0,1): "d2", (1,0): "A1", (1,1): "m2", (2,1): "M2", 
 		(2,2): "d3", (3,1): "A2", (3,2): "m3", (4,2): "M3", (4,3): "d4", 
@@ -197,7 +168,7 @@ class Voice:
 	def set_sheet_notes(self):
 		"""Convert midi pitches into sheet music note names"""
 
-		tonic_letter = Voice.tonic.replace('#',"").replace('b',"")
+		tonic_letter = self.tonic.replace('#',"").replace('b',"")
 		tonic_index = Voice.note_letters.index(tonic_letter)
 
 		self.logger.warning(len(self.midi_notes))
@@ -231,7 +202,7 @@ class Voice:
 		object_index = 0
 		if Voice.pickup:
 			object_duration = Voice.pickup_duration // 960
-			lily_part = [f"\\partial {Voice.beat_durations[object_duration]}"]
+			lily_part = [f"\\partial {self.beat_durations[object_duration]}"]
 		else:
 			lily_part = []
 
@@ -242,15 +213,15 @@ class Voice:
 
 			object_duration = Fraction(numerator=midi_note.duration, denominator=960)
 			object_rhythm = Voice.partition_rhythm(
-				Voice.beat_durations, object_duration)
+				self.beat_durations, object_duration)
 			if sheet_note is None:
 				lily_rest = ""
 				for rest_part in object_rhythm[:-1]:
 					lily_rest = "".join([
-						lily_rest, "r", Voice.beat_durations[rest_part], " "])
+						lily_rest, "r", self.beat_durations[rest_part], " "])
 
 				lily_rest = "".join([
-					lily_rest, "r", Voice.beat_durations[object_rhythm[-1]]])
+					lily_rest, "r", self.beat_durations[object_rhythm[-1]]])
 
 				lily_part.append(lily_rest)
 				continue
@@ -286,12 +257,12 @@ class Voice:
 			for beat_part in object_rhythm[:-1]:
 				lily_note = "".join([
 					lily_note, note_letter, accidental_mark, octave_mark,
-					Voice.beat_durations[beat_part], "~ "
+					self.beat_durations[beat_part], "~ "
 				])
 
 			lily_note = "".join([
 				lily_note, note_letter, accidental_mark, octave_mark, 
-				Voice.beat_durations[object_rhythm[-1]]
+				self.beat_durations[object_rhythm[-1]]
 			])
 
 			lily_part.append(lily_note)

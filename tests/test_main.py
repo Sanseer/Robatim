@@ -6,7 +6,7 @@ from fractions import Fraction
 import requests
 
 from generate.voices.voice import Voice 
-from generate.idioms.score import Score
+from generate.idioms.progression import Progression
 
 class MainScoreMethods(unittest.TestCase):
 
@@ -129,14 +129,14 @@ class MainScoreMethods(unittest.TestCase):
 
 	def test_truncation(self):
 
-		self.assertFalse(Score.allows_truncation([], 0, 2))
-		self.assertFalse(Score.allows_truncation([], 3, 0))
-		self.assertFalse(Score.allows_truncation([1, 2, 3], 4, 4))
-		self.assertFalse(Score.allows_truncation([2, 3, 2, 1, 2, 3], 2, 3))
+		self.assertFalse(Progression.allows_truncation([], 0, 2))
+		self.assertFalse(Progression.allows_truncation([], 3, 0))
+		self.assertFalse(Progression.allows_truncation([1, 2, 3], 4, 4))
+		self.assertFalse(Progression.allows_truncation([2, 3, 2, 1, 2, 3], 2, 3))
 
-		self.assertTrue(Score.allows_truncation([0, 1, 0, 1], 2, 1))
-		self.assertTrue(Score.allows_truncation([3, 2, 1, 3, 2], 3, 1))
-		self.assertTrue(Score.allows_truncation([5, 0, 2, 5, 1, 2, 5, 2, 2], 3, 2))
+		self.assertTrue(Progression.allows_truncation([0, 1, 0, 1], 2, 1))
+		self.assertTrue(Progression.allows_truncation([3, 2, 1, 3, 2], 3, 1))
+		self.assertTrue(Progression.allows_truncation([5, 0, 2, 5, 1, 2, 5, 2, 2], 3, 2))
 
 
 if __name__ == "__main__":

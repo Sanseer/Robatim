@@ -515,7 +515,7 @@ class Chorale(Voice):
 		)
 		end_voices_used = [[{0,1,2,3}], [{}]]
 
-		if Voice.repeat_ending:
+		if self.repeat_ending:
 			self.add_chord_section(
 				-2 % num_chords, num_chords, all_note_durations, 
 				all_voices_used, chord_units_used
