@@ -28,12 +28,6 @@ class Voice(Score):
 	alto_motion = []
 	soprano_motion = []
 
-	note_letters = ("C","D","E","F","G","A","B")
-	note_names = (
-		("B#","C","Dbb"), ("B##","C#", "Db"), ("C##", "D", "Ebb"), ("D#","Eb"),
-		("D##","E","Fb"), ("E#","F","Gbb"), ("E##","F#", "Gb"), ("F##","G","Abb"), 
-		("G#", "Ab"), ("G##","A","Bbb"), ("A#","Bb","Cbb"), ("A##","B","Cb"), 
-	)
 	interval_names = {
 		(0,0): "P8", (0,1): "d2", (1,0): "A1", (1,1): "m2", (2,1): "M2", 
 		(2,2): "d3", (3,1): "A2", (3,2): "m3", (4,2): "M3", (4,3): "d4", 

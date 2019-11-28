@@ -2,6 +2,7 @@ import random
 import json
 import requests
 import time
+import argparse
 
 from generate.midi_export import MIDIFile
 from generate.idioms.score import Score
@@ -72,9 +73,9 @@ def make_score_pdf(sheet_code):
 	with open("final_score.pdf", "wb") as f:
 		f.write(pdf_response.content)
 
-def reset_score_settings():
+def reset_score_settings(score_args):
 	"""Reset parameters of score to allow creation of a new piece"""
-	Score.reset()
+	Score.reset(score_args.tonic, score_args.mode, score_args.style)
 	Voice.chord_sequence = []
 	Voice.all_midi_pitches = []
 	Voice.midi_score = []
@@ -90,6 +91,13 @@ def reset_score_settings():
 
 
 if __name__ == "__main__":
+	parser = argparse.ArgumentParser(
+		description="A pseudo-random music generator"
+	)
+	parser.add_argument('-t', "--tonic")
+	parser.add_argument('-m', "--mode")
+	parser.add_argument("-s", "--style", default="Mm")
+	score_args = parser.parse_args()
 	track = 0
 	current_time = 0
 	channel = 0
@@ -107,7 +115,7 @@ if __name__ == "__main__":
 
 	while True:
 		try:
-			reset_score_settings()
+			reset_score_settings(score_args)
 			Melody().make_melody()
 			chorale.Chorale().create_parts()
 			chorale.Bass().create_part()
