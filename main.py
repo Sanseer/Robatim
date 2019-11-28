@@ -17,6 +17,8 @@ def make_lily_file():
 		mode = "major"
 	elif Voice.mode == "aeolian":
 		mode = "minor"
+	else: 
+		mode = Voice.mode
 
 	if Voice.beat_division == 3:
 		time_sig = f"{Voice.measure_length * 3}/8"
@@ -161,7 +163,7 @@ if __name__ == "__main__":
 		MOD_SPEED = 1
 	if Voice.mode == "aeolian":
 		tempo = random.choice(range(85, 101)) * MOD_SPEED
-	elif Voice.mode == "ionian":
+	else:
 		tempo = random.choice(range(85, 111)) * MOD_SPEED
 	MyMIDI.addTempo(track, current_time, tempo)
 

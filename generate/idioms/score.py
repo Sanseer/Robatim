@@ -60,7 +60,6 @@ class Score:
 		"dorian": (0, 2, 3, 5, 7, 9, 10),
 		"aeolian": (0, 2, 3, 5, 7, 8, 10),
 		"phrygian": (0, 1, 3, 5, 7, 8, 10),
-		"locrian": (0, 1, 3, 5, 6, 8, 10, 12)
 	}
 	note_letters = ("C","D","E","F","G","A","B")
 	note_names = (
@@ -76,8 +75,7 @@ class Score:
 			mode = mode.lower()
 		if tonic is not None:
 			tonic = tonic.title()
-		# if mode in cls.mode_notes:
-		if mode in ("ionian", "aeolian"):
+		if mode in cls.mode_notes:
 			cls.mode = mode
 		elif mode == "major":
 			cls.mode = "ionian"
@@ -86,10 +84,10 @@ class Score:
 		elif mode is None: 
 			if style == "Mm":
 				cls.mode = random.choice(("ionian", "aeolian"))
-			# elif style == "modal":
-			# 	cls.mode = random.choice(
-			# 		("lydian", "mixolydian", "dorian", "phrygian")
-			# 	)
+			elif style == "modal":
+				cls.mode = random.choice(
+					("lydian", "mixolydian", "dorian", "phrygian")
+				)
 			else:
 				raise ValueError("Invalid mode (style) input")
 		else:

@@ -7,6 +7,7 @@ import time
 from generate.voices.voice import Voice
 from generate.idioms.chord import Chord
 from generate.idioms.progression import Progression
+from generate.idioms.score import Score
 
 class Melody(Voice):
 	"""A chord-based melody builder"""
@@ -140,6 +141,7 @@ class Melody(Voice):
 		self.realize_melody()
 
 		self.add_midi_score()
+		self.prepare_score()
 
 		self.set_sheet_notes()
 		self.make_lily_part()
@@ -164,6 +166,12 @@ class Melody(Voice):
 
 	def make_chord_progression(self):
 		"""Make a chord progression using common practice idioms"""
+		major_minor_tonality = ("ionian", "aeolian") 
+		if self.mode not in major_minor_tonality:
+			temp_mode = self.mode
+			Score.mode = random.choice(major_minor_tonality)
+		else:
+			temp_mode = None
 		chord_structure, Voice.chord_acceleration = self.progression_obj.choose_progression_type()
 		print(f"Chord acceleration: {Voice.chord_acceleration}")
 		self.logger.warning(f"{chord_structure}")
@@ -177,6 +185,8 @@ class Melody(Voice):
 					Voice.chord_sequence.append(Chord(chord_choice))
 
 		print(f"Chord sequence: {Voice.chord_sequence}")
+		if temp_mode is not None:
+			Score.mode = temp_mode
 
 	def create_rhythm(self):
 		"""Choose a rhythm for the melody with basic/contrasting ideas"""
@@ -641,7 +651,6 @@ class Melody(Voice):
 			self.midi_notes.append(
 				Voice.Note("Rest", self.current_time, Voice.max_note_duration))
 			self.current_time += Voice.max_note_duration
-			self.add_rest_placeholders()
 			return
 
 		second_pickup_fraction = Fraction(
@@ -671,7 +680,6 @@ class Melody(Voice):
 			Voice.Note("Rest", self.current_time, Voice.max_note_duration)
 		)
 		self.current_time += Voice.max_note_duration
-		self.add_rest_placeholders()
 
 	def add_pickup_notes(self):
 		"""Adds pickup notes to beginning of the piece"""
@@ -819,6 +827,11 @@ class Melody(Voice):
 				object_index += 1
 
 		return object_index
+
+	def prepare_score(self):
+		self.add_rest_placeholders()
+		if self.mode not in ("ionian", "aeolian"):
+			Voice.chord_sequence = (Chord("0I"),) * 16
 
 	def add_rest_placeholders(self):
 		"""Modify scale degree sequence to match midi note sequence"""
