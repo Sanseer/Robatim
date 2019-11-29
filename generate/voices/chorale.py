@@ -67,7 +67,7 @@ class Chorale(Voice):
 		self.condensed_chords.append(current_chord_obj)
 		self.unique_chord_indices.add(0)
 		self.unsorted_pitch_combo_sequence.append(
-			Voice.make_pitch_combos(current_chord_obj.pitches_to_degrees)
+			Voice.make_pitch_combos(current_chord_obj)
 		)
 		previous_chord_obj = current_chord_obj
 
@@ -76,7 +76,7 @@ class Chorale(Voice):
 				self.condensed_chords.append(current_chord_obj)
 				self.unique_chord_indices.add(original_chord_index)
 				self.unsorted_pitch_combo_sequence.append(
-					Voice.make_pitch_combos(current_chord_obj.pitches_to_degrees)
+					Voice.make_pitch_combos(current_chord_obj)
 				)
 			previous_chord_obj = current_chord_obj
 
@@ -144,7 +144,6 @@ class Chorale(Voice):
 		unsorted_pitch_combos = self.unsorted_pitch_combo_sequence[self.chord_index]
 		current_chord = current_chord_obj.chord_name
 		chord_direction = str(current_chord_obj)[0]
-		bass_degree = current_chord_obj.bass_degree
 
 		if self.chord_index > 0:
 			previous_chord_obj = self.condensed_chords[self.chord_index - 1]
@@ -166,7 +165,7 @@ class Chorale(Voice):
 			if self.is_voice_lead(
 			  pitch_combo, current_chord, previous_chord, chord_direction, 
 			  current_pitches_dict, previous_degree_combo, 
-			  previous_chord_members, current_chord_members, bass_degree):
+			  previous_chord_members, current_chord_members):
 				yield pitch_combo
 
 	def arrange_pitch_combos(
@@ -224,32 +223,14 @@ class Chorale(Voice):
 	def is_voice_lead(
 	  self, pitch_combo, current_chord, previous_chord, chord_direction, 
 	  current_pitches_dict, previous_degree_combo, previous_chord_members, 
-	  current_chord_members, bass_degree):
+	  current_chord_members):
 		"""Check voice-leading of current chord progression"""
 
 		(b_pitch, t_pitch, a_pitch, s_pitch) = pitch_combo
-		current_degree_combo = (current_pitches_dict[b_pitch], 
-			current_pitches_dict[t_pitch], 
-			current_pitches_dict[a_pitch],
-			current_pitches_dict[s_pitch])
-
-		if current_chord_members[0] not in current_degree_combo:
-			return False
-		if current_chord_members[1] not in current_degree_combo:
-			return False
-		if len(current_chord_members) == 4:  
-			if current_degree_combo.count(current_chord_members[3]) != 1:
-				return False 
-			if (current_chord in Voice.subdom_sevenths and 
-			  current_chord != "II7" and 
-			  current_chord_members[2] not in current_degree_combo):
-				return False
-		if bass_degree != current_degree_combo[0]:
-			return False
-		if current_degree_combo.count(6) >= 2:
-			return False
-		if current_chord == "I64" and current_degree_combo.count(0) >= 2:
-			return False
+		current_degree_combo = (
+			current_pitches_dict[b_pitch], current_pitches_dict[t_pitch], 
+			current_pitches_dict[a_pitch], current_pitches_dict[s_pitch]
+		)
 
 		bass_tenor_intervals = self.bass_tenor_intervals[:]
 		bass_tenor_intervals.append(

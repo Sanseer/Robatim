@@ -127,8 +127,9 @@ class Voice(Score):
 	    return result_list
 
 	@staticmethod
-	def make_pitch_combos(current_pitches_dict):
+	def make_pitch_combos(current_chord_obj):
 		"""Generates voicing combinations for a given chord"""
+		current_pitches_dict = current_chord_obj.pitches_to_degrees
 		possible_midi_pitches = [[] for _ in range(4)]
 		for midi_pitch in current_pitches_dict:
 			if 40 <= midi_pitch <= 60:
@@ -142,11 +143,18 @@ class Voice(Score):
 			if midi_pitch > 79:
 				break
 
+		current_chord_members = current_chord_obj.scale_degrees
+		bass_degree = current_chord_obj.bass_degree
+		current_chord = current_chord_obj.chord_name
 		# must realize full sequence to prevent iterator exhaustion
 		# faster runtime if pitch combos are only calculated once per chord index
 		validated_pitch_combos = []
 		for chord_combo in itertools.product(*possible_midi_pitches):
 			(b_pitch, t_pitch, a_pitch, s_pitch) = chord_combo
+			current_degree_combo = (
+				current_pitches_dict[b_pitch], current_pitches_dict[t_pitch],
+				current_pitches_dict[a_pitch], current_pitches_dict[s_pitch],
+			)
 			if not b_pitch <= t_pitch <= a_pitch <= s_pitch:
 				continue 
 			if b_pitch - t_pitch > 24:
@@ -154,6 +162,23 @@ class Voice(Score):
 			if a_pitch - t_pitch > 12:
 				continue
 			if s_pitch - a_pitch > 12:
+				continue
+			if current_chord_members[0] not in current_degree_combo:
+				continue
+			if current_chord_members[1] not in current_degree_combo:
+				continue
+			if len(current_chord_members) == 4:  
+				if current_degree_combo.count(current_chord_members[3]) != 1:
+					continue 
+				if (current_chord in Voice.subdom_sevenths and 
+				  current_chord != "II7" and 
+				  current_chord_members[2] not in current_degree_combo):
+					continue
+			if bass_degree != current_degree_combo[0]:
+				continue
+			if current_degree_combo.count(6) >= 2:
+				continue
+			if current_chord == "I64" and current_degree_combo.count(0) >= 2:
 				continue
 			validated_pitch_combos.append(chord_combo)
 
