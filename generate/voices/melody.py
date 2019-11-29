@@ -45,9 +45,7 @@ class Melody(Voice):
 		self.all_scale_degree_options = []
 
 		self.break_notes = random.choice((True, False))
-		self.restart_basic_idea = random.choice((True, False, False))
 		print(f"Repeat ending: {self.repeat_ending}")
-		print(f"Repeat basic idea: {self.restart_basic_idea}")
 
 		self.melody_range = []
 		self.unit_length = 0
@@ -68,25 +66,28 @@ class Melody(Voice):
 
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [
-				((current - 1,), "CN"), ((current + 1,), "CN")
+				((current - 1,), "CN"), ((current + 1,), "CN"),
 			],
 			1: lambda previous, current, slope: [
 				((previous,), "RET"), ((current,), "ANT"), 
-				((current + slope,), "IN")
+				((current + slope,), "CIN"), ((previous - slope,), "PIN"),
+				((previous - slope * 2,), "OPT"),
 			],
 			2: lambda previous, current, slope: [
-				((previous + slope,), "PT"), ((current + slope,), "IN")
+				((previous + slope,), "IPT"), ((current + slope,), "CIN"),
+				((current,), "ANT"),
 			],
 			3: lambda previous, current, slope: [
-				((previous + slope * 2,), "PT"), ((current + slope,), "IN")
+				((previous + slope * 2,), "IPT"), ((current + slope,), "CIN"),
+				((previous + slope,), "IPT"),
 			],
 			4: lambda previous, current, slope: [
-				((previous + slope * 2,), "PT"), ((current + slope,), "IN")
+				((previous + slope * 2,), "IPT"), ((current + slope,), "CIN"),
 			],
 			5: lambda previous, current, slope: [
-				((previous + slope * 2,), "PT"), ((previous + slope * 3,), "PT")
+				((previous + slope * 2,), "IPT"), ((previous + slope * 3,), "IPT"),
 			],
-			6: lambda previous, current, slope: [((current + slope,), "IN")],
+			6: lambda previous, current, slope: [((current + slope,), "CIN")],
 		}
 
 		self.all_double_figurations = {
@@ -97,23 +98,28 @@ class Melody(Voice):
 				((current - 2, current - 1), "DCN"),
 			],
 			1: lambda previous, current, slope: [
-				((previous - slope, previous), "DRN"), 
-				((current + slope * 2, current + slope), "DRN"), 
-				((current, current + slope), "ANT")
+				((previous - slope, previous), "OPT"), 
+				((current + slope * 2, current + slope), "OPT"), 
+				((current, current + slope), "OPT"),
+				((previous - slope * 2, previous - slope), "OPT"),
 			],
 			2: lambda previous, current, slope: [
-				((current + slope * 2, current + slope), "DRN")
+				((current + slope * 2, current + slope), "OPT"),
+				((previous - slope, previous + slope), "OPT"),
+				((current, current + slope), "OPT"),
 			],
 			3: lambda previous, current, slope: [
-				((previous + slope, previous + slope * 2), "PT"), 
-				((current + slope * 2, current + slope), "DRN")
+				((previous + slope, previous + slope * 2), "IPT"), 
+				((current + slope * 2, current + slope), "OPT"),
+				((previous + slope, current), "IPT"),
 			],
 			4: lambda previous, current, slope: [
-				((previous + slope * 2, previous + slope * 3), "PT")
+				((previous + slope * 2, previous + slope * 3), "IPT"),
+				((previous + slope, previous + slope * 2), "IPT"),
 			],
 			5: lambda previous, current, slope: [
-				((previous + slope * 2, previous + slope * 4), "PT"),
-				((current + slope * 2, current + slope), "DRN")
+				((previous + slope * 2, previous + slope * 4), "IPT"),
+				((current + slope * 2, current + slope), "OPT"),
 			],
 			6: lambda previous, current, slope: [],
 		}
@@ -122,10 +128,10 @@ class Melody(Voice):
 			1: lambda previous, current, slope: [],
 			2: lambda previous, current, slope: [],
 			3: lambda previous, current, slope: [
-				((previous + slope * 2, previous + slope, previous + slope * 2), "PT")
+				((previous + slope * 2, previous + slope, previous + slope * 2), "IPT"),
 			],
 			4: lambda previous, current, slope: [
-				((previous + slope, previous + slope * 2, previous + slope * 3), "PT")
+				((previous + slope, previous + slope * 2, previous + slope * 3), "IPT"),
 			],
 			5: lambda previous, current, slope: [],
 			6: lambda previous, current, slope: [],
@@ -461,7 +467,8 @@ class Melody(Voice):
 		current_section = self.chord_index // 4
 		section_start_index = current_section * 4
 		section_scale_degrees = (
-			self.chosen_scale_degrees[section_start_index:section_start_index + 4])
+			self.chosen_scale_degrees[section_start_index:section_start_index + 4]
+		)
 		end_degree = section_scale_degrees[-1]
 		while end_degree is None:
 			section_scale_degrees.pop()
@@ -505,12 +512,17 @@ class Melody(Voice):
 				return False
 			if self.nested_scale_degrees[13][-1] - 0 > 4:
 				return False
+			if (self.chosen_figurations.count("OPT") > 2 and 
+			  self.nested_scale_degrees[0:4] != self.nested_scale_degrees[8:12]):
+				return False
 
 		num_still_figures = self.chosen_figurations.count("CN")
 		num_still_figures += self.chosen_figurations.count("DN")
 		num_still_figures += self.chosen_figurations.count("DCN")
 
 		if num_still_figures > 2:
+			return False
+		if self.chosen_figurations.count("OPT") > 4:
 			return False
 
 		if self.chord_index >= 3:
@@ -588,7 +600,7 @@ class Melody(Voice):
 
 			# chord 8 and 12 are short-circuited
 			# only need to evaluate once going forward
-			if self.chord_index == 13 and max(unnested_scalar_melody) < 6:
+			if self.chord_index == 13 and max(unnested_scalar_melody) < 5:
 				continue
 			if self.chord_index == 9:
 				section1 = Voice.merge_lists(*self.nested_scale_degrees[:4])
@@ -596,12 +608,6 @@ class Melody(Voice):
 
 				if max(section1) == max(section2):
 					continue
-
-			if (self.restart_basic_idea and self.chord_index == 10 and 
-			  Voice.chord_sequence[0] == Voice.chord_sequence[8] and 
-			  self.nested_scale_degrees[0] != self.nested_scale_degrees[8]):
-				# Must force restart
-				continue
 
 			valid_figure = inbetween
 			break

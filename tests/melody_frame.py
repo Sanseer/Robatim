@@ -8,8 +8,11 @@ class MelodyFrame:
 		self.unnested_scale_degrees = unnest_sequence(self.nested_scale_degrees)
 		self.chosen_scale_degrees = make_base_melody(self.nested_scale_degrees)
 		self.melodic_mvmt = make_melodic_ramp(
-			self.chosen_scale_degrees, self.pickup)
+			self.chosen_scale_degrees, self.pickup
+		)
+		self.chosen_figurations = set_melodic_figures(self.nested_scale_degrees)
 		self.relevant_melodic_mvmt = self.melodic_mvmt[1:]
+		self.repeat_intro = self.nested_scale_degrees[0:4] == self.nested_scale_degrees[8:12]
 
 	def __repr__(self):
 		return str(self.nested_scale_degrees)
@@ -40,6 +43,54 @@ def make_melodic_ramp(chosen_scale_degrees, pickup):
 			melodic_mvmt.append('_')
 
 	return ''.join(melodic_mvmt)
+
+def set_melodic_figures(nested_scale_degrees):
+	chosen_figurations = []
+	melodic_figures = {
+		(2, (1,)): "IPT", (0, (2, 1)): "DCN", (2, (-1, 1)): "OPT", 
+		(0, (-1,)): "CN", (1, (-1,)): "PIN", (1, (2,)): "CIN",
+		(1, (-2, -1)): "OPT", (4, (2,)): "IPT", (3, (4,)): "CIN",
+		(3, (1,)): "IPT", (1, (0,)): "RET", (2, (2,)): "ANT",
+		(3, (2,)): "IPT", (3, (1, 3)): "IPT", (2, (2, 3)): "OPT",
+		(4, (1, 2)): "IPT", (1, (-2,)): "OPT", (1, (-1, 0)): "OPT",
+		(3, (1, 2)): "IPT", (5, (3,)): "5PT", (0, (1,)): "CN",
+		(1, (1,)): "ANT"
+	}
+	chord_index = 0
+	for previous_melody_group, current_melody_group in zip(
+	  nested_scale_degrees, nested_scale_degrees[1:]):
+		chord_index += 1
+		figure_group = []
+		main_pitch_diff = current_melody_group[0] - previous_melody_group[0]
+		main_pitch_direction = Voice.calculate_slope(main_pitch_diff)
+		main_pitch_diff = abs(main_pitch_diff)
+		embellish_degrees = previous_melody_group[1:]
+		if not embellish_degrees:
+			chosen_figurations.append(None)
+			continue
+		for previous_melody_note in embellish_degrees:
+			pitch_diff = previous_melody_note - previous_melody_group[0]
+			pitch_direction = Voice.calculate_slope(pitch_diff)
+			if pitch_direction == 0:
+				reference_direction = 0
+			if 0 != main_pitch_direction == pitch_direction:
+				reference_direction = 1 * abs(pitch_diff)
+			elif 0 != main_pitch_direction != pitch_direction:
+				reference_direction = -1 * abs(pitch_diff)
+			elif main_pitch_direction == 0:
+				reference_direction = pitch_diff
+			figure_group.append(reference_direction)
+		figure_group = tuple(figure_group)
+		if chord_index == 8:
+			modifier = "PICK_"
+		else:
+			modifier = ""
+		chosen_figurations.append(
+			modifier + melodic_figures[(main_pitch_diff, figure_group)]
+		)
+	print(chosen_figurations)
+	return chosen_figurations
+
 
 
 def unnest_sequence(sequence):
@@ -109,7 +160,7 @@ def test_predominant_descent(obj):
 	return True
 
 
-def test_large_leap_unnested(obj):
+def test_large_leap_nested(obj):
 	chord_index = 1
 	for current_degree, next_degree in zip(
 	  obj.chosen_scale_degrees, obj.chosen_scale_degrees[1:]):
@@ -120,7 +171,7 @@ def test_large_leap_unnested(obj):
 	return True
 
 
-def test_large_leap_nested(obj):
+def test_large_leap_unnested(obj):
 	previous_melody_note = obj.nested_scale_degrees[0][0]
 	for chord_index, melody_group in enumerate(obj.nested_scale_degrees):
 		for fig_index, current_melody_note in enumerate(melody_group):
@@ -216,6 +267,32 @@ def test_unnested_climaxes(obj):
 	if max(section3) <= max(section4):
 		return False
 	return True
+
+def test_bounds(obj):
+	if min(obj.unnested_scale_degrees) < -3:
+		return False
+	if max(obj.unnested_scale_degrees) > 7:
+		return False
+	if max(obj.unnested_scale_degrees) < 5:
+		return False
+	section1 = Voice.merge_lists(*obj.nested_scale_degrees[:3])
+	if min(section1) < 0:
+		return False
+	return True
+
+def test_still_figures(obj):
+	num_still_figures = obj.chosen_figurations.count("CN")
+	num_still_figures += obj.chosen_figurations.count("DN")
+	num_still_figures += obj.chosen_figurations.count("DCN")
+
+	return num_still_figures <= 2
+
+def test_irregular_figures(obj):
+	if obj.chosen_figurations.count("OPT") > 4:
+		return False
+	if obj.chosen_figurations.count("OPT") > 2 and not obj.repeat_intro:
+		return False
+	return True 
 
 melodies = [
 	MelodyFrame([
