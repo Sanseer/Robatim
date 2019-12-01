@@ -14,12 +14,7 @@ class Melody(Voice):
 
 	def __init__(self):
 
-		self.logger = logging.getLogger("melody")
-		melody_handler = logging.FileHandler("logs/melody.log", mode='w')
-		melody_handler.setLevel(logging.WARNING)
-		melody_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
-		melody_handler.setFormatter(melody_format)
-		self.logger.addHandler(melody_handler)
+		Melody.create_logger()
 
 		#reset, incase of failed melody
 		Chord.reset_settings()

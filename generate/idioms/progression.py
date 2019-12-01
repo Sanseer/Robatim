@@ -11,12 +11,7 @@ class Progression(Score):
 
 	def __init__(self):
 
-		self.logger = logging.getLogger("score")
-		score_handler = logging.FileHandler("logs/progression.log", mode='w')
-		score_handler.setLevel(logging.WARNING)
-		score_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
-		score_handler.setFormatter(score_format)
-		self.logger.addHandler(score_handler)
+		Progression.create_logger()
 
 		# save memory
 		empty_tuple = tuple()

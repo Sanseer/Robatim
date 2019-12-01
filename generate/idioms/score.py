@@ -1,5 +1,6 @@
 import random
 from fractions import Fraction
+import logging
 
 class Score:
 	"""Overarching model of a musical piece"""
@@ -153,3 +154,15 @@ class Score:
 			cls.key_sigs = tuple(modal_scale_keys)
 			print(f"Possible key sigs: {cls.key_sigs}")
 		return random.choice(cls.key_sigs) 
+
+	@classmethod
+	def create_logger(cls):
+		"""Creates a log file to track parameters of a class"""
+
+		logger_name = cls.__name__.lower()
+		cls.logger = logging.getLogger(logger_name)
+		log_handler = logging.FileHandler(f"logs/{logger_name}.log")
+		log_handler.setLevel(logging.WARNING)
+		log_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
+		log_handler.setFormatter(log_format)
+		cls.logger.addHandler(log_handler)

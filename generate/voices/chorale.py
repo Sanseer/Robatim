@@ -46,12 +46,7 @@ class Chorale(Voice):
 		self.possible_chord_voicings = []
 		self.unsorted_pitch_combo_sequence = []
 
-		self.logger = logging.getLogger("chorale")
-		chorale_handler = logging.FileHandler("logs/chorale.log", mode='w')
-		chorale_handler.setLevel(logging.WARNING)
-		chorale_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
-		chorale_handler.setFormatter(chorale_format)
-		self.logger.addHandler(chorale_handler)
+		Chorale.create_logger()
 
 	def create_parts(self):
 		"""Create a four-part harmonic sequence"""
@@ -577,12 +572,7 @@ class Bass(Voice):
 		self.unnested_scale_degrees = Voice.chorale_scale_degrees[0]
 		self.midi_notes = Voice.midi_score[1]
 
-		self.logger = logging.getLogger("bass")
-		voice_handler = logging.FileHandler("logs/bass.log", mode='w')
-		voice_handler.setLevel(logging.WARNING)
-		voice_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
-		voice_handler.setFormatter(voice_format)
-		self.logger.addHandler(voice_handler)
+		Bass.create_logger()
 
 
 class Tenor(Voice):
@@ -593,12 +583,8 @@ class Tenor(Voice):
 		self.unnested_scale_degrees = Voice.chorale_scale_degrees[1]
 		self.midi_notes = Voice.midi_score[2]
 
-		self.logger = logging.getLogger("tenor")
-		voice_handler = logging.FileHandler("logs/tenor.log", mode='w')
-		voice_handler.setLevel(logging.WARNING)
-		voice_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
-		voice_handler.setFormatter(voice_format)
-		self.logger.addHandler(voice_handler)
+		Tenor.create_logger()
+
 
 class Alto(Voice):
 	"""The second from top voice of a chorale"""
@@ -608,12 +594,8 @@ class Alto(Voice):
 		self.unnested_scale_degrees = Voice.chorale_scale_degrees[2]
 		self.midi_notes = Voice.midi_score[3]
 
-		self.logger = logging.getLogger("alto")
-		voice_handler = logging.FileHandler("logs/alto.log", mode='w')
-		voice_handler.setLevel(logging.WARNING)
-		voice_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
-		voice_handler.setFormatter(voice_format)
-		self.logger.addHandler(voice_handler)
+		Alto.create_logger()
+
 
 class Soprano(Voice):
 	"""The top voice of a chorale"""
@@ -623,17 +605,5 @@ class Soprano(Voice):
 		self.unnested_scale_degrees = Voice.chorale_scale_degrees[3]
 		self.midi_notes = Voice.midi_score[4]
 
-		self.logger = logging.getLogger("soprano")
-		voice_handler = logging.FileHandler("logs/soprano.log", mode='w')
-		voice_handler.setLevel(logging.WARNING)
-		voice_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
-		voice_handler.setFormatter(voice_format)
-		self.logger.addHandler(voice_handler)
-
-
-
-
-
-
-
+		Soprano.create_logger()
 
