@@ -118,19 +118,6 @@ class Melody(Voice):
 			],
 			6: lambda previous, current, slope: [],
 		}
-		self.all_triple_figurations = {
-			0: lambda previous, current, slope: [],
-			1: lambda previous, current, slope: [],
-			2: lambda previous, current, slope: [],
-			3: lambda previous, current, slope: [
-				((previous + slope * 2, previous + slope, previous + slope * 2), "IPT"),
-			],
-			4: lambda previous, current, slope: [
-				((previous + slope, previous + slope * 2, previous + slope * 3), "IPT"),
-			],
-			5: lambda previous, current, slope: [],
-			6: lambda previous, current, slope: [],
-		}
 
 		self.sheet_notes = []
 
@@ -219,9 +206,9 @@ class Melody(Voice):
 			}
 		elif self.time_sig == (3,2):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(4,4,2,2), (8,2,2), (8,4), (10,2)], 
-				1: [(4,4,2,2), (4,4,4), (6,2,4), (8,2,2), (8,4), (10,2)], 
-				2:[(4,2,6), (4,4,2,2), (4,4,4), (6,6), (6,2,2,2), (6,2,4), (8,2,2), (10,1,1)],
+				-1: [(12,)], 0: [(8,2,2), (8,4), (10,2)], 
+				1: [(4,4,4), (6,2,4), (8,2,2), (8,4), (10,2)], 
+				2:[(4,2,6), (4,4,4), (6,6), (6,2,4), (8,2,2), (10,1,1)],
 				-2: [(8,4), (10,2)],
 			}
 
@@ -564,8 +551,6 @@ class Melody(Voice):
 			all_figurations = self.all_single_figurations
 		elif embellish_amount == 3:
 			all_figurations = self.all_double_figurations
-		elif embellish_amount == 4:
-			all_figurations = self.all_triple_figurations
 		possible_scale_degrees = all_figurations[degree_mvmt](
 			self.previous_degree_choice, self.current_degree_choice, melody_slope)
 
