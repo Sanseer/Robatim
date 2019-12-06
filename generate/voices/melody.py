@@ -106,7 +106,7 @@ class Melody(Voice):
 			3: lambda previous, current, slope: [
 				((previous + slope, previous + slope * 2), "IPT"), 
 				((current + slope * 2, current + slope), "OPT"),
-				((previous + slope, current), "IPT"),
+				((previous + slope, current), "ANT"),
 			],
 			4: lambda previous, current, slope: [
 				((previous + slope * 2, previous + slope * 3), "IPT"),
@@ -333,7 +333,7 @@ class Melody(Voice):
 
 		self.time1 = time.time()
 		if self.time1 - self.time0 > 15:
-			print("Melody takiing too long.")
+			print("Melody taking too long.")
 			raise AssertionError
 
 		# can't track negative progress because figuration options
@@ -455,6 +455,11 @@ class Melody(Voice):
 			if not Voice.has_proper_leaps(unnested_part_half):
 				# "Leap should be followed by contrary stepwise motion (full melody)"
 				return False
+		if self.chord_index == 11:
+			ante_cons_transition = Voice.merge_lists(*self.nested_scale_degrees[5:10]) 
+			if (not Voice.has_proper_leaps(ante_cons_transition) and
+			  self.nested_scale_degrees[0] != self.nested_scale_degrees[8]):
+				return False 
 
 		# score divides into 4 sections, 16 items
 		# first 2 sections: antecedent
@@ -482,8 +487,9 @@ class Melody(Voice):
 				else:
 					return False 
 
-		if self.chord_index == 2 and self.chosen_figurations[0] == "IN":
-			return False
+		if self.chord_index == 2: 
+			if self.chosen_figurations[0] in ("IN", "ANT"):
+				return False
 		if self.chord_index >= 3:
 			previous_melody_note = self.chosen_scale_degrees[self.chord_index - 3]
 			for chord_index, melody_group in enumerate(
@@ -494,6 +500,10 @@ class Melody(Voice):
 					  (fig_index != 0 or chord_index not in self.valid_leap_indices)):
 						return False
 					previous_melody_note = current_melody_note
+			if (self.chord_index not in self.quick_turn_indices and 
+			  melodic_mvmt[self.chord_index - 2:] in {"><>", "<><"}):
+				# No late melodic jukes
+				return False
 
 		if self.chord_index == 8: 
 			section1 = self.chosen_scale_degrees[:4]
@@ -505,7 +515,7 @@ class Melody(Voice):
 			section4 = self.chosen_scale_degrees[12:]
 			if max(section3) <= max(section4):
 				return False
-			if self.nested_scale_degrees[13][-1] - 0 > 4:
+			if abs(self.nested_scale_degrees[-3][-1]) > 1:
 				return False
 			if (self.chosen_figurations.count("OPT") > 2 and 
 			  self.nested_scale_degrees[0:4] != self.nested_scale_degrees[8:12]):
@@ -519,12 +529,6 @@ class Melody(Voice):
 			return False
 		if self.chosen_figurations.count("OPT") > 4:
 			return False
-
-		if self.chord_index >= 3:
-			if (self.chord_index not in self.quick_turn_indices and 
-			  melodic_mvmt[self.chord_index - 2:] in {"><>", "<><"}):
-				# No late melodic jukes
-				return False
 		
 		return True
 

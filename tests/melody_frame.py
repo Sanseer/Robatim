@@ -44,6 +44,7 @@ def make_melodic_ramp(chosen_scale_degrees, pickup):
 
 	return ''.join(melodic_mvmt)
 
+
 def set_melodic_figures(nested_scale_degrees):
 	chosen_figurations = []
 	melodic_figures = {
@@ -51,7 +52,7 @@ def set_melodic_figures(nested_scale_degrees):
 		(0, (-1,)): "CN", (1, (-1,)): "PIN", (1, (2,)): "CIN",
 		(1, (-2, -1)): "OPT", (4, (2,)): "IPT", (3, (4,)): "CIN",
 		(3, (1,)): "IPT", (1, (0,)): "RET", (2, (2,)): "ANT",
-		(3, (2,)): "IPT", (3, (1, 3)): "IPT", (2, (2, 3)): "OPT",
+		(3, (2,)): "IPT", (3, (1, 3)): "ANT", (2, (2, 3)): "OPT",
 		(4, (1, 2)): "IPT", (1, (-2,)): "OPT", (1, (-1, 0)): "OPT",
 		(3, (1, 2)): "IPT", (5, (3,)): "5PT", (0, (1,)): "CN",
 		(1, (1,)): "ANT"
@@ -90,7 +91,6 @@ def set_melodic_figures(nested_scale_degrees):
 		)
 	print(chosen_figurations)
 	return chosen_figurations
-
 
 
 def unnest_sequence(sequence):
@@ -140,24 +140,25 @@ def test_double_repeat(obj):
 
 def test_leaps_within_octave(obj):
 	for current_degree, next_degree in zip(
-	  obj.unnested_scale_degrees, obj.unnested_scale_degrees[1:]):
+	  obj.chosen_scale_degrees, obj.chosen_scale_degrees[1:]):
 		if abs(current_degree - next_degree) > 7:
 			return False
 	return True
 
 
-def test_end_leap(obj):
+def test_end_leap_nested(obj):
 	last_degree = obj.chosen_scale_degrees[-2]
 	penultimate_degree = obj.chosen_scale_degrees[-3]
-	if abs(penultimate_degree - last_degree) > 4:
-		return False
-	return True
+	return abs(penultimate_degree - last_degree) <= 4
+
+
+def test_end_leap_unnested(obj):
+	penultimate_degree = obj.nested_scale_degrees[-3][-1]
+	return abs(penultimate_degree) <= 1
 
 
 def test_predominant_descent(obj):
-	if obj.relevant_melodic_mvmt.count('>') > obj.relevant_melodic_mvmt.count('<'):
-		return False
-	return True
+	return obj.relevant_melodic_mvmt.count('>') <= obj.relevant_melodic_mvmt.count('<')
 
 
 def test_large_leap_nested(obj):
@@ -188,7 +189,15 @@ def test_proper_leaps(obj):
 	unnested_consequent = Voice.merge_lists(*obj.nested_scale_degrees[8:])
 	proper_antecedent_leaps = Voice.has_proper_leaps(unnested_antecedent)
 	proper_consequent_leaps = Voice.has_proper_leaps(unnested_consequent)
-	return proper_antecedent_leaps and proper_consequent_leaps
+	if not (proper_antecedent_leaps and proper_consequent_leaps):
+		return False
+
+	ante_cons_transition = Voice.merge_lists(*obj.nested_scale_degrees[5:10])
+	if (not Voice.has_proper_leaps(ante_cons_transition) and 
+	  obj.nested_scale_degrees[0] != obj.nested_scale_degrees[8]):
+		return False 
+
+	return True
 
 
 def test_nested_climaxes(obj):
@@ -268,6 +277,7 @@ def test_unnested_climaxes(obj):
 		return False
 	return True
 
+
 def test_bounds(obj):
 	if min(obj.unnested_scale_degrees) < -3:
 		return False
@@ -280,6 +290,7 @@ def test_bounds(obj):
 		return False
 	return True
 
+
 def test_still_figures(obj):
 	num_still_figures = obj.chosen_figurations.count("CN")
 	num_still_figures += obj.chosen_figurations.count("DN")
@@ -287,12 +298,22 @@ def test_still_figures(obj):
 
 	return num_still_figures <= 2
 
+
+def test_anticipation_figs(obj):
+	return obj.chosen_figurations[0] != "ANT"
+
+
+def test_neighbor_figs(obj):
+	return obj.chosen_figurations[0] != "IN"
+
+
 def test_irregular_figures(obj):
 	if obj.chosen_figurations.count("OPT") > 4:
 		return False
 	if obj.chosen_figurations.count("OPT") > 2 and not obj.repeat_intro:
 		return False
 	return True 
+
 
 melodies = [
 	MelodyFrame([
