@@ -126,8 +126,13 @@ class Progression(Score):
 				major_mode_only, lambda: self.previous_chord ==  "+IV",
 			)
 		)
+
+		lessen_deceptive_cadence = lambda: self.chord_index != 8 or random.choice((True, False))
 		validate_minus_VI = lambda: self.previous_chord in ("0I", "-V")
-		MINUS_VI = self.PNode("-VI", (validate_minus_VI, prevent_ending))
+		MINUS_VI = self.PNode("-VI", (
+			validate_minus_VI, prevent_ending, lessen_deceptive_cadence
+			)
+		)
 		validate_minus_II = (				
 			lambda: self.mode == "ionian" or self.chord_index % 2 == 1 and 
 				self.previous_chord in ("-II6", "-IV")
@@ -147,7 +152,10 @@ class Progression(Score):
 		)
 
 		validate_minus_IV6 = lambda: self.previous_chord in ("0I", "-VI", "-V")
-		MINUS_IV6 = self.PNode("-IV6", (validate_minus_IV6, prevent_ending))
+		MINUS_IV6 = self.PNode("-IV6", (
+			validate_minus_IV6, prevent_ending, lessen_deceptive_cadence
+			)
+		)
 		MINUS_IV6MAJOR = self.PNode(
 			"-IV6_MAJOR", (minor_mode_only, validate_minus_IV6)
 		)
