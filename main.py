@@ -91,6 +91,11 @@ def reset_score_settings(score_args):
 	Voice.alto_motion = []
 	Voice.soprano_motion = []
 
+	with open("logs/chorale.log", 'w') as f:
+		pass
+	with open("logs/melody.log", 'w') as f:
+		pass
+
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(

@@ -266,7 +266,6 @@ class Melody(Voice):
 	def create_first_melody_note(self):
 		"""Reset the first melody note of the sequence"""
 
-		self.logger.warning(f"Chord index: {self.chord_index}")
 		# AssertionError singles out this scenario.
 		# it traverses the call stack to main.py before being handled.
 		# Other exceptions like IndexError can occur elsewhere in class instance
@@ -285,8 +284,7 @@ class Melody(Voice):
 		self.chord_index += 1
 		self.current_scale_degree_options[1] = self.all_scale_degree_options[1][:]
 		self.previous_degree_choice = self.current_degree_choice
-		self.logger.warning("")
-		self.logger.warning("")
+
 
 	def realize_melody(self):
 		"""Create and validate a melody sequence"""
@@ -296,7 +294,6 @@ class Melody(Voice):
 
 		self.time0 = time.time()
 		while None in self.chosen_scale_degrees:
-			self.logger.warning(f"Chord index: {self.chord_index}")
 			if self.chord_index == 0:
 				self.create_first_melody_note()
 			if self.melody_figure_options[self.chord_index - 1]:
@@ -337,10 +334,6 @@ class Melody(Voice):
 	def advance_score(self):
 		"""Progress to the next chord position after current melody is validated"""
 
-		self.logger.warning(f"Melodic direction {self.melodic_direction}")
-		self.logger.warning(f"Chosen scale degrees: {self.chosen_scale_degrees}")
-		self.logger.warning("")
-		self.logger.warning("")
 		self.chord_index += 1
 		if self.chord_index < len(self.chosen_scale_degrees):
 			self.previous_degree_choice = self.current_degree_choice
@@ -351,7 +344,6 @@ class Melody(Voice):
 	def attempt_melody_figure(self):
 		"""Try the next melody figure using the validated base melody"""
 
-		self.logger.warning("Choosing from remaining figures")
 		# only occurs when backtracking
 		self.current_degree_choice = self.chosen_scale_degrees[self.chord_index]
 		self.reset_unnested_melody()
@@ -364,7 +356,6 @@ class Melody(Voice):
 	def attempt_full_melody(self):
 		"""Try the next base melody +/- figuration at current chord position"""
 
-		self.logger.warning("Choosing base note")
 		self.current_degree_choice = (
 			self.current_scale_degree_options[self.chord_index].pop()
 		)
@@ -597,12 +588,10 @@ class Melody(Voice):
 			break
 
 		if valid_figure is None:
-			self.logger.warning("Melody failed")
 			return False
 		self.nested_scale_degrees[self.chord_index - 1] = [
 				self.previous_degree_choice, *valid_figure]
 		self.chosen_figurations[self.chord_index - 1] = fig_type
-		self.logger.warning(f"Nested valid melody: {self.nested_scale_degrees}")
 		return True
 
 	def add_midi_score(self):
@@ -634,7 +623,6 @@ class Melody(Voice):
 		self.nested_scale_degrees.pop()
 		self.add_midi_section(self.nested_scale_degrees, 0, {}, index_shift)
 
-		self.logger.warning(f"Midi melody: {self.midi_notes}")
 		self.unnested_scale_degrees.pop()
 
 		if not self.repeat_ending:

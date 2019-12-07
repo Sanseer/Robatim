@@ -84,7 +84,6 @@ class Chorale(Voice):
 
 		self.time0 = time.time()
 		while None in self.chosen_chord_voicings:
-			self.logger.warning(f"Chord index: {self.chord_index}")
 			self.combo_choice = next(
 				self.possible_chord_voicings[self.chord_index], None
 			)
@@ -524,11 +523,9 @@ class Chorale(Voice):
 			pitches_to_degrees = current_chord_obj.pitches_to_degrees
 			note_durations = all_note_durations[chord_index % chord_units_used]
 			voices_used = all_voices_used[chord_index % chord_units_used]
-			self.logger.warning(f"Note durations: {note_durations}")
 
 			if chord_index in self.unique_chord_indices:
 				current_pitch_combo = next(unique_chord_iter)
-				self.logger.warning(f"Current pitch combo: {current_pitch_combo}")
 				last_pitch_combo = current_pitch_combo
 
 				for voice_index, current_pitch in enumerate(current_pitch_combo):
@@ -545,7 +542,6 @@ class Chorale(Voice):
 							Voice.chorale_scale_degrees[voice_index].append(None)
 						note_time += note_duration
 			else:
-				self.logger.warning(f"Last pitch combo: {last_pitch_combo}")
 				for voice_index, last_pitch in enumerate(last_pitch_combo):
 					note_time = self.current_time
 

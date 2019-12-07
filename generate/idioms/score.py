@@ -161,7 +161,7 @@ class Score:
 
 		logger_name = cls.__name__.lower()
 		cls.logger = logging.getLogger(logger_name)
-		log_handler = logging.FileHandler(f"logs/{logger_name}.log")
+		log_handler = logging.FileHandler(f"logs/{logger_name}.log", mode='w')
 		log_handler.setLevel(logging.WARNING)
 		log_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
 		log_handler.setFormatter(log_format)

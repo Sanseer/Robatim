@@ -602,7 +602,6 @@ class Progression(Score):
 				all_progression_types[full_pattern] = accelerate
 
 		progression_type = random.choice(tuple(all_progression_types))
-		print(f"Progression type: {progression_type}")
 		return progression_type, all_progression_types[progression_type]
 
 	@staticmethod
