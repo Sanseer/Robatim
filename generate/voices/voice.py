@@ -16,8 +16,6 @@ class Voice(Score):
 	midi_score = []
 	lily_score = []
 	chorale_scale_degrees = []
-	dominant_harmony = {"V", "V7", "V6", "V65", "VII6", "V43", "V42"}
-	subdom_sevenths = {"II7", "II65", "II43", "II42"}
 
 	pickup_duration = 0
 	max_note_duration = 0
@@ -126,8 +124,8 @@ class Voice(Score):
 
 	    return result_list
 
-	@staticmethod
-	def make_pitch_combos(current_chord_obj):
+	@classmethod
+	def make_pitch_combos(cls, current_chord_obj):
 		"""Generates voicing combinations for a given chord"""
 		current_pitches_dict = current_chord_obj.pitches_to_degrees
 		possible_midi_pitches = [[] for _ in range(4)]
@@ -170,15 +168,19 @@ class Voice(Score):
 			if len(current_chord_members) == 4:  
 				if current_degree_combo.count(current_chord_members[3]) != 1:
 					continue 
-				if (current_chord in Voice.subdom_sevenths and 
+				if (current_chord in cls.subdom_sevenths and 
 				  current_chord != "II7" and 
 				  current_chord_members[2] not in current_degree_combo):
 					continue
 			if bass_degree != current_degree_combo[0]:
 				continue
-			if current_degree_combo.count(6) >= 2:
+			if current_chord in cls.secondary_dominants: 
+				leading_degree = 3
+				if current_degree_combo.count(leading_degree) >= 2:
+					continue
+			elif current_chord == "I64" and current_degree_combo.count(0) >= 2:
 				continue
-			if current_chord == "I64" and current_degree_combo.count(0) >= 2:
+			elif current_degree_combo.count(6) >= 2:
 				continue
 			validated_pitch_combos.append(chord_combo)
 

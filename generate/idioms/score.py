@@ -69,6 +69,10 @@ class Score:
 		("G#", "Ab"), ("G##","A","Bbb"), ("A#","Bb","Cbb"), ("A##","B","Cb"), 
 	)
 
+	primary_dominants = {"V", "V7", "V6", "V65", "VII6", "V43", "V42"}
+	secondary_dominants = {"V/V", "V7/V", "V6/V", "V65/V", "VII6/V", "V43/V", "V42/V"}
+	subdom_sevenths = {"II7", "II65", "II43", "II42"}
+
 	@classmethod
 	def reset(cls, tonic=None, mode=None, style=None):
 		"""Reset the variables of the Score class"""

@@ -156,6 +156,8 @@ class Melody(Voice):
 		"""Make a chord progression using common practice idioms"""
 		major_minor_tonality = ("ionian", "aeolian") 
 		if self.mode not in major_minor_tonality:
+			# I don't know any modal progressions yet so, I'll use
+			# major-minor progressions for melody with a pedal chord for harmony
 			temp_mode = self.mode
 			Score.mode = random.choice(major_minor_tonality)
 		else:
@@ -744,13 +746,13 @@ class Melody(Voice):
 			else: 
 				note_alterations = {}
 				
-			if self.mode == "aeolian" and current_chord_name in Voice.dominant_harmony:
+			if self.mode == "aeolian" and current_chord_name in self.primary_dominants:
 				if melodic_minor: 
 					note_alterations[5] = 1 
 				else:
 					# catch raised notes inbetween 2 chords
 					next_chord_name = Voice.chord_sequence[chord_index + 1].chord_name
-					if next_chord_name in Voice.dominant_harmony:
+					if next_chord_name in self.primary_dominants:
 						affected_scale_group = current_scale_group + next_scale_group
 					else:
 						affected_scale_group = current_scale_group
@@ -810,7 +812,7 @@ class Melody(Voice):
 		self.add_rest_placeholders()
 		if self.mode not in ("ionian", "aeolian"):
 			Chord.reset_settings()
-			Voice.chord_sequence = (Chord("0I", True),) * 16
+			Voice.chord_sequence = (Chord("0I"),) * 16
 
 	def add_rest_placeholders(self):
 		"""Modify scale degree sequence to match midi note sequence"""

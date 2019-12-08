@@ -45,35 +45,53 @@ class Progression(Score):
 		from_negative_chord = lambda: self.previous_chord[0] == "-"
 		validate_minus_V7 = (
 			lambda: self.previous_chord in (
-				"0I", "-I6", "-II", "-II7", "-II6", "-II65", "-IV", "-IV_MAJOR", 
-				"-VI", "-IV6", "-IV6_MAJOR", "-IV7"
+				"0I", "-I6", "+II", "-II", "-II7", "-II6", "-II65", "-IV", 
+				"-IV_MAJOR", "-VI", "-IV6", "-IV6_MAJOR", "-IV7", "-V/V", 
+				"+V/V", "-V6/V", "+V7/V","-V7/V"," -V65/V", "-V43/V", "-VII6/V",
 			)
 		)
 		validate_minus_V6 = (
 			lambda: self.previous_chord in (
 				"0I", "+I6", "+II", "+II6", "+IV", "-IV6", "-IV6_MAJOR", 
-				"-IV65", "-IV65_MAJOR", "+II7", "+II65", "0II42", 
+				"-IV65", "-IV65_MAJOR", "+II7", "+II65", "0II42", "0V42/V", 
+				"-VII6/V", "-V43/V"
 			)
 		)
 		prevent_a2_with_V6 = (
 			lambda: self.mode == "ionian" or self.previous_chord not in ("-IV6", "-IV65")
 		)
+		not_secondary_dominants = lambda: self.previous_chord[1:] not in self.secondary_dominants
 
 		not_plus_II7 = lambda: self.previous_chord != "+II7"
 		not_minus_II7 = lambda: self.previous_chord != "-II7"
-		not_II42 = lambda: self.previous_chord != "0II42"
-		PLUS_V = self.PNode("+V", (from_positive_chord, not_plus_II7, not_II42))
+		not_chord42 = lambda: "42" not in self.previous_chord
+		PLUS_V = self.PNode("+V", (from_positive_chord, not_plus_II7, not_chord42))
 		MINUS_V = self.PNode("-V", (validate_minus_V7, not_minus_II7)) 
-		PLUS_V7 = self.PNode("+V7", (from_positive_chord, not_II42))
-		MINUS_V7 = self.PNode("-V7", (validate_minus_V7,))
+		PLUS_V7 = self.PNode(
+			"+V7", (from_positive_chord, not_chord42, not_secondary_dominants)
+		)
+		MINUS_V7 = self.PNode("-V7", (validate_minus_V7, not_secondary_dominants))
 		MINUS_V6 = self.PNode("-V6", (validate_minus_V6, prevent_a2_with_V6))
 
-		MINUS_V65 = self.PNode("-V65", (validate_minus_V6, prevent_a2_with_V6))
-		PLUS_VII6 = self.PNode("+VII6", (from_positive_chord, not_II42)
+		MINUS_V65 = self.PNode(
+			"-V65", (
+				validate_minus_V6, prevent_a2_with_V6
+			)
 		)
-		PLUS_V43 = self.PNode("+V43", (from_positive_chord, not_II42)
+		PLUS_VII6 = self.PNode(
+			"+VII6", (
+				from_positive_chord, not_chord42, not_secondary_dominants,
+			)
 		)
-		PLUS_V42 = self.PNode("+V42", (from_positive_chord, not_II42)
+		PLUS_V43 = self.PNode(
+			"+V43", (
+				from_positive_chord, not_chord42, not_secondary_dominants,
+			)
+		)
+		PLUS_V42 = self.PNode(
+			"+V42", (
+				from_positive_chord, not_chord42, not_secondary_dominants,
+			)
 		)
 
 		proper_subdom_order = (
@@ -86,6 +104,11 @@ class Progression(Score):
 		no_major_mode_shift = lambda: self.previous_chord[-5:] != "MAJOR"
 		no_minor_mode_shift = lambda: self.previous_chord[-5:] != "MINOR"
 
+		not_plus_II6 = lambda: self.previous_chord != "+II6"
+		not_minus_II6 = lambda: self.previous_chord != "-II6"
+		not_plus_II = lambda: self.previous_chord != "+II"
+		not_minus_II = lambda: self.previous_chord != "-II"
+
 		maintain_seventh_tension = (
 			lambda: self.previous_chord[-2:] not in ("65", "43", "42"),
 			lambda: self.previous_chord[-1] != "7",
@@ -97,16 +120,28 @@ class Progression(Score):
 		PLUS_II = self.PNode(
 			"+II", (
 				validate_plus_II, from_positive_chord, 
-				*maintain_seventh_tension
+				*maintain_seventh_tension,
+			)
+		)
+		PLUS_V_OF_V = self.PNode(
+			"+V/V", (
+				validate_plus_II, from_positive_chord, not_plus_II,
+				*maintain_seventh_tension, 
 			)
 		)
 		PLUS_II6 = self.PNode(
 			"+II6", (from_positive_chord, *maintain_seventh_tension)
 		)
+		PLUS_V6_OF_V = self.PNode(
+			"+V6/V", (
+				from_positive_chord, not_plus_II6, *maintain_seventh_tension
+			)
+		)
+		not_sec_V = lambda: self.previous_chord[-2:] != "/V"
 		PLUS_IV = self.PNode(
 			"+IV", (
 				proper_subdom_order, from_positive_chord, no_minor_mode_shift,
-				*maintain_seventh_tension,
+				*maintain_seventh_tension, not_sec_V
 			)
 		)
 		PLUS_IVMAJOR = self.PNode(
@@ -142,9 +177,18 @@ class Progression(Score):
 				validate_minus_II, from_negative_chord, *maintain_seventh_tension,
 			)
 		)
+		MINUS_V_OF_V = self.PNode(
+			"-V/V", (
+				validate_minus_II, from_negative_chord, not_minus_II,
+				*maintain_seventh_tension
+			)
+		)
 		MINUS_II6 = self.PNode(
 			"-II6", (from_negative_chord, *maintain_seventh_tension)
 		) 
+		MINUS_V6_OF_V = self.PNode(
+			"-V6/V", (from_negative_chord, not_minus_II6, *maintain_seventh_tension)
+		)
 		MINUS_IV = self.PNode(
 			"-IV", (
 				from_negative_chord, proper_subdom_order, *maintain_seventh_tension
@@ -159,11 +203,7 @@ class Progression(Score):
 		MINUS_IV6MAJOR = self.PNode(
 			"-IV6_MAJOR", (minor_mode_only, validate_minus_IV6)
 		)
-
-		not_plus_II6 = lambda: self.previous_chord != "+II6"
-		not_minus_II6 = lambda: self.previous_chord != "-II6"
-		not_plus_II = lambda: self.previous_chord != "+II"
-		not_minus_II = lambda: self.previous_chord != "-II"
+		MINUS_VII6_OF_V = self.PNode("-VII6/V", (validate_minus_IV6,))
 
 		# II7 must go to V7 if it's the last subdom chord
 		ante_section_only = lambda: self.chord_index < 8
@@ -171,17 +211,48 @@ class Progression(Score):
 		PLUS_II65 = self.PNode(
 			"+II65", (from_positive_chord, not_plus_II6)
 		)
+		PLUS_V65_OF_V = self.PNode(
+			"+V65/V", (
+				from_positive_chord, not_plus_II6, *maintain_seventh_tension,
+			)
+		)
 		MINUS_II65 = self.PNode(
 			"-II65",(from_negative_chord, not_minus_II6)
+		)
+		MINUS_V65_OF_V = self.PNode(
+			"-V65/V", (
+				from_negative_chord, not_minus_II6, *maintain_seventh_tension,
+			)
 		)
 		PLUS_II7 = self.PNode(
 			"+II7", (from_positive_chord, not_plus_II)
 		)
+		PLUS_V7_OF_V = self.PNode(
+			"+V7/V", (
+				from_positive_chord, not_plus_II, *maintain_seventh_tension,
+			)
+		)
 		MINUS_II7 = self.PNode(
 			"-II7", (from_negative_chord, not_minus_II, cons_section_only)
 		)
+		MINUS_V7_OF_V = self.PNode(
+			"-V7/V", (
+				from_negative_chord, not_minus_II, *maintain_seventh_tension,
+			)
+		)
+		MINUS_V43_OF_V = self.PNode(
+			"-V43/V", (
+				from_negative_chord, not_minus_II, *maintain_seventh_tension, 
+			)
+		)
 		NULL_II42 = self.PNode(
 			"0II42", (from_positive_chord, ante_section_only)
+		)
+		NULL_V42_OF_V = self.PNode(
+			"0V42/V", (
+				from_positive_chord, ante_section_only, 
+				*maintain_seventh_tension,
+			)
 		)
 		PLUS_IV7 = self.PNode(
 			"+IV7", (
@@ -201,7 +272,9 @@ class Progression(Score):
 		MINUS_IV65MAJOR = self.PNode(
 			"-IV65_MAJOR", (minor_mode_only, validate_minus_IV6, ante_section_only)
 		)
-		PLUS_I64 = self.PNode("+I64", (from_positive_chord, not_II42))
+		PLUS_I64 = self.PNode(
+			"+I64", (from_positive_chord, not_chord42, not_secondary_dominants)
+		)
 
 		# patterns ignore individual chord rules
 		PATTERN_EXTEND5_DOUBLE01 = self.PNode(
@@ -219,7 +292,7 @@ class Progression(Score):
 		)
 		PATTERN_EXTEND5_DOUBLE05 = self.PNode(
 			(PLUS_V, PLUS_V42, PLUS_I6), (
-				from_positive_chord, not_plus_II7, not_II42
+				from_positive_chord, not_plus_II7, not_chord42
 			)
 		)
 		PATTERN_EXTEND5_DOUBLE06 = self.PNode(
@@ -234,29 +307,42 @@ class Progression(Score):
 		)
 
 		PATTERN_EXTEND5_DOUBLE10 = self.PNode(
-			(PLUS_I64, PLUS_V, NULL_I), (from_positive_chord, not_II42)
+			(PLUS_I64, PLUS_V, NULL_I), (
+				from_positive_chord, not_chord42, not_secondary_dominants
+			)
 		)
 		PATTERN_EXTEND5_DOUBLE11 = self.PNode(
-			(PLUS_I64, MINUS_V, NULL_I), (from_positive_chord, not_II42)
+			(PLUS_I64, MINUS_V, NULL_I), (
+				from_positive_chord, not_chord42, not_secondary_dominants
+			)
 		)
 		PATTERN_EXTEND5_DOUBLE12 = self.PNode(
-			(PLUS_I64, PLUS_V42, PLUS_I6), (from_positive_chord, not_II42)
+			(PLUS_I64, PLUS_V42, PLUS_I6), (
+				from_positive_chord, not_chord42, not_secondary_dominants
+			)
 		)
 		PATTERN_EXTEND5_DOUBLE13 = self.PNode(
-			(PLUS_I64, PLUS_V7, NULL_I), (from_positive_chord, not_II42)
+			(PLUS_I64, PLUS_V7, NULL_I), (
+				from_positive_chord, not_chord42, not_secondary_dominants
+			)
 		)
 		PATTERN_EXTEND5_DOUBLE14 = self.PNode(
-			(PLUS_I64, MINUS_V7, NULL_I), (from_positive_chord, not_II42)
+			(PLUS_I64, MINUS_V7, NULL_I), (
+				from_positive_chord, not_chord42, not_secondary_dominants
+			)
 		)
 		PATTERN_EXTEND5_DOUBLE15 = self.PNode(
 			(PLUS_IV, PLUS_IVMINOR, NULL_I), (
 				major_mode_only, no_minor_mode_shift, proper_subdom_order, 
-				from_positive_chord, *maintain_seventh_tension
+				from_positive_chord, *maintain_seventh_tension, 
+				not_sec_V
 			)
 		)
 
 		PATTERN_EXTEND5_DOUBLE20 = self.PNode(
-			(PLUS_V43, NULL_I, MINUS_V6), (from_positive_chord, not_II42)
+			(PLUS_V43, NULL_I, MINUS_V6), (
+				from_positive_chord, not_chord42, not_secondary_dominants
+			)
 		)
 		PATTERN_EXTEND5_DOUBLE21 = self.PNode(
 			(MINUS_V, MINUS_IV6, (MINUS_V6, MINUS_V65)), (
@@ -273,17 +359,17 @@ class Progression(Score):
 			)
 		)
 		PATTERN_EXTEND5_DOUBLE24 = self.PNode(
-			((MINUS_V6, MINUS_V65), MINUS_IV6, MINUS_V), (
+			(MINUS_V6, MINUS_IV6, MINUS_V), (
 				major_mode_only, validate_minus_V6, prevent_a2_with_V6
 			)
 		)
 		PATTERN_EXTEND5_DOUBLE25 = self.PNode(
-			((MINUS_V6, MINUS_V65), MINUS_VI, MINUS_V), (
+			(MINUS_V6, MINUS_VI, MINUS_V), (
 				major_mode_only, validate_minus_V6, prevent_a2_with_V6
 			)
 		)
 		PATTERN_EXTEND5_DOUBLE26 = self.PNode(
-			((MINUS_V6, MINUS_V65), MINUS_IV6MAJOR, MINUS_V), (
+			(MINUS_V6, MINUS_IV6MAJOR, MINUS_V), (
 				minor_mode_only, validate_minus_V6, prevent_a2_with_V6
 			)
 		)
@@ -380,6 +466,11 @@ class Progression(Score):
 			PLUS_II7, PLUS_II65, MINUS_II7, MINUS_II65, NULL_II42,
 			PLUS_IV7, MINUS_IV7, MINUS_IV65, MINUS_IV65MAJOR,
 		)
+		self.alt_subdom_single_minus1 = (
+			PLUS_V_OF_V, MINUS_V_OF_V, PLUS_V6_OF_V, MINUS_V6_OF_V, 
+			PLUS_V7_OF_V, MINUS_V7_OF_V, PLUS_V65_OF_V, MINUS_V65_OF_V, 
+			(MINUS_V43_OF_V, MINUS_VII6_OF_V), NULL_V42_OF_V
+		)
 		self.subdominant_single_minus2 = (
 			PLUS_II, PLUS_II6, PLUS_IV, MINUS_VI, MINUS_II, MINUS_II6, MINUS_IV,
 			MINUS_VI, MINUS_IV6, PLUS_II7, PLUS_II65, MINUS_II7, MINUS_II65,
@@ -439,9 +530,11 @@ class Progression(Score):
 			"2HC": (
 				empty_tuple, self.ante_ending_single, self.tonic_chords_single, 
 				self.ante_ending_triple, self.ante_plus1_64
-			), "SDOM_AT_-1": (self.subdominant_single_minus1,),
-			"SDOM_AF_-1": (self.subdominant_single_minus1,),
-			"SDOM_AT_-2": (self.subdominant_single_minus2,),
+			), "SDOM_AT_-1": (
+				self.subdominant_single_minus1, self.alt_subdom_single_minus1,
+			), "SDOM_AF_-1": (
+				self.subdominant_single_minus1, self.alt_subdom_single_minus1,
+			), "SDOM_AT_-2": (self.subdominant_single_minus2,),
 			"3SDOM_EX": (
 				self.subdominant_single_minus1, self.tonic_chords_single, 
 				self.subdominant_single_minus1, self.subdominant_triple,
@@ -462,23 +555,28 @@ class Progression(Score):
 		chord_args = chord_group_select[chord_pattern]
 		return chord_adder(*chord_args)
 
-	def add_one_chord(self, chord_group):
+	def add_one_chord(self, *args):
 		"""Generate the next chord in a progression based on score state"""
 
-		valid_chords = []
-		for chord in chord_group:
-			# account for interchangeable chords
-			if not isinstance(chord, self.PNode):
-				chord = random.choice(chord)
-			self.logger.warning(f"Chord: {chord}")
-			# prevent repeat of subdom chords
-			if (all(stipulation() for stipulation in chord.stipulations)
-			  and chord.value != self.previous_chord):
-				valid_chords.append(chord.value)
+		all_valid_chords = []
+		for chord_group in args:
+			valid_chords = []
+			for chord in chord_group:
+				# account for interchangeable chords
+				if not isinstance(chord, self.PNode):
+					chord = random.choice(chord)
+				self.logger.warning(f"Attempting: {chord.value}")
+				# prevent repeat of subdom chords
+				if (all(stipulation() for stipulation in chord.stipulations)
+				  and chord.value != self.previous_chord):
+					valid_chords.append(chord.value)
+			if valid_chords:
+				all_valid_chords.append(valid_chords)
 
 		self.chord_index += 1
-		self.logger.warning(f"Valid chords: {valid_chords}")
-		self.previous_chord = random.choice(valid_chords)
+		self.logger.warning(f"All valid chords: {all_valid_chords}")
+		chosen_chord_group = random.choice(all_valid_chords)
+		self.previous_chord = random.choice(chosen_chord_group)
 		self.logger.warning(f"Chosen chord: {self.previous_chord}")
 		self.logger.warning("-" * 30)
 		return self.previous_chord

@@ -46,6 +46,9 @@ class Chorale(Voice):
 		self.possible_chord_voicings = []
 		self.unsorted_pitch_combo_sequence = []
 
+		self.resolve_I6 = {"P5", "M3", "m3"}
+		self.resolve_I = {"M3", "m3"}
+
 		Chorale.create_logger()
 
 	def create_parts(self):
@@ -62,7 +65,7 @@ class Chorale(Voice):
 		self.condensed_chords.append(current_chord_obj)
 		self.unique_chord_indices.add(0)
 		self.unsorted_pitch_combo_sequence.append(
-			Voice.make_pitch_combos(current_chord_obj)
+			self.make_pitch_combos(current_chord_obj)
 		)
 		previous_chord_obj = current_chord_obj
 
@@ -71,7 +74,7 @@ class Chorale(Voice):
 				self.condensed_chords.append(current_chord_obj)
 				self.unique_chord_indices.add(original_chord_index)
 				self.unsorted_pitch_combo_sequence.append(
-					Voice.make_pitch_combos(current_chord_obj)
+					self.make_pitch_combos(current_chord_obj)
 				)
 			previous_chord_obj = current_chord_obj
 
@@ -297,18 +300,38 @@ class Chorale(Voice):
 			  composite_motion[voice_index][-1] == 
 			  composite_motion[voice_index][-2])):
 				return False
-			if (previous_chord in {"V7", "V65", "V42"} and 
-			  current_chord not in Voice.dominant_harmony and
-			  previous_degree == previous_chord_members[3] and
-			  not 1 <= old_pitch - new_pitch <= 2):
-				return False
-			if previous_chord == "V7" and previous_degree == 6:
-				if voice_index == 2:
-					if current_degree != 0:
-						return False 
-				else:
-					if current_degree not in {0, 4}:
-						return False
+			if previous_chord in {"V7", "V65", "V43"}:  
+				if (current_chord not in self.primary_dominants and
+				  previous_degree == previous_chord_members[3]):
+					if previous_chord == "V43":
+						if not 1 <= abs(old_pitch - new_pitch) <= 2:
+							return False
+					else:
+						if not 1 <= old_pitch - new_pitch <= 2:
+							return False
+				elif previous_chord == "V7" and previous_degree == 6:
+					if voice_index == 2:
+						if current_degree != 0:
+							return False 
+					else:
+						if current_degree not in {0, 4}:
+							return False
+			elif previous_chord in {"V7/V", "V65/V", "V43"}:
+				if previous_degree == previous_chord_members[3]:
+					if previous_chord == "V43/V":
+						if not 1 <= abs(old_pitch - new_pitch) <= 2:
+							return False
+					else:
+						if not 1 <= old_pitch - new_pitch <= 2:
+							return False
+				elif previous_chord == "V7/V" and previous_degree == 3:
+					if voice_index == 2:
+						if current_degree != 4:
+							return False
+					else:
+						if current_degree not in {4, 1}:
+							return False
+
 			if (previous_chord == "I64" and 
 			  previous_degree == 0 and current_degree != 6):
 				return False
@@ -368,15 +391,23 @@ class Chorale(Voice):
 			tenor_alto_motion, tenor_soprano_motion, alto_soprano_motion,
 		]
 
+
 		for interval_list, motion_list in zip(
 		  composite_intervals, composite_mvmts):
 			if (interval_list[-1] in {"P5", "P8"} and 
 			  motion_list[-1] == "Parallel"):
 				return False
-			if previous_chord in {"VII6", "V43"} and interval_list[-2] == "d5":
-				if current_chord == "I6" and interval_list[-1] not in {"P5", "M3", "m3"}:
+			if (previous_chord in {"VII6", "V43"} and 
+			  interval_list[-2] == "d5"):
+				if current_chord == "I6" and interval_list[-1] not in self.resolve_I6:
 					return False
-				if current_chord == "I" and interval_list[-1] not in {"M3", "m3"}:
+				if current_chord == "I" and interval_list[-1] not in self.resolve_I:
+					return False
+			elif (previous_chord in {"V43/V", "VII6/V"} and 
+			  interval_list[-2] == "d5"):
+				if current_chord == "V6" and interval_list[-1] not in self.resolve_I6:
+					return False
+				if current_chord == "V" and interval_list[-1] not in self.resolve_I:
 					return False
 
 		# add new parameters to official sequence
