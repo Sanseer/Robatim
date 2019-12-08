@@ -1,8 +1,8 @@
 import collections
 
-from generate.voices.voice import Voice
+from generate.idioms.score import Score
 
-class Chord:
+class Chord(Score):
 	"""A grouping of scale degrees and corresponding pitches"""
 
 	chord_members = {
@@ -41,12 +41,12 @@ class Chord:
 
 		if self.chord_name not in self.all_pitches_to_degrees or reset:
 			current_pitch = -12
-			root_pitch = current_pitch + Voice.tonics[Voice.tonic]
-			scale_sequence = Voice.mode_notes[Voice.mode]
+			root_pitch = current_pitch + self.tonics[self.tonic]
+			scale_sequence = self.mode_notes[self.mode]
 
-			if Voice.mode == "ionian" and self.chord_name in self.major_mode_alterations:
+			if self.mode == "ionian" and self.chord_name in self.major_mode_alterations:
 				note_alterations = self.major_mode_alterations[self.chord_name]
-			elif Voice.mode == "aeolian" and self.chord_name in self.minor_mode_alterations:
+			elif self.mode == "aeolian" and self.chord_name in self.minor_mode_alterations:
 				note_alterations = self.minor_mode_alterations[self.chord_name]
 			else:
 				note_alterations = {}	
@@ -68,7 +68,7 @@ class Chord:
 	def __repr__(self):
 		return self.chord_symbol
 
-	@staticmethod
-	def reset_settings():
+	@classmethod
+	def reset_settings(cls):
 		"""Removes all pitch-to-scale degree assignments"""
-		Chord.all_pitches_to_degrees = collections.defaultdict(dict)
+		cls.all_pitches_to_degrees = collections.defaultdict(dict)
