@@ -33,13 +33,13 @@ class Chord:
 		"I_MAJOR": 0,
 	}
 
-	def __init__(self, chord_symbol):
+	def __init__(self, chord_symbol, reset=False):
 		self.chord_name = chord_symbol[1:] 
 		self.chord_symbol = chord_symbol
 		self.scale_degrees = self.chord_members[self.chord_name]
 		self.bass_degree = self.bass_degrees[self.chord_name]
 
-		if self.chord_name not in self.all_pitches_to_degrees:
+		if self.chord_name not in self.all_pitches_to_degrees or reset:
 			current_pitch = -12
 			root_pitch = current_pitch + Voice.tonics[Voice.tonic]
 			scale_sequence = Voice.mode_notes[Voice.mode]

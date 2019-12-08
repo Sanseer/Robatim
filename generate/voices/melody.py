@@ -809,7 +809,8 @@ class Melody(Voice):
 	def prepare_score(self):
 		self.add_rest_placeholders()
 		if self.mode not in ("ionian", "aeolian"):
-			Voice.chord_sequence = (Chord("0I"),) * 16
+			Chord.reset_settings()
+			Voice.chord_sequence = (Chord("0I", True),) * 16
 
 	def add_rest_placeholders(self):
 		"""Modify scale degree sequence to match midi note sequence"""
