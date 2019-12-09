@@ -14,7 +14,7 @@ class MakeSongMethods(unittest.TestCase):
 			mf.test_large_leap_nested, mf.test_nested_climaxes, 
 			mf.test_unnested_climaxes, mf.test_late_melodic_jukes, 
 			mf.test_bounds, mf.test_still_figures, mf.test_irregular_figures,
-			mf.test_anticipation_figs, mf.test_neighbor_figs,
+			mf.test_starting_fig,
 		)
 
 		for melody_obj in mf.melodies:

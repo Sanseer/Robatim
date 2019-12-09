@@ -176,7 +176,8 @@ def test_large_leap_unnested(obj):
 	previous_melody_note = obj.nested_scale_degrees[0][0]
 	for chord_index, melody_group in enumerate(obj.nested_scale_degrees):
 		for fig_index, current_melody_note in enumerate(melody_group):
-			if (abs(current_melody_note - previous_melody_note) > 4 and 
+			pitch_diff = current_melody_note - previous_melody_note
+			if (abs(pitch_diff) > 4 and pitch_diff < 0 and 
 			  (fig_index != 0 or chord_index not in {4, 8})):
 				return False
 			previous_melody_note = current_melody_note
@@ -299,18 +300,16 @@ def test_still_figures(obj):
 	return num_still_figures <= 2
 
 
-def test_anticipation_figs(obj):
-	return obj.chosen_figurations[0] != "ANT"
-
-
-def test_neighbor_figs(obj):
-	return obj.chosen_figurations[0] != "IN"
+def test_starting_fig(obj):
+	return obj.chosen_figurations[0] == "IPT"
 
 
 def test_irregular_figures(obj):
 	if obj.chosen_figurations.count("OPT") > 4:
 		return False
 	if obj.chosen_figurations.count("OPT") > 2 and not obj.repeat_intro:
+		return False
+	if obj.chosen_figurations.count("ANT") > 1:
 		return False
 	return True 
 

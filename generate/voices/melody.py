@@ -203,14 +203,14 @@ class Melody(Voice):
 		elif self.time_sig in {(2,3), (4,3)}:
 			rhythm_mapping = {
 				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (6,2,4), (10,2)], 
-				2: [(4,2,6), (4,4,4), (6,6), (6,2,4), (6,4,2), (8,4), (10, 1, 1)],
+				2: [(4,2,6), (4,4,4), (6,6), (6,2,4), (6,4,2), (8,4), (10, 1, 1), (10,2)],
 				-2: [(6,6), (10,2)],
 			}
 		elif self.time_sig == (3,2):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(8,2,2), (8,4), (10,2)], 
+				-1: [(12,)], 0: [(8,2,2), (8,4), (10,2), (6,2,4)], 
 				1: [(4,4,4), (6,2,4), (8,2,2), (8,4), (10,2)], 
-				2:[(4,2,6), (4,4,4), (6,6), (6,2,4), (8,2,2), (10,1,1)],
+				2:[(4,2,6), (4,4,4), (6,6), (6,2,4), (8,2,2), (10,1,1), (10,2), (8,4)],
 				-2: [(8,4), (10,2)],
 			}
 
@@ -468,7 +468,7 @@ class Melody(Voice):
 					return False 
 
 		if self.chord_index == 2: 
-			if self.chosen_figurations[0] in ("IN", "ANT"):
+			if self.chosen_figurations[0] != "IPT":
 				return False
 		if self.chord_index >= 3:
 			previous_melody_note = self.chosen_scale_degrees[self.chord_index - 3]
@@ -476,7 +476,8 @@ class Melody(Voice):
 			  self.nested_scale_degrees[self.chord_index - 3:self.chord_index - 1],
 			  self.chord_index - 3):
 				for fig_index, current_melody_note in enumerate(melody_group):
-					if (abs(current_melody_note - previous_melody_note) > 4 and
+					pitch_diff = current_melody_note - previous_melody_note
+					if (abs(pitch_diff) > 4 and pitch_diff < 0 and
 					  (fig_index != 0 or chord_index not in self.valid_leap_indices)):
 						return False
 					previous_melody_note = current_melody_note
@@ -508,6 +509,8 @@ class Melody(Voice):
 		if num_still_figures > 2:
 			return False
 		if self.chosen_figurations.count("OPT") > 4:
+			return False
+		if self.chosen_figurations.count("ANT") > 1:
 			return False
 		
 		return True
