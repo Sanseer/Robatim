@@ -286,6 +286,8 @@ class Chorale(Voice):
 
 		# bass voice is immutable b/c chord progression
 		composite_motion = [tenor_motion, alto_motion, soprano_motion]
+		standard_dominant_sevenths = {"V7", "V65", "V43"}
+		alt_dominant_sevenths = {"V7/V", "V65/V", "V43/V", "V7/III", "V65/III", "V43/III"}
 		for voice_index, new_pitch in enumerate(pitch_combo[1:]):
 			previous_degree = previous_degree_combo[voice_index + 1]
 			current_degree = current_degree_combo[voice_index + 1]
@@ -300,7 +302,7 @@ class Chorale(Voice):
 			  composite_motion[voice_index][-1] == 
 			  composite_motion[voice_index][-2])):
 				return False
-			if previous_chord in {"V7", "V65", "V43"}:  
+			if previous_chord in standard_dominant_sevenths:  
 				if (current_chord not in self.primary_dominants and
 				  previous_degree == previous_chord_members[3]):
 					if previous_chord == "V43":
@@ -316,20 +318,23 @@ class Chorale(Voice):
 					else:
 						if current_degree not in {0, 4}:
 							return False
-			elif previous_chord in {"V7/V", "V65/V", "V43"}:
+			elif previous_chord in alt_dominant_sevenths:
 				if previous_degree == previous_chord_members[3]:
-					if previous_chord == "V43/V":
+					if previous_chord[:4] == "V43/":
 						if not 1 <= abs(old_pitch - new_pitch) <= 2:
 							return False
 					else:
 						if not 1 <= old_pitch - new_pitch <= 2:
 							return False
-				elif previous_chord == "V7/V" and previous_degree == 3:
+				elif (previous_chord[:3] == "V7/" and 
+				  previous_degree == self.leading_degrees[previous_chord]):
+					tonic = (previous_degree + 1) % 7
+					dominant = (previous_degree - 2) % 7
 					if voice_index == 2:
-						if current_degree != 4:
+						if current_degree != tonic:
 							return False
 					else:
-						if current_degree not in {4, 1}:
+						if current_degree not in {tonic, dominant}:
 							return False
 
 			if (previous_chord == "I64" and 

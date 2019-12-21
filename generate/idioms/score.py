@@ -70,7 +70,10 @@ class Score:
 	)
 
 	primary_dominants = {"V", "V7", "V6", "V65", "VII6", "V43", "V42"}
-	secondary_dominants = {"V/V", "V7/V", "V6/V", "V65/V", "VII6/V", "V43/V", "V42/V"}
+	secondary_dominants = {
+		"V/V", "V7/V", "V6/V", "V65/V", "VII6/V", "V43/V", "V42/V", "V/III",
+		"V7/III", "V6/III", "V65/III", "V43/III", "VII6/III"
+	}
 	subdom_sevenths = {"II7", "II65", "II43", "II42"}
 
 	@classmethod

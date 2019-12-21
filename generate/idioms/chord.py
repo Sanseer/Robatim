@@ -16,7 +16,10 @@ class Chord(Score):
 		"IV7": (3, 5, 0, 2), "IV65": (3, 5, 0, 2), "IV65_MAJOR": (3, 5, 0, 2),
 		"I_MAJOR": (0, 2, 4), "V/V": (1, 3, 5), "V6/V": (1, 3, 5), 
 		"V7/V": (1, 3, 5, 0), "V65/V": (1, 3, 5, 0), "V43/V": (1, 3, 5, 0),
-		"V42/V": (1, 3, 5, 0), "VII6/V": (3, 5, 0),
+		"V42/V": (1, 3, 5, 0), "VII6/V": (3, 5, 0), "VI6": (5, 0, 2),
+		"V/III": (6, 1, 3), "III": (2, 4, 6), "V7/III": (6, 1, 3, 5), 
+		"V6/III": (6, 1, 3), "V65/III": (6, 1, 3, 5), "V43/III": (6, 1, 3, 5),
+		"VII6/III": (1, 3, 5), "VII_MAJOR": (6, 1, 3), "VII6_MAJOR": (6, 1, 3),
 	}
 	minor_mode_alterations = {
 		"V": {6: 1}, "V7": {6: 1}, "V6": {6: 1}, "VII6": {6: 1}, "V65": {6: 1},
@@ -28,6 +31,8 @@ class Chord(Score):
 	major_mode_alterations = {
 		"IV_MINOR": {5: -1}, "V/V": {3: 1}, "V6/V": {3: 1}, "V7/V": {3: 1}, 
 		"V65/V": {3: 1}, "V43/V": {3: 1}, "V42/V": {3: 1}, "VII6/V": {3: 1}, 
+		"V/III": {1: 1, 3: 1}, "V7/III": {1: 1, 3: 1}, "V6/III": {1: 1, 3: 1},
+		"V65/III": {1: 1, 3: 1}, "V43/III": {1: 1, 3: 1}, "VII6/III": {1: 1, 3: 1},
 	}
 	all_pitches_to_degrees = collections.defaultdict(dict)
 	bass_degrees = {
@@ -36,7 +41,9 @@ class Chord(Score):
 		"IV_MINOR": 3, "I64": 4, "VI": 5, "IV6": 5, "IV6_MAJOR": 5, "II7": 1,
 		"II65": 3, "II43": 5, "II42": 0, "IV7": 3, "IV65": 5, "IV65_MAJOR": 5,
 		"I_MAJOR": 0, "V/V": 1, "V6/V": 3, "V7/V": 1, "V65/V": 3, "V43/V": 5,
-		"V42/V": 0, "VII6/V": 5,
+		"V42/V": 0, "VII6/V": 5, "VI6": 0, "V/III": 6, "III": 2, "V7/III": 6,
+		"V6/III": 1, "V65/III": 1, "V43/III": 3, "VII6/III": 3, "VII_MAJOR": 6, 
+		"VII6_MAJOR": 1
 	}
 
 	def __init__(self, chord_symbol):

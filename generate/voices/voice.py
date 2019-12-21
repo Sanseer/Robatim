@@ -34,7 +34,11 @@ class Voice(Score):
 		(10,5): "A6", (10,6): "m7", (11,6): "M7", (11,7): "d8", (0,6): "A7", 
 		(11,0): "d8",
 	}
-
+	leading_degrees = {
+		"V/V": 3, "V7/V": 3, "V6/V": 3, "V65/V": 3, "V43/V": 3, "VII6/V": 3, 
+		"V42/V": 3, "V/III": 1,"V7/III": 1,"V6/III": 1, "V65/III": 1, 
+		"V43/III": 1, "VII6/III": 1,
+	}
 	@staticmethod
 	def calculate_slope(move_distance):
 		"""Discerns negative and positive numbers"""
@@ -175,7 +179,7 @@ class Voice(Score):
 			if bass_degree != current_degree_combo[0]:
 				continue
 			if current_chord in cls.secondary_dominants: 
-				leading_degree = 3
+				leading_degree = cls.leading_degrees[current_chord]
 				if current_degree_combo.count(leading_degree) >= 2:
 					continue
 			elif current_chord == "I64" and current_degree_combo.count(0) >= 2:
