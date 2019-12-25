@@ -1,6 +1,6 @@
-import random
 import collections
 import logging
+import random
 
 from generate.idioms.score import Score
 
@@ -26,7 +26,9 @@ class Progression(Score):
 
 		not_plus_III = lambda: self.previous_chord != "+III"
 		not_minus_III = lambda: self.previous_chord != "-III"
-		not_secondary_dominants = lambda: self.previous_chord[1:] not in self.secondary_dominants
+		not_secondary_dominants = (
+			lambda: self.previous_chord[1:] not in self.secondary_dominants
+		)
 		NULL_I = self.PNode(
 			"0I", (
 				lambda: self.previous_chord not in ("+V42", "-IV6", "-VI", "-I6"),
@@ -43,11 +45,15 @@ class Progression(Score):
 		)
 		PLUS_I6 = self.PNode(
 			"+I6", (
-				lambda: self.previous_chord in ("+VII6", "+V43", "+V42", "0I", "+IV"),
+				lambda: self.previous_chord in (
+					"+VII6", "+V43", "+V42", "0I", "+IV"
+				),
 				prevent_ending,
 			)
 		)
-		MINUS_I6 = self.PNode("-I6", (lambda: self.previous_chord in ("-IV6", "-VI"),))
+		MINUS_I6 = self.PNode(
+			"-I6", (lambda: self.previous_chord in ("-IV6", "-VI"),)
+		)
 
 		from_positive_chord = lambda: self.previous_chord[0] in ("0", "+")
 		from_negative_chord = lambda: self.previous_chord[0] == "-"
@@ -125,10 +131,12 @@ class Progression(Score):
 				lambda: self.previous_chord in (
 					"-VII_MAJOR", "+VII6_MAJOR", "-V/III", "-V7/III", 
 					"+V6/III", "+V65/III", "+V43/III", "+VII6/III"
-					), prevent_ending
+				), prevent_ending
 			)
 		)
-		MINUS_III = self.PNode("-III", (lambda: self.previous_chord in ("-V/III", "-V7/III"),))
+		MINUS_III = self.PNode(
+			"-III", (lambda: self.previous_chord in ("-V/III", "-V7/III"),)
+		)
 		proper_subdom_order = (
 			lambda: self.previous_chord not in (
 				"+II", "-II", "+II6", "-II6", "+II65", "-II65", "+II7", "-II7", 
@@ -202,10 +210,13 @@ class Progression(Score):
 			)
 		)
 
-		lessen_deceptive_cadence = lambda: self.chord_index != 8 or random.choice((True, True, True, False))
+		lessen_deceptive_cadence = (
+			lambda: self.chord_index != 8 or random.choice((True, True, True, False))
+		)
 		validate_minus_VI = lambda: self.previous_chord in ("0I", "-V", "0VI6")
-		MINUS_VI = self.PNode("-VI", (
-			validate_minus_VI, prevent_ending, lessen_deceptive_cadence
+		MINUS_VI = self.PNode(
+			"-VI", (
+				validate_minus_VI, prevent_ending, lessen_deceptive_cadence
 			)
 		)
 		validate_minus_II = (				
@@ -239,7 +250,9 @@ class Progression(Score):
 			)
 		)
 
-		validate_minus_IV6 = lambda: self.previous_chord in ("0I", "-VI", "-V", "-VII_MAJOR")
+		validate_minus_IV6 = (
+			lambda: self.previous_chord in ("0I", "-VI", "-V", "-VII_MAJOR")
+		)
 		MINUS_IV6 = self.PNode("-IV6", (
 			validate_minus_IV6, prevent_ending, lessen_deceptive_cadence
 			)
@@ -601,7 +614,8 @@ class Progression(Score):
 			"1EXTON2": self.add_one_chord, "2HC": self.add_three_chords,
 			"SDOM_AT_-1": self.add_one_chord, "SDOM_AF_-1": self.add_one_chord,
 			"SDOM_AT_-2": self.add_one_chord, "3SDOM_EX": self.add_three_chords,
-			"2END_EX1": self.add_three_chords, "ANTE_3DOM_EX": self.add_three_chords,
+			"2END_EX1": self.add_three_chords, 
+			"ANTE_3DOM_EX": self.add_three_chords,
 			"CONS_3DOM_EX": self.add_three_chords,
 		}
 		chord_group_select = {
@@ -690,14 +704,14 @@ class Progression(Score):
 			for chord_double in chord_doublers1:
 				self.previous_chord = temp_previous_chord
 				self.chord_index = temp_chord_index
-				if not isinstance(chord_double, self.PNode):
+				while not isinstance(chord_double, self.PNode):
 					chord_double = random.choice(chord_double)
 				self.logger.warning(chord_double)
 				if all(stipulation() for stipulation in chord_double.stipulations):
 					self.previous_chord = chord_double.value
 					self.chord_index += 2
 					for chord_single in chord_doublers2:
-						if not isinstance(chord_single, self.PNode):
+						while not isinstance(chord_single, self.PNode):
 							chord_single = random.choice(chord_single)
 						self.logger.warning(chord_single)
 						if all(stipulation() for stipulation in chord_single.stipulations):
@@ -711,7 +725,7 @@ class Progression(Score):
 			if chord_singlers:
 				valid_chord_sequences = []
 				for chord_single in chord_singlers:
-					if not isinstance(chord_single, self.PNode):
+					while not isinstance(chord_single, self.PNode):
 						chord_single = random.choice(chord_single)
 					self.logger.warning(chord_single)
 					if all(stipulation() for stipulation in chord_single.stipulations):
@@ -785,7 +799,8 @@ class Progression(Score):
 		for antecedent_pattern in antecedent_patterns:
 			for consequent_pattern in consequent_patterns:
 				full_pattern = antecedent_pattern + consequent_pattern
-				if len(full_pattern) == 16 and Progression.allows_truncation(full_pattern, 2, "RPT"):
+				if (len(full_pattern) == 16 and 
+				  Progression.allows_truncation(full_pattern, 2, "RPT")):
 					accelerate = False
 				else:
 					accelerate = True

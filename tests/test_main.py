@@ -1,12 +1,11 @@
-import unittest
-import json
-import time
 from fractions import Fraction
-
+import json
 import requests
+import time
+import unittest
 
-from generate.voices.voice import Voice 
 from generate.idioms.progression import Progression
+from generate.voices.voice import Voice 
 
 class MainScoreMethods(unittest.TestCase):
 

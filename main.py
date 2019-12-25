@@ -1,14 +1,14 @@
-import random
+import argparse
 import json
+import random
 import requests
 import time
-import argparse
 
-from generate.midi_export import MIDIFile
 from generate.idioms.score import Score
-from generate.voices.voice import Voice
-from generate.voices.melody import Melody
+from generate.midi_export import MIDIFile
 import generate.voices.chorale as chorale
+from generate.voices.melody import Melody
+from generate.voices.voice import Voice
 
 def make_lily_file():
 	"""Generate Lilypond file from musical sequence"""
@@ -32,7 +32,7 @@ def make_lily_file():
 	for lily_part in Voice.lily_score:
 		sheet_code = sheet_code.replace(
 			"PART_SLOT", " ".join([
-				"\\key", Voice.tonic.replace('#','is').replace('b',"es").lower(),
+				"\\key", Voice.tonic.replace('#', 'is').replace('b', "es").lower(),
 				f"\\{mode} \\time {time_sig} {lily_part}",
 			]), 1
 		)
@@ -51,6 +51,7 @@ def make_lily_file():
 		rejection_message = "An error occured with the API and/or internet connection. " 
 		rejection_message += "Check your internet connection and try again."
 		print(rejection_message)
+
 
 def make_score_pdf(sheet_code):
 	"""Generate sheet music pdf from lilyPond format"""
@@ -74,6 +75,7 @@ def make_score_pdf(sheet_code):
 
 	with open("final_score.pdf", "wb") as f:
 		f.write(pdf_response.content)
+
 
 def reset_score_settings(score_args):
 	"""Reset parameters of score to allow creation of a new piece"""

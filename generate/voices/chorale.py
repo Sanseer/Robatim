@@ -1,6 +1,6 @@
 import itertools
-import random
 import logging
+import random
 import time
 
 from generate.voices.voice import Voice
@@ -524,7 +524,7 @@ class Chorale(Voice):
 		end_note_durations = (
 			(Voice.max_note_duration,), (Voice.max_note_duration,)
 		)
-		end_voices_used = [[{0,1,2,3}], [{}]]
+		end_voices_used = [[{0, 1, 2, 3}], [{}]]
 
 		if self.repeat_ending:
 			self.add_chord_section(

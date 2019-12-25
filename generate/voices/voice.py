@@ -39,6 +39,7 @@ class Voice(Score):
 		"V42/V": 3, "V/III": 1,"V7/III": 1,"V6/III": 1, "V65/III": 1, 
 		"V43/III": 1, "VII6/III": 1,
 	}
+	
 	@staticmethod
 	def calculate_slope(move_distance):
 		"""Discerns negative and positive numbers"""

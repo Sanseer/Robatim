@@ -1,13 +1,13 @@
-import itertools
-import random
 from fractions import Fraction
+import itertools
 import logging
+import random
 import time
 
-from generate.voices.voice import Voice
 from generate.idioms.chord import Chord
 from generate.idioms.progression import Progression
 from generate.idioms.score import Score
+from generate.voices.voice import Voice
 
 class Melody(Voice):
 	"""A chord-based melody builder"""
@@ -194,24 +194,29 @@ class Melody(Voice):
 			self.rhythm_symbols = raw_rhythm_symbols
 		print(f"Rhythm symbols: {self.rhythm_symbols}")
 
-		if self.time_sig in {(2,2), (4,2)}:
+		if self.time_sig in {(2, 2), (4, 2)}:
 			rhythm_mapping = {
-				-1: [(8,)], 0: [(4,4), (6,2)], 1: [(4,4), (6,2)], 
-				2:[(3,3,2), (4,2,2), (6,1,1)],
-				-2: [(4,4), (6,2)],
+				-1: [(8,)], 0: [(4, 4), (6, 2)], 1: [(4, 4), (6, 2)], 
+				2:[(3, 3, 2), (4, 2, 2), (6, 1, 1)],
+				-2: [(4, 4), (6, 2)],
 			}
-		elif self.time_sig in {(2,3), (4,3)}:
+		elif self.time_sig in {(2, 3), (4, 3)}:
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(6,6), (10,2)], 1: [(6,6), (6,2,4), (10,2)], 
-				2: [(4,2,6), (4,4,4), (6,6), (6,2,4), (6,4,2), (8,4), (10, 1, 1), (10,2)],
-				-2: [(6,6), (10,2)],
+				-1: [(12,)], 0: [(6, 6), (10, 2)], 
+				1: [(6, 6), (6, 2, 4), (10, 2)], 
+				2: [
+					(4, 2, 6), (4, 4, 4), (6, 6), (6, 2, 4), (6, 4, 2), 
+					(8, 4), (10, 1, 1), (10, 2)
+				], -2: [(6, 6), (10, 2)],
 			}
-		elif self.time_sig == (3,2):
+		elif self.time_sig == (3, 2):
 			rhythm_mapping = {
-				-1: [(12,)], 0: [(8,2,2), (8,4), (10,2), (6,2,4)], 
-				1: [(4,4,4), (6,2,4), (8,2,2), (8,4), (10,2)], 
-				2:[(4,2,6), (4,4,4), (6,6), (6,2,4), (8,2,2), (10,1,1), (10,2), (8,4)],
-				-2: [(8,4), (10,2)],
+				-1: [(12,)], 0: [(8, 2, 2), (8, 4), (10, 2), (6, 2, 4)], 
+				1: [(4, 4, 4), (6, 2, 4), (8, 2, 2), (8, 4), (10, 2)], 
+				2:[
+					(4, 2, 6), (4, 4, 4), (6, 6), (6, 2, 4), (8, 2, 2), 
+					(10, 1, 1), (10, 2), (8, 4)
+				], -2: [(8, 4), (10, 2)],
 			}
 
 		chosen_rhythms = {}
@@ -273,7 +278,9 @@ class Melody(Voice):
 		# Other exceptions like IndexError can occur elsewhere in class instance
 		# and would be silenced by main.py, preventing debugging.
 		try:
-			self.current_degree_choice = self.current_scale_degree_options[0].pop()
+			self.current_degree_choice = (
+				self.current_scale_degree_options[0].pop()
+			)
 		except IndexError:
 			print("Melody failed")
 			raise AssertionError
@@ -284,14 +291,18 @@ class Melody(Voice):
 			self.melodic_direction[0] = '_'
 
 		self.chord_index += 1
-		self.current_scale_degree_options[1] = self.all_scale_degree_options[1][:]
+		self.current_scale_degree_options[1] = (
+			self.all_scale_degree_options[1][:]
+		)
 		self.previous_degree_choice = self.current_degree_choice
 
 
 	def realize_melody(self):
 		"""Create and validate a melody sequence"""
 		self.create_melody_options()
-		self.current_scale_degree_options[0].extend(self.all_scale_degree_options[0][:])
+		self.current_scale_degree_options[0].extend(
+			self.all_scale_degree_options[0][:]
+		)
 		self.create_first_melody_note()
 
 		self.time0 = time.time()
@@ -610,7 +621,7 @@ class Melody(Voice):
 		self.logger.warning(f"Melody range: {self.melody_range}")
 
 		self.unit_length = sum(self.finalized_rhythms[0])
-		if self.time_sig in {(4,3), (4,2)}:
+		if self.time_sig in {(4, 3), (4, 2)}:
 			chord_quarter_length = self.measure_length // 2
 		else:
 			chord_quarter_length = self.measure_length

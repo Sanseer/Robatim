@@ -1,6 +1,6 @@
-import random
 from fractions import Fraction
 import logging
+import random
 
 class Score:
 	"""Overarching model of a musical piece"""
@@ -13,7 +13,7 @@ class Score:
 	# exclude 9/8 because of uneven divisions
 	# 2/4, 3/4, 6/8, 4/4, 12/8
 	# the difference between duple and quadruple meter is semantic
-	time_sigs = ((2,2), (3,2), (2,3), (4,2), (3,2), (4,3))
+	time_sigs = ((2, 2), (3, 2), (2, 3), (4, 2), (3, 2), (4, 3))
 	time_sig = None
 	simple_beat_durations = {
 		4: "1", 3: "2.", 2: "2", 1.5: "4.", 1: "4", 0.75: "8.",
@@ -62,11 +62,12 @@ class Score:
 		"aeolian": (0, 2, 3, 5, 7, 8, 10),
 		"phrygian": (0, 1, 3, 5, 7, 8, 10),
 	}
-	note_letters = ("C","D","E","F","G","A","B")
+	note_letters = ("C", "D", "E", "F", "G", "A", "B")
 	note_names = (
-		("B#","C","Dbb"), ("B##","C#", "Db"), ("C##", "D", "Ebb"), ("D#","Eb"),
-		("D##","E","Fb"), ("E#","F","Gbb"), ("E##","F#", "Gb"), ("F##","G","Abb"), 
-		("G#", "Ab"), ("G##","A","Bbb"), ("A#","Bb","Cbb"), ("A##","B","Cb"), 
+		("B#", "C", "Dbb"), ("B##", "C#", "Db"), ("C##", "D", "Ebb"), 
+		("D#", "Eb"), ("D##", "E", "Fb"), ("E#", "F", "Gbb"), 
+		("E##", "F#", "Gb"), ("F##", "G", "Abb"), ("G#", "Ab"), 
+		("G##", "A", "Bbb"), ("A#", "Bb", "Cbb"), ("A##", "B", "Cb"), 
 	)
 
 	primary_dominants = {"V", "V7", "V6", "V65", "VII6", "V43", "V42"}
@@ -159,7 +160,7 @@ class Score:
 					old_reference_pitch = new_reference_pitch
 				modal_scale_keys.append(chosen_note_name)
 			cls.key_sigs = tuple(modal_scale_keys)
-			print(f"Possible key sigs: {cls.key_sigs}")
+		print(f"Possible key sigs: {cls.key_sigs}")
 		return random.choice(cls.key_sigs) 
 
 	@classmethod
