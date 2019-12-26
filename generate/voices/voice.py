@@ -9,7 +9,6 @@ class Voice(Score):
 	chord_sequence = []
 	pickup = False
 	all_midi_pitches = []
-
 	chord_acceleration = False
 
 	Note = collections.namedtuple('Note', ["pitch", "time", "duration"])
@@ -66,8 +65,8 @@ class Voice(Score):
 
 		return False
 
-	@staticmethod
-	def get_turns(sequence):
+	@classmethod
+	def get_turns(cls, sequence):
 		"""Returns the number of times the direction of a sequence changes"""
 		search_slope = 0
 		turns = 0
@@ -75,7 +74,7 @@ class Voice(Score):
 		old_item = next(iter_sequence, None)
 		new_item = next(iter_sequence, None)
 		while new_item is not None:
-			current_slope = Voice.calculate_slope(new_item - old_item)
+			current_slope = cls.calculate_slope(new_item - old_item)
 
 			if 0 != current_slope != search_slope:
 				turns += 1 
@@ -85,15 +84,15 @@ class Voice(Score):
 			new_item = next(iter_sequence, None)
 		return turns
 
-	@staticmethod
-	def has_proper_leaps(sequence):
+	@classmethod
+	def has_proper_leaps(cls, sequence):
 		"""Check for contrary stepwise motion following leaps"""
 		current_leap_slope = None
 		current_move_slope = None
 		previous_degree_mvmt = 0
 		for scale_degree0, scale_degree1 in zip(sequence, sequence[1:]):
 			current_degree_mvmt = scale_degree1 - scale_degree0
-			current_move_slope = Voice.calculate_slope(current_degree_mvmt)
+			current_move_slope = cls.calculate_slope(current_degree_mvmt)
 
 			if current_leap_slope == current_move_slope:
 				return False
@@ -195,7 +194,7 @@ class Voice(Score):
 		"""Convert midi pitches into sheet music note names"""
 
 		tonic_letter = self.tonic.replace('#',"").replace('b',"")
-		tonic_index = Voice.note_letters.index(tonic_letter)
+		tonic_index = self.note_letters.index(tonic_letter)
 
 		self.logger.warning(len(self.midi_notes))
 		self.logger.warning(len(self.unnested_scale_degrees))
@@ -209,10 +208,10 @@ class Voice(Score):
 				continue
 			true_midi_pitch = midi_note.pitch
 			scale_midi_pitch =  true_midi_pitch % 12
-			possible_note_names = Voice.note_names[scale_midi_pitch]
+			possible_note_names = self.note_names[scale_midi_pitch]
 
 			note_letter_index = (tonic_index + scale_degree) % 7
-			note_letter = Voice.note_letters[note_letter_index]
+			note_letter = self.note_letters[note_letter_index]
 			octave = true_midi_pitch // 12 - 1
 
 			for possible_note_name in possible_note_names:
@@ -226,8 +225,8 @@ class Voice(Score):
 		"""Write sheet music text notation for voice part"""
 
 		object_index = 0
-		if Voice.pickup:
-			object_duration = Voice.pickup_duration // 960
+		if self.pickup:
+			object_duration = self.pickup_duration // 960
 			lily_part = [f"\\partial {self.beat_durations[object_duration]}"]
 		else:
 			lily_part = []
@@ -239,7 +238,8 @@ class Voice(Score):
 
 			object_duration = Fraction(numerator=midi_note.duration, denominator=960)
 			object_rhythm = Voice.partition_rhythm(
-				self.beat_durations, object_duration)
+				self.beat_durations, object_duration
+			)
 			if sheet_note is None:
 				lily_rest = ""
 				for rest_part in object_rhythm[:-1]:
@@ -259,10 +259,10 @@ class Voice(Score):
 
 			# B# is technically in the octave above (starting from C)
 			# Cb is technically in the octave below
-			if sheet_note.startswith(("B#","B##")):
-				register_shift = -1
-			elif sheet_note.startswith(("Cb","Cbb")):
-				register_shift = 1
+			if sheet_note.startswith(("B#", "B##")):
+				register_shift -= 1
+			elif sheet_note.startswith(("Cb", "Cbb")):
+				register_shift += 1
 			octave = int(sheet_note[-1]) + register_shift
 			if octave < 3:
 				octave_shift = 3 - octave
@@ -295,11 +295,11 @@ class Voice(Score):
 			object_index += 1
 
 		lily_string = " ".join(note for note in lily_part) 
-		Voice.lily_score.append(lily_string)
+		self.lily_score.append(lily_string)
 		self.logger.warning(f"Lily part: {lily_part}")
 
-	@staticmethod
-	def get_interval(old_pitch, new_pitch, current_pitches_dict):
+	@classmethod
+	def get_interval(cls, old_pitch, new_pitch, current_pitches_dict):
 		"""Returns the specific interval of two pitches"""
 		pitch_diff = new_pitch - old_pitch
 		chromatic_diff = pitch_diff % 12
@@ -311,7 +311,7 @@ class Voice(Score):
 		if generic_interval < 0:
 			generic_interval += 7
 
-		return Voice.interval_names[(chromatic_diff, generic_interval)]
+		return cls.interval_names[(chromatic_diff, generic_interval)]
 
 	def add_voice_motion(self, voice_motion, new_pitch, voice_index):
 		"""Appends the next voice motion to a sequence"""
