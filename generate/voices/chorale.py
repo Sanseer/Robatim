@@ -46,9 +46,6 @@ class Chorale(Voice):
 		self.possible_chord_voicings = []
 		self.unsorted_pitch_combo_sequence = []
 
-		self.resolve_I6 = {"P5", "M3", "m3"}
-		self.resolve_I = {"M3", "m3"}
-
 		Chorale.create_logger()
 
 	def create_parts(self):
@@ -92,15 +89,16 @@ class Chorale(Voice):
 			)
 			if self.combo_choice is None:
 				self.possible_chord_voicings[self.chord_index] = None
-
-				# cannot track positive progress of maze algorithm
-				# you don't know how soon to success but you know
-				# how soon to complete failure
-				# not useful to negative track because ≈ 10^21 combinations
-				# means most cases are solved within a few seconds or
-				# have a very long wait time
+				"""
+				cannot track positive progress of maze algorithm
+				you don't know how soon to success but you know
+				how soon to complete failure
+				not useful to negative track because ≈ 10^21 combinations
+				means most cases are solved within a few seconds or
+				have a very long wait time, hence the timeout below
+				"""
 				if self.chord_index <= 0:
-					print("Harmony failed")
+					print("Harmony failed.")
 					raise AssertionError
 
 				self.time1 = time.time()
@@ -229,6 +227,8 @@ class Chorale(Voice):
 			current_pitches_dict[a_pitch], current_pitches_dict[s_pitch]
 		)
 
+		# copying lists so that you can test the next chord
+		# allows easier discarding of changes if the chord fails
 		bass_tenor_intervals = self.bass_tenor_intervals[:]
 		bass_tenor_intervals.append(
 			self.get_interval(b_pitch, t_pitch, current_pitches_dict)
@@ -396,6 +396,8 @@ class Chorale(Voice):
 			tenor_alto_motion, tenor_soprano_motion, alto_soprano_motion,
 		]
 
+		resolve_I6 = {"P5", "M3", "m3"}
+		resolve_I = {"M3", "m3"}
 
 		for interval_list, motion_list in zip(
 		  composite_intervals, composite_mvmts):
@@ -404,18 +406,18 @@ class Chorale(Voice):
 				return False
 			if (previous_chord in {"VII6", "V43"} and 
 			  interval_list[-2] == "d5"):
-				if current_chord == "I6" and interval_list[-1] not in self.resolve_I6:
+				if current_chord == "I6" and interval_list[-1] not in resolve_I6:
 					return False
-				if current_chord == "I" and interval_list[-1] not in self.resolve_I:
+				if current_chord == "I" and interval_list[-1] not in resolve_I:
 					return False
 			elif (previous_chord in {"V43/V", "VII6/V"} and 
 			  interval_list[-2] == "d5"):
-				if current_chord == "V6" and interval_list[-1] not in self.resolve_I6:
+				if current_chord == "V6" and interval_list[-1] not in resolve_I6:
 					return False
-				if current_chord == "V" and interval_list[-1] not in self.resolve_I:
+				if current_chord == "V" and interval_list[-1] not in resolve_I:
 					return False
 
-		# add new parameters to official sequence
+		# chord succeeded: add new parameters to official sequence
 		self.bass_tenor_intervals.append(bass_tenor_intervals[-1]) 
 		self.bass_alto_intervals.append(bass_alto_intervals[-1]) 
 		self.bass_soprano_intervals.append(bass_soprano_intervals[-1]) 

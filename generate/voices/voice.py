@@ -11,7 +11,7 @@ class Voice(Score):
 	all_midi_pitches = []
 	chord_acceleration = False
 
-	Note = collections.namedtuple('Note', ["pitch", "time", "duration"])
+	Note = collections.namedtuple("Note", ["pitch", "time", "duration"])
 	midi_score = []
 	lily_score = []
 	chorale_scale_degrees = []
@@ -193,7 +193,7 @@ class Voice(Score):
 	def set_sheet_notes(self):
 		"""Convert midi pitches into sheet music note names"""
 
-		tonic_letter = self.tonic.replace('#',"").replace('b',"")
+		tonic_letter = self.tonic.replace("#","").replace("b","")
 		tonic_index = self.note_letters.index(tonic_letter)
 
 		self.logger.warning(len(self.midi_notes))
@@ -257,8 +257,12 @@ class Voice(Score):
 			note_letter = sheet_note[0].lower()
 			register_shift = 0
 
-			# B# is technically in the octave above (starting from C)
-			# Cb is technically in the octave below
+			"""
+			Weird octave behavior at boundaries when accidentals are used
+			B#2 enharmonic with C3, B2 enharmonic with Cb3
+			example lilycode: {b' bis' c''}
+			example lilycode: {b' ces'' c''}
+			"""
 			if sheet_note.startswith(("B#", "B##")):
 				register_shift -= 1
 			elif sheet_note.startswith(("Cb", "Cbb")):
@@ -266,17 +270,17 @@ class Voice(Score):
 			octave = int(sheet_note[-1]) + register_shift
 			if octave < 3:
 				octave_shift = 3 - octave
-				octave_mark = str(octave_shift * ',')
+				octave_mark = str(octave_shift * ",")
 			elif octave > 3:
 				octave_shift = octave - 3
 				octave_mark = str(octave_shift * "'")
-			if '#' in sheet_note or 'b' in sheet_note:
+			if "#" in sheet_note or "b" in sheet_note:
 				accidental = sheet_note[1]
-				if accidental == '#':
-					accidental_amount = sheet_note.count('#')
+				if accidental == "#":
+					accidental_amount = sheet_note.count("#")
 					accidental_mark = "is" * accidental_amount
-				elif accidental == 'b':
-					accidental_amount = sheet_note.count('b')
+				elif accidental == "b":
+					accidental_amount = sheet_note.count("b")
 					accidental_mark = "es" * accidental_amount
 
 			lily_note = ""

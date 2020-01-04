@@ -1,3 +1,8 @@
+"""
+This script along with test_song.py is used to 
+develop melodic rules used in main program
+"""
+
 from generate.voices.voice import Voice
 
 class MelodyFrame:
@@ -29,24 +34,38 @@ def make_base_melody(nested_scale_degrees):
 def make_melodic_ramp(chosen_scale_degrees, pickup):
 	melodic_mvmt = []
 	if pickup:
-		melodic_mvmt.append('>')
+		melodic_mvmt.append(">")
 	else:
-		melodic_mvmt.append('_')
+		melodic_mvmt.append("_")
 
 	for current_degree, next_degree in zip(
 		chosen_scale_degrees, chosen_scale_degrees[1:]):
 		if next_degree > current_degree:
-			melodic_mvmt.append('>')
+			melodic_mvmt.append(">")
 		elif next_degree < current_degree:
-			melodic_mvmt.append('<')
+			melodic_mvmt.append("<")
 		else:
-			melodic_mvmt.append('_')
+			melodic_mvmt.append("_")
 
-	return ''.join(melodic_mvmt)
+	return "".join(melodic_mvmt)
 
 
 def set_melodic_figures(nested_scale_degrees):
+	"""Defines figurations found in actual music"""
+	
 	chosen_figurations = []
+	"""
+	IPT = inner passing tone
+	OPT = outer passing tone
+	ANT = anticipation
+	RET = retardation
+	CIN = current incomplete neighbor
+	PIN = previous incomplete neighbor
+	DN = double neighbor
+	CN = complete neighbor
+	DCN = double complete neighbor
+	Format of keys: (degree difference between base notes, (figurations))
+	"""
 	melodic_figures = {
 		(2, (1,)): "IPT", (0, (2, 1)): "DCN", (2, (-1, 1)): "OPT", 
 		(0, (-1,)): "CN", (1, (-1,)): "PIN", (1, (2,)): "CIN",
@@ -158,7 +177,7 @@ def test_end_leap_unnested(obj):
 
 
 def test_predominant_descent(obj):
-	return obj.relevant_melodic_mvmt.count('>') <= obj.relevant_melodic_mvmt.count('<')
+	return obj.relevant_melodic_mvmt.count(">") <= obj.relevant_melodic_mvmt.count("<")
 
 
 def test_large_leap_nested(obj):
@@ -313,28 +332,33 @@ def test_irregular_figures(obj):
 		return False
 	return True 
 
-
+# melodies might be slightly altered for convenience
 melodies = [
+	# Hans Zimmer - Davy Jones
 	MelodyFrame([
 		[0, 1], [2, 3], [4, 6, 5], [4], 
 		[4, 5], [6, 7, 5], [4, 3], [4], 
 		[5, 6], [4, 2], [3, 5, 4], [2, 0],
 		[1, -1], [-3, 1], [0], [0]
+	# The Animals - House of the Rising Sun
 	], False), MelodyFrame([
 		[0, 1], [2, 4], [3, 2], [0], 
 		[7, 7], [6, 4], [4], [4],
 		[7, 6], [4, 2], [3, 2], [0, -1],
 		[0, 0], [-1, -1], [0], [0]
+	# Darren Korb - Vagrant Song
 	], True), MelodyFrame([
 		[0, 2], [3, 2], [3, 2, 0], [0, 2],
 		[3, 4], [6, 4, 3], [4], [4, 3],
 		[4, 6], [7, 6], [4, 3, 2], [0, -1],
 		[0, 2], [-1, -1], [0], [0],
+	# Unknown - Greensleeves
 	], True), MelodyFrame([
 		[2, 3], [4, 5, 4], [3, 1], [-1, 0, 1], 
 		[2, 0], [0, -1, 0], [1, -1], [-3, 0], 
 		[2, 3], [4, 5, 4], [3, 1], [-1, 0, 1],
 		[2, 1, 0], [-1, -2, -1], [0], [0] 
+	# Tchaikovsky - Old French Song
 	], True), MelodyFrame([
 		[0, 1], [2, 3], [4], [4, 4], 
 		[3, 4], [5, 3], [4], [4, 4],
@@ -343,6 +367,7 @@ melodies = [
 	], True)
 ]
 
+# Unknown - Scarborough Fair
 # MelodyFrame([
 # 		[0, 0], [4, 4], [1, 2, 1], [0],
 # 		[7, 6], [4, 5, 3], [4,], [4],

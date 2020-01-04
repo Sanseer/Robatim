@@ -4,8 +4,9 @@ import random
 import requests
 import time
 
-from generate.idioms.score import Score
 from generate.midi_export import MIDIFile
+
+from generate.idioms.score import Score
 import generate.voices.chorale as chorale
 from generate.voices.melody import Melody
 from generate.voices.voice import Voice
@@ -26,13 +27,13 @@ def make_lily_file():
 		time_sig = f"{Voice.measure_length}/4"
 	title = f"Medley in {Voice.tonic} {mode}"
 
-	with open("logs/old_layout.txt", 'r') as f:
+	with open("logs/old_layout.txt", "r") as f:
 		sheet_code = f.read()
 
 	for lily_part in Voice.lily_score:
 		sheet_code = sheet_code.replace(
 			"PART_SLOT", " ".join([
-				"\\key", Voice.tonic.replace('#', 'is').replace('b', "es").lower(),
+				"\\key", Voice.tonic.replace("#", "is").replace("b", "es").lower(),
 				f"\\{mode} \\time {time_sig} {lily_part}",
 			]), 1
 		)
@@ -40,7 +41,7 @@ def make_lily_file():
 	sheet_code = sheet_code.replace("PART_SLOT", "")
 	sheet_code = sheet_code.replace("Medley", title)
 
-	with open("logs/new_layout.txt", 'w') as f:
+	with open("logs/new_layout.txt", "w") as f:
 		f.write(sheet_code)
 
 	try:
@@ -60,11 +61,12 @@ def make_score_pdf(sheet_code):
 		"version": "stable", "code": sheet_code, "id": ""
 	}
 	# AWS can't parse python dictionaries
-	with open("payload.json", 'w') as f:
+	with open("payload.json", "w") as f:
 		json.dump(payload, f)
-	with open("payload.json", 'rb') as f:
+	with open("payload.json", "rb") as f:
 		sheet_music_response = requests.post(
-			"https://7icpm9qr6a.execute-api.us-west-2.amazonaws.com/prod/prepare_preview/stable", data=f)
+			"https://7icpm9qr6a.execute-api.us-west-2.amazonaws.com/prod/prepare_preview/stable", data=f
+		)
 
 	time.sleep(1)
 	response_id = sheet_music_response.json()["id"]
@@ -93,9 +95,9 @@ def reset_score_settings(score_args):
 	Voice.alto_motion = []
 	Voice.soprano_motion = []
 
-	with open("logs/chorale.log", 'w') as f:
+	with open("logs/chorale.log", "w") as f:
 		pass
-	with open("logs/melody.log", 'w') as f:
+	with open("logs/melody.log", "w") as f:
 		pass
 
 
@@ -103,20 +105,22 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(
 		description="A pseudo-random music generator"
 	)
-	parser.add_argument('-t', "--tonic")
-	parser.add_argument('-m', "--mode")
+	parser.add_argument("-t", "--tonic")
+	parser.add_argument("-m", "--mode")
 	parser.add_argument("-s", "--style", default="Mm")
 	score_args = parser.parse_args()
 	track = 0
-	current_time = 0
 	channel = 0
+	current_time = 0
 	tempo = 60  # In BPM
 	# volume 0-127, as per the MIDI standard
 
-	MyMIDI = MIDIFile(5, eventtime_is_ticks=True) 
+	MyMIDI = MIDIFile(5, ticks_per_quarternote=960, eventtime_is_ticks=True)
 	# defaults to format 1 (tempo track automatically created)
 
-	MyMIDI.addProgramChange(track, channel, current_time, 73)
+	# Melody instrument
+	MyMIDI.addProgramChange(0, 0, current_time, 73)
+	# Chord instruments
 	MyMIDI.addProgramChange(1, 1, current_time, 32)
 	MyMIDI.addProgramChange(2, 2, current_time, 32)
 	MyMIDI.addProgramChange(3, 3, current_time, 32)
@@ -136,6 +140,7 @@ if __name__ == "__main__":
 			print("Restarting...\n")
 			continue
 			
+	# adding melody to track
 	for new_note in Voice.midi_score[0]:
 		if isinstance(new_note.pitch, int):
 			MyMIDI.addNote(track, channel, *new_note, 100)
@@ -154,6 +159,7 @@ if __name__ == "__main__":
 			)
 			Voice.midi_score[voice_index][-2] = new_midi_obj
 
+	# adding chords to track
 	for voice_index, part in enumerate(Voice.midi_score[1:]):
 		track += 1
 		channel += 1
@@ -161,9 +167,11 @@ if __name__ == "__main__":
 		for new_note in part:
 			if isinstance(new_note.pitch, int): 
 				MyMIDI.addNote(track, channel, *new_note, volume)
-
-	# 3/4 time sig feels slower at same tempo because 
-	# beats are in groups of 3 instead of 2
+	"""
+	3/4 time sig feels slower at same tempo because 
+	beats are in groups of 3 instead of 2
+	Adjust to match chord durations in other time sigs
+	"""
 	if Voice.time_sig == (3, 2):
 		MOD_SPEED = 1.5
 	else: 

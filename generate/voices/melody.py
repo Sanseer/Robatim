@@ -59,6 +59,20 @@ class Melody(Voice):
 		}
 		self.chosen_figurations = [None for _ in range(15)]
 
+		"""
+		IPT = inner passing tone
+		OPT = outer passing tone
+		ANT = anticipation
+		RET = retardation
+		CIN = current incomplete neighbor
+		PIN = previous incomplete neighbor
+		DN = double neighbor
+		CN = complete neighbor
+		DCN = double complete neighbor
+		Keys indicate scale degree difference between base melody notes
+		Negative slope (-1) if previous melody note is higher than current melody note
+		Positive slope (+1) if previous melody note is lower than current melody note 
+		"""
 		self.all_single_figurations = {
 			0: lambda previous, current, slope: [
 				((current - 1,), "CN"), ((current + 1,), "CN"),
@@ -154,6 +168,7 @@ class Melody(Voice):
 
 	def make_chord_progression(self):
 		"""Make a chord progression using common practice idioms"""
+
 		major_minor_tonality = ("ionian", "aeolian") 
 		if self.mode not in major_minor_tonality:
 			# I don't know any modal progressions yet so, I'll use
@@ -175,6 +190,7 @@ class Melody(Voice):
 					Voice.chord_sequence.append(Chord(chord_choice))
 
 		print(f"Chord sequence: {Voice.chord_sequence}")
+		self.logger.warning(f"Chord sequence: {Voice.chord_sequence}")
 		if temp_mode is not None:
 			Score.mode = temp_mode
 
@@ -273,10 +289,12 @@ class Melody(Voice):
 	def create_first_melody_note(self):
 		"""Reset the first melody note of the sequence"""
 
-		# AssertionError singles out this scenario.
-		# it traverses the call stack to main.py before being handled.
-		# Other exceptions like IndexError can occur elsewhere in class instance
-		# and would be silenced by main.py, preventing debugging.
+		"""
+		AssertionError singles out this scenario.
+		it traverses the call stack to main.py before being handled.
+		Other exceptions like IndexError can occur elsewhere in class instance
+		and would be silenced by main.py, preventing debugging.
+		"""
 		try:
 			self.current_degree_choice = (
 				self.current_scale_degree_options[0].pop()
@@ -286,9 +304,9 @@ class Melody(Voice):
 			raise AssertionError
 		self.chosen_scale_degrees[0] = self.current_degree_choice
 		if Voice.pickup:
-			self.melodic_direction[0] = '>'
+			self.melodic_direction[0] = ">"
 		else:
-			self.melodic_direction[0] = '_'
+			self.melodic_direction[0] = "_"
 
 		self.chord_index += 1
 		self.current_scale_degree_options[1] = (
@@ -333,10 +351,14 @@ class Melody(Voice):
 			print("Melody taking too long.")
 			raise AssertionError
 
-		# can't track negative progress because figuration options
-		# (as opposed to base melody options) determines # of possible combos.
-		# figurations are calculated at the time of validation
-
+		"""
+		cannot track positive progress of maze algorithm
+		In other words, you don't know how soon to success 
+		cannot track negative progress (how soon to complete failure) 
+		because figuration options (as opposed to base melody options) 
+		determines # of possible combos.
+		figurations are calculated at the time of validation
+		"""
 		self.previous_degree_choice = self.chosen_scale_degrees[self.chord_index - 1]
 		if not self.melody_figure_options[self.chord_index - 1]:
 			self.melodic_direction[self.chord_index] = None
@@ -374,11 +396,11 @@ class Melody(Voice):
 		)
 
 		if self.current_degree_choice == self.previous_degree_choice:
-			self.melodic_direction[self.chord_index] = '_'
+			self.melodic_direction[self.chord_index] = "_"
 		elif self.current_degree_choice > self.previous_degree_choice:
-			self.melodic_direction[self.chord_index] = '>'
+			self.melodic_direction[self.chord_index] = ">"
 		elif self.current_degree_choice < self.previous_degree_choice:
-			self.melodic_direction[self.chord_index] = '<'
+			self.melodic_direction[self.chord_index] = "<"
 
 		self.reset_unnested_melody()
 		self.chosen_scale_degrees[self.chord_index] = self.current_degree_choice 
@@ -390,10 +412,15 @@ class Melody(Voice):
 
 	def validate_base_melody(self):
 		"""Check current base melody with idioms"""
+
 		melodic_mvmt = "".join(
 			str(slope) for slope in self.melodic_direction[:self.chord_index + 1]
 		)
-
+		"""
+		All melody rules (base and figures) are based on observations
+		from actual music. See tests/test_song.py and tests/melody_frame.py
+		for more details.
+		"""
 		if "_" * 3 in melodic_mvmt:
 			# Avoid long rests
 			return False
@@ -431,7 +458,7 @@ class Melody(Voice):
 			if abs_current_move_distance > 4:
 				# Don't end with a large leap
 				return False
-			if relevant_melodic_mvt.count('>') > relevant_melodic_mvt.count('<'):
+			if relevant_melodic_mvt.count(">") > relevant_melodic_mvt.count("<"):
 				# Descending motion should predominate
 				return False
 		if abs_current_move_distance > 4 and self.chord_index not in self.valid_leap_indices:
@@ -452,9 +479,11 @@ class Melody(Voice):
 			  self.nested_scale_degrees[0] != self.nested_scale_degrees[8]):
 				return False 
 
-		# score divides into 4 sections, 16 items
-		# first 2 sections: antecedent
-		# last 2 sections: consequent
+		"""
+		score divides into 4 sections, 16 items
+		first 2 sections: antecedent
+		last 2 sections: consequent
+		"""
 		current_section = self.chord_index // 4
 		section_start_index = current_section * 4
 		section_scale_degrees = (
@@ -589,8 +618,11 @@ class Melody(Voice):
 			unnested_scalar_melody = self.unnested_scale_degrees[:]
 			unnested_scalar_melody.extend(inbetween)
 
-			# chord 8 and 12 are short-circuited
-			# only need to evaluate once going forward
+			"""
+			chord 8 and 12 are short-circuited
+			only need to evaluate once going forward
+			so, use the next indices for testing at divisible checkpoints
+			"""
 			if self.chord_index == 13 and max(unnested_scalar_melody) < 5:
 				continue
 			if self.chord_index == 9:

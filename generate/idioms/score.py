@@ -109,10 +109,6 @@ class Score:
 			cls.tonic = tonic
 		else:
 			raise ValueError("Invalid tonic note")
-		# elif cls.mode == "aeolian":
-		# 	cls.key_sigs = (
-		# 		"A", "E", "B", "F#", "C#", "G#", "D#", "Bb", "F", "C", "G", "D",
-		# 	)
 
 		cls.time_sig = random.choice(cls.time_sigs)
 		cls.measure_length = cls.time_sig[0]
@@ -169,7 +165,7 @@ class Score:
 
 		logger_name = cls.__name__.lower()
 		cls.logger = logging.getLogger(logger_name)
-		log_handler = logging.FileHandler(f"logs/{logger_name}.log", mode='w')
+		log_handler = logging.FileHandler(f"logs/{logger_name}.log", mode="w")
 		log_handler.setLevel(logging.WARNING)
 		log_format = logging.Formatter("%(name)s %(levelname)s %(message)s")
 		log_handler.setFormatter(log_format)

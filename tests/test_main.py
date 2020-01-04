@@ -21,9 +21,9 @@ class MainScoreMethods(unittest.TestCase):
 		# sending too many requests is bad for server?
 		time.sleep(1)
 
-		with open("payload.json", 'w') as f:
+		with open("payload.json", "w") as f:
 			json.dump(payload, f)
-		with open("payload.json", 'rb')  as f:
+		with open("payload.json", "rb")  as f:
 			sheet_music_response = requests.post(
 				"https://7icpm9qr6a.execute-api.us-west-2.amazonaws.com/prod/prepare_preview/stable", data=f)
 		self.assertTrue(sheet_music_response.status_code == 200)

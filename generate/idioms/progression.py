@@ -55,6 +55,8 @@ class Progression(Score):
 			"-I6", (lambda: self.previous_chord in ("-IV6", "-VI"),)
 		)
 
+		# positive chords are at or above the starting/ending tonic
+		# negative chords are below the starting/ending tonic
 		from_positive_chord = lambda: self.previous_chord[0] in ("0", "+")
 		from_negative_chord = lambda: self.previous_chord[0] == "-"
 		validate_minus_V7 = (
