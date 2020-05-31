@@ -55,6 +55,41 @@ class TestScore(unittest.TestCase):
 		new_pitch = robatim.Pitch("B#")
 		self.assertEqual(str(new_pitch.change_pitch_accidental(new_pitch, -1)), "B")
 
+	def test_pitch_shift(self):
+
+		new_pitch = robatim.Pitch("G")
+		self.assertEqual(str(new_pitch.shift(1, 3)), "A#")
+		new_pitch = robatim.Pitch("E")
+		self.assertEqual(str(new_pitch.shift(-2, -2)), "C##")
+		new_pitch = robatim.Pitch("F#")
+		self.assertEqual(str(new_pitch.shift(3, 5)), "B")
+
+		new_pitch = robatim.Pitch("Db")
+		self.assertEqual(str(new_pitch.shift(0, 0)), "Db")
+		new_pitch = robatim.Pitch("C##")
+		self.assertEqual(str(new_pitch.shift(0, -2)), "C")
+		new_pitch = robatim.Pitch("Ab")
+		self.assertEqual(str(new_pitch.shift(-1, 0)), "G#")
+
+	def test_scale_pitches(self):
+		chosen_scale_obj = robatim.Scale("Ab") 
+		scale_sequence = ("Ab", "Bb", "C", "Db", "Eb", "F", "G")
+
+		def analyze_scale_members(chosen_scale_obj, scale_sequence):
+			for scale_pitch in chosen_scale_obj.scale_pitches:
+				self.assertIn(str(scale_pitch), scale_sequence)
+
+		analyze_scale_members(chosen_scale_obj, scale_sequence)
+
+		scale_members = {
+			("G", "ionian"): ("G", "A", "B", "C", "D", "E", "F#"), 
+			("C", "aeolian"): ("C", "D", "Eb", "F", "G", "Ab", "Bb"),
+			("D", "dorian"): ("D", "E", "F", "G", "A", "B", "C"),
+			("G#", "ionian"): ("G#", "A#", "B#", "C#", "D#", "E#", "F##"),
+		}
+		for scale_parameters, scale_sequence in scale_members.items():
+			analyze_scale_members(robatim.Scale(*scale_parameters), scale_sequence)
+
 
 if __name__ == "__main__":
 	unittest.main() 

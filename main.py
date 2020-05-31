@@ -111,7 +111,7 @@ class Scale(Engraver):
 			"ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", 
 			"locrian",
 		)
-		scale_index = mode_wheel.index(mode)
+		scale_index = mode_wheel.index(mode.lower())
 		old_pitch_obj = Pitch(tonic)
 		self.scale_pitches = [old_pitch_obj]
 
