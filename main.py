@@ -1,3 +1,5 @@
+from __future__ import annotations
+# allows use of an annotation before function definition (Python 3.7+)
 import random
 from typing import List, Tuple, Union
 from fractions import Fraction
@@ -10,9 +12,90 @@ class Engraver:
 	roman_numerals = ("I", "II", "III", "IV", "V", "VI", "VII")
 	note_letters = ("A", "B", "C", "D", "E", "F", "G")
 
+class Pitch(Engraver):
+	
+	def __init__(self, pitch_symbol: str) -> None:
+
+		self.pitch_letter = pitch_symbol[0].upper()
+		if self.pitch_letter not in self.note_letters:
+			raise ValueError
+		self.accidental_symbol = pitch_symbol[1:]
+		self.accidental_amount = Pitch.accidental_symbol_to_amount(self.accidental_symbol)
+
+	def __str__(self) -> str:
+		return self.pitch_letter + self.accidental_symbol 
+
+	@staticmethod
+	def accidental_symbol_to_amount(accidental_symbol: str) -> int:
+
+		if len(set(accidental_symbol)) > 1:
+			raise ValueError
+
+		if "#" in accidental_symbol:
+			return accidental_symbol.count("#")
+		elif "b" in accidental_symbol:
+			return accidental_symbol.count("b") * -1
+		elif not accidental_symbol:
+			return 0
+		else:
+			raise ValueError
+
+	@staticmethod
+	def accidental_amount_to_symbol(accidental_amount: int) -> str:
+		
+		if accidental_amount > 0:
+			return "#" * accidental_amount
+		elif accidental_amount < 0:
+			return "b" * abs(accidental_amount)
+		else:
+			return ""
+
+	def shift(self, letter_increment: int, pitch_increment: int) -> Pitch:
+
+		# object parameter in both functions for consistency
+		# outward-facing methods pass pitch objects implicitly
+		# inward-facing methods pass pitch objects explicitly
+		pitch_letter_convert = self.change_pitch_letter(self, letter_increment)
+		final_pitch_obj = self.change_pitch_accidental(
+			pitch_letter_convert, pitch_increment
+		)
+		return final_pitch_obj
+
+	def change_pitch_letter(self, old_pitch_obj: Pitch, letter_increment: int) -> Pitch:
+
+		if letter_increment == 0:
+			return old_pitch_obj
+
+		letter_direction = collapse_magnitude(letter_increment)
+		half_step_letters = {"B", "C", "E", "F"}
+		new_accidental_amount = old_pitch_obj.accidental_amount
+		old_pitch_letter = old_pitch_obj.pitch_letter
+		old_letter_index = self.note_letters.index(old_pitch_letter)
+
+		for _ in range(abs(letter_increment)):
+			new_letter_index = (old_letter_index + letter_direction) % 7 
+			new_pitch_letter = self.note_letters[new_letter_index]
+			pitch_pair = {new_pitch_letter, old_pitch_letter}
+			if len(half_step_letters & pitch_pair) == 2:
+				new_accidental_amount += letter_direction
+			else:
+				new_accidental_amount += (letter_direction * 2)
+			old_pitch_letter = new_pitch_letter
+			old_letter_index = new_letter_index
+
+		new_accidental_symbol = Pitch.accidental_amount_to_symbol(new_accidental_amount)
+		return Pitch(new_pitch_letter + new_accidental_symbol)
+
+	def change_pitch_accidental(old_pitch_obj: Pitch, pitch_increment: int) -> Pitch:
+
+		new_accidental_amount = old_pitch_obj.accidental_amount + pitch_increment
+		new_accidental_symbol = Pitch.accidental_amount_to_symbol(new_accidental_amount)
+		return Pitch(old_pitch_obj.pitch_letter + new_accidental_symbol)
+  
+
 class Scale(Engraver):
 
-	def __init__(self, tonic="C", mode="ionian") -> None:
+	def __init__(self, tonic: str = "C", mode: str = "ionian") -> None:
 
 		mode_wheel = (
 			"ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", 
@@ -29,7 +112,7 @@ class Scale(Engraver):
 			old_pitch_obj = new_pitch_obj
 			scale_index = (scale_index + 1) % 7
 
-	def create_chord_pitches(self, chosen_roman_numeral, is_triad) -> List[Pitch]:
+	def create_chord_pitches(self, chosen_roman_numeral: str, is_triad: bool) -> List[Pitch]:
 
 		root_index = self.roman_numerals.index(chosen_roman_numeral)
 		chord_pitches = [self.scale_pitches[root_index]]
@@ -44,6 +127,7 @@ class Scale(Engraver):
 			chord_pitches.append(self.scale_pitches[pitch_index])
 
 		return chord_pitches
+
 
 class Chord(Engraver):
 
@@ -105,87 +189,6 @@ class Note(Engraver):
 		self.midi_pitch = midi_pitch
 		self.pitch_name = ""
 
-
-class Pitch(Engraver):
-	
-	def __init__(self, pitch_symbol: str) -> None:
-
-		self.pitch_letter = pitch_symbol[0].upper()
-		if self.pitch_letter not in self.note_letters:
-			raise ValueError
-		self.accidental_symbol = pitch_symbol[1:]
-		self.accidental_amount = Pitch.accidental_symbol_to_amount(self.accidental_symbol)
-
-	def __str__(self) -> str:
-		return self.pitch_letter + self.accidental_symbol 
-
-	@staticmethod
-	def accidental_symbol_to_amount(accidental_symbol: str) -> int:
-
-		if len(set(accidental_symbol)) > 1:
-			raise ValueError
-
-		if "#" in accidental_symbol:
-			return accidental_symbol.count("#")
-		elif "b" in accidental_symbol:
-			return accidental_symbol.count("b") * -1
-		elif not accidental_symbol:
-			return 0
-		else:
-			raise ValueError
-
-	@staticmethod
-	def accidental_amount_to_symbol(accidental_amount: int) -> str:
-		
-		if accidental_amount > 0:
-			return "#" * accidental_amount
-		elif accidental_amount < 0:
-			return "b" * abs(accidental_amount)
-		else
-			return ""
-
-	def shift(self, letter_increment: int, pitch_increment: int) -> Pitch:
-
-		# object parameter in both functions for consistency
-		# outward-facing methods pass pitch objects implicitly
-		# inward-facing methods pass pitch objects explicitly
-		pitch_letter_convert = self.change_pitch_letter(self, letter_increment)
-		final_pitch_obj = self.change_pitch_accidental(
-			pitch_letter_convert, pitch_increment
-		)
-		return final_pitch_obj
-
-	def change_pitch_letter(self, old_pitch_obj: Pitch, letter_increment: int) -> Pitch:
-
-		if letter_increment == 0:
-			return old_pitch_obj
-
-		letter_direction = collapse_magnitude(letter_increment)
-		half_step_letters = {"B", "C", "E", "F"}
-		new_accidental_amount = old_pitch_obj.accidental_amount
-		old_pitch_letter = old_pitch_obj.pitch_letter
-		old_letter_index = self.note_letters.index(old_pitch_letter)
-
-		for _ in range(abs(letter_increment)):
-			new_letter_index = (old_letter_index + letter_direction) % 7 
-			new_pitch_letter = self.note_letters[new_letter_index]
-			pitch_pair = {new_pitch_letter, old_pitch_letter}
-			if len(half_step_letters & pitch_pair) == 2:
-				new_accidental_amount += letter_direction
-			else:
-				new_accidental_amount += (letter_direction * 2)
-			old_pitch_letter = new_pitch_letter
-			old_letter_index = new_letter_index
-
-		new_accidental_symbol = Pitch.accidental_amount_to_symbol(new_accidental_amount)
-		return Pitch(new_pitch_letter + new_accidental_symbol)
-
-	def change_pitch_accidental(old_pitch_obj: Pitch, pitch_increment: int) -> Pitch:
-
-		new_accidental_amount = old_pitch_obj.accidental_amount + pitch_increment
-		new_accidental_symbol = Pitch.accidental_amount_to_symbol(new_accidental_amount)
-		return Pitch(old_pitch_obj.pitch_letter + new_accidental_symbol)
-  
 
 class Measure(Engraver):
 
@@ -278,7 +281,8 @@ class Score(Engraver):
 	def export_score(self) -> None:
 		pass
 
-my_score = Score()
-my_score.create_theme()
-my_score.export_score()
+if __name__ == "__main__":
+	my_score = Score()
+	my_score.create_theme()
+	my_score.export_score()
 		
