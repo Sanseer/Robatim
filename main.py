@@ -12,6 +12,16 @@ class Engraver:
 	roman_numerals = ("I", "II", "III", "IV", "V", "VI", "VII")
 	note_letters = ("A", "B", "C", "D", "E", "F", "G")
 
+
+def collapse_magnitude(amount: int) -> int:
+	if amount > 0:
+		return 1
+	if amount < 0:
+		return - 1
+	else:
+		return 0
+
+
 class Pitch(Engraver):
 	
 	def __init__(self, pitch_symbol: str) -> None:
@@ -77,16 +87,16 @@ class Pitch(Engraver):
 			new_pitch_letter = self.note_letters[new_letter_index]
 			pitch_pair = {new_pitch_letter, old_pitch_letter}
 			if len(half_step_letters & pitch_pair) == 2:
-				new_accidental_amount += letter_direction
+				new_accidental_amount -= letter_direction
 			else:
-				new_accidental_amount += (letter_direction * 2)
+				new_accidental_amount -= (letter_direction * 2)
 			old_pitch_letter = new_pitch_letter
 			old_letter_index = new_letter_index
 
 		new_accidental_symbol = Pitch.accidental_amount_to_symbol(new_accidental_amount)
 		return Pitch(new_pitch_letter + new_accidental_symbol)
 
-	def change_pitch_accidental(old_pitch_obj: Pitch, pitch_increment: int) -> Pitch:
+	def change_pitch_accidental(self, old_pitch_obj: Pitch, pitch_increment: int) -> Pitch:
 
 		new_accidental_amount = old_pitch_obj.accidental_amount + pitch_increment
 		new_accidental_symbol = Pitch.accidental_amount_to_symbol(new_accidental_amount)
@@ -280,6 +290,7 @@ class Score(Engraver):
 
 	def export_score(self) -> None:
 		pass
+
 
 if __name__ == "__main__":
 	my_score = Score()
