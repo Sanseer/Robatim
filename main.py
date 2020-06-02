@@ -1,5 +1,6 @@
 from __future__ import annotations
 # allows use of an annotation before function definition (Python 3.7+)
+import collections
 import random
 from typing import List, Tuple, Union
 from fractions import Fraction
@@ -16,7 +17,7 @@ class Engraver:
 def collapse_magnitude(amount: int) -> int:
 	if amount > 0:
 		return 1
-	if amount < 0:
+	elif amount < 0:
 		return - 1
 	else:
 		return 0
@@ -179,20 +180,6 @@ class Chord(Engraver):
 			)
 
 
-class ChordType:
-
-	def __init__(
-	  self, chord_designator: str, chord_conditional: str, 
-	  duration: Union[int, float, Fraction] = 0) -> None:
-		self.duration = duration
-		self.chord_designator = chord_designator
-		self.chord_conditional = chord_conditional  
-
-	def realize(self) -> Chord:
-		if self.chord_designator == "SINGLE":
-			return Chord(self.chord_conditional, self.duration)
-
-
 class Note(Engraver):
 
 	def __init__(self, midi_pitch: int) -> None:
@@ -219,6 +206,7 @@ class Measure(Engraver):
 			Chord(chord.symbol, chord.duration, current_offset, self.absolute_offset)
 		)
 
+ChordType = collections.namedtuple("ChordType", ["function", "duration"])
 
 class Phrase(Engraver):
 
@@ -253,27 +241,73 @@ class MiniPeriod(Phrase):
 		super().__init__(relative_offset, parent_absolute_offset, num_measures)
 		self.progressions = (
 			Progression( # e.g., I II6 V I
-				ChordType("SINGLE", "I", self.measure_duration), 
-				ChordType("MULTI", "SUBDOM_-1", self.measure_duration),
-				ChordType("MULTI", "DOM_-1", self.measure_duration), 
-				ChordType("SINGLE", "I", self.measure_duration),
+				ChordType("TONIC", self.measure_duration), 
+				ChordType("PREDOMINANT", self.measure_duration),
+				ChordType("DOMINANT", self.measure_duration), 
+				ChordType("TONIC", self.measure_duration),
 			),
 		)
 
 	def add_melody_notes(self) -> None:
 		pass
 
+ChordRule = collections.namedtuple("ChordRule", ["function", "parameters"])
 
 class Progression:
+
+	all_chords = {
+		"TONIC": ("I", "I6"), 
+		"PREDOMINANT": ("VI", "IV6", "IV", "II6", "II"),
+		"DOMINANT": ("I64", "V42", "V43", "VII6", "V65", "V6", "V"),
+	}
+
+	chord_rules = {}
 	
 	def __init__(self, *args: Tuple[ChordType, ...]) -> None:
 		self.chord_types = args
 
-	def realize(self) -> List[Chord]:
-		chord_sequence = []
+	def realize(self) -> List[Chord, ...]:
+
+		reference_chord_combos = []
+		chosen_chords = []
+		remaining_chord_combos = []
 		for chord_type in self.chord_types:
-			chord_sequence.append(chord_type.realize())
-		return chord_sequence
+			possible_chords = list(self.all_chords[chord_type.function])
+			reference_chord_combos.append(possible_chords)
+			chosen_chords.append(None)
+			remaining_chord_combos.append(None)
+
+		chord_index = 0
+		remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
+		while None in chosen_chords:
+			chosen_chord = random.choice(remaining_chord_combos[chord_index])
+			remaining_chord_combos[chord_index].remove(chosen_chord)
+
+			is_chord_valid = True
+			for rule_obj in self.chord_rules[chosen_chord]:
+				is_chord_rule_valid = rule_obj.function(*rule_obj.parameters)
+				if not is_chord_rule_valid:
+					is_chord_valid = False
+					break
+			else:
+				chosen_chords[chord_index] = chosen_chord
+				chord_index += 1
+				try:
+					remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
+				except IndexError:
+					continue
+
+			if not is_chord_valid and not remaining_chord_combos[chord_index]:
+				remaining_chord_combos[chord_index] = None
+				if chord_index == 0:
+					raise IndexError
+				chord_index -= 1
+				chosen_chords[chord_index] = None
+
+		final_chords = []
+		for chord_symbol, chord_type in zip(chosen_chords, self.chord_types):
+			final_chords.append(Chord(chord_symbol, chord_type.duration))
+		return final_chords
 
 
 class Score(Engraver):
