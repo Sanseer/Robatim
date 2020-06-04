@@ -10,6 +10,7 @@ class Engraver:
 	# 4/4 time signature
 	measure_duration = 1
 	scale_obj = None
+	time_sig_obj = None
 	roman_numerals = ("I", "II", "III", "IV", "V", "VI", "VII")
 	note_letters = ("A", "B", "C", "D", "E", "F", "G")
 
@@ -180,11 +181,10 @@ class Chord(Engraver):
 			)
 
 
-class Note(Engraver):
+class MidiNote(Pitch):
 
-	def __init__(self, midi_pitch: int) -> None:
-		self.midi_pitch = midi_pitch
-		self.pitch_name = ""
+	def __init__(self, pitch_symbol: str, octave_num: int) -> None:
+		super().__init__(pitch_symbol)
 
 
 class Measure(Engraver):
@@ -221,6 +221,7 @@ class Phrase(Engraver):
 			self.measures.append(
 				Measure(index * self.measure_duration, self.absolute_offset)
 			)
+		self.base_melody = []
 
 	def imprint_progression(self) -> None:
 		progression = random.choice(self.progressions)
@@ -230,6 +231,41 @@ class Phrase(Engraver):
 			measure_index = relative_offset // self.measure_duration
 			self.measures[measure_index].imprint_chord(current_chord)
 			relative_offset += current_chord.duration 
+
+	def add_melody_notes(self) -> None:
+
+		melodic_divisions = self.time_sig_obj.melodic_divisions
+		base_melody_degree_options = []
+		base_melody_pitch_options = []
+		base_melody_duration = self.measure_duration / melodic_divisions
+
+		for current_measure in self.measures:
+			current_offset = 0
+			for _ in range(melodic_divisions):
+				base_melody_pitch_options.append([])
+				base_melody_degree_options.append([])
+				current_chord = current_measure.get_chord(current_offset)
+
+				for current_pitch in current_chord.pitches:
+					base_melody_pitch_options[-1].append(current_pitch)
+					current_degree = self.scale_obj.get_degree(current_pitch)
+					base_melody_degree_options[-1].append(current_degree)
+				current_offset += base_melody_duration
+
+		base_melody_iter = self.find_melody(
+			base_melody_pitch_options, base_melody_degree_options
+		)
+
+		while True:
+			self.base_melody = next(base_melody_iter, None)
+			if self.base_melody is None:
+				raise ValueError
+			full_melody = self.embellish_melody() 
+			if full_melody:
+				break 
+
+		for current_measure, measure_notes in zip(self.measures, full_melody):
+			current_measure.imprint_notes(measure_notes)
 
 
 class MiniPeriod(Phrase): 
@@ -248,8 +284,9 @@ class MiniPeriod(Phrase):
 			),
 		)
 
-	def add_melody_notes(self) -> None:
-		pass
+	def find_melody(self, base_melody_pitch_options, base_melody_degree_options):
+		reference_pitch_options = copy.deepcopy(base_melody_pitch_options)
+		reference_degree_options = copy.deepcopy(base_melody_degree_options)
 
 ChordRule = collections.namedtuple("ChordRule", ["function", "parameters"])
 
