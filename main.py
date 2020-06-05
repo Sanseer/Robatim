@@ -1,6 +1,7 @@
 from __future__ import annotations
 # allows use of an annotation before function definition (Python 3.7+)
 import collections
+import copy
 import random
 from typing import List, Tuple, Union
 from fractions import Fraction
@@ -181,7 +182,7 @@ class Chord(Engraver):
 			)
 
 
-class MidiNote(Pitch):
+class Note(Pitch):
 
 	def __init__(self, pitch_symbol: str, octave_num: int) -> None:
 		super().__init__(pitch_symbol)
@@ -234,31 +235,11 @@ class Phrase(Engraver):
 
 	def add_melody_notes(self) -> None:
 
-		melodic_divisions = self.time_sig_obj.melodic_divisions
-		base_melody_degree_options = []
-		base_melody_pitch_options = []
-		base_melody_duration = self.measure_duration / melodic_divisions
+		base_melody_note_options = self.get_base_melody_options()
+		base_melody_finder = self.find_base_melody(base_melody_note_options)
 
-		for current_measure in self.measures:
-			current_offset = 0
-			for _ in range(melodic_divisions):
-				base_melody_pitch_options.append([])
-				base_melody_degree_options.append([])
-				current_chord = current_measure.get_chord(current_offset)
-
-				for current_pitch in current_chord.pitches:
-					base_melody_pitch_options[-1].append(current_pitch)
-					current_degree = self.scale_obj.get_degree(current_pitch)
-					base_melody_degree_options[-1].append(current_degree)
-				current_offset += base_melody_duration
-
-		base_melody_iter = self.find_melody(
-			base_melody_pitch_options, base_melody_degree_options
-		)
-
-		while True:
-			self.base_melody = next(base_melody_iter, None)
-			if self.base_melody is None:
+		while True: 
+			if not next(base_melody_finder):
 				raise ValueError
 			full_melody = self.embellish_melody() 
 			if full_melody:
@@ -266,6 +247,66 @@ class Phrase(Engraver):
 
 		for current_measure, measure_notes in zip(self.measures, full_melody):
 			current_measure.imprint_notes(measure_notes)
+
+	def get_base_melody_options(self) -> List[List[Note, ...], ...]:
+
+		melodic_divisions = self.time_sig_obj.melodic_divisions
+		base_melody_note_options = []
+		base_melody_duration = self.measure_duration / melodic_divisions
+
+		for current_measure in self.measures:
+			current_offset = 0
+			for _ in range(melodic_divisions):
+				base_melody_note_options.append([])
+				current_chord = current_measure.get_chord(current_offset)
+
+				for current_note in current_chord.get_melody_notes():
+					base_melody_note_options[-1].append(current_note)
+				current_offset += base_melody_duration
+
+		return base_melody_note_options
+
+	def find_base_melody(
+	  self, base_melody_note_options: List[List[Note, ...], ...]) -> bool:
+
+		reference_note_options = copy.deepcopy(base_melody_note_options)
+		base_melody_length = len(base_melody_note_options)
+		self.base_melody = [None for _ in range(base_melody_length)]
+		self.base_degrees = base_melody[:]
+
+		note_index = 0
+		current_note_options = base_melody_note_options[note_index]
+
+		while True:
+			if current_note_options: 
+				attempted_note = random.choice(current_note_options)
+				current_note_options.remove(attempted_note)
+				attempted_scale_degree = self.scale_obj.get_degree(attempted_note)
+
+				if self.test_melody_note(
+				  note_index, attempted_note, attempted_scale_degree):
+					self.base_melody[note_index] = attempted_note
+					self.base_degrees[note_index] = attempted_scale_degree
+					note_index += 1
+					
+					if note_index == base_melody_length:
+						note_index -= 1
+						yield True
+						self.base_melody[note_index] = None
+						self.base_degrees[note_index] = None
+						continue
+
+			else:
+				base_melody_note_options[note_index] = (
+					reference_note_options[note_index][:]
+				)
+				if note_index == 0:
+					return False
+					
+				note_index -= 1
+				current_note_options = base_melody_note_options[note_index]
+				self.base_melody[note_index] = None
+				self.base_degrees[note_index] = None
 
 
 class MiniPeriod(Phrase): 
@@ -283,10 +324,6 @@ class MiniPeriod(Phrase):
 				ChordType("TONIC", self.measure_duration),
 			),
 		)
-
-	def find_melody(self, base_melody_pitch_options, base_melody_degree_options):
-		reference_pitch_options = copy.deepcopy(base_melody_pitch_options)
-		reference_degree_options = copy.deepcopy(base_melody_degree_options)
 
 ChordRule = collections.namedtuple("ChordRule", ["function", "parameters"])
 
@@ -317,22 +354,23 @@ class Progression:
 		chord_index = 0
 		remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
 		while None in chosen_chords:
-			chosen_chord = random.choice(remaining_chord_combos[chord_index])
-			remaining_chord_combos[chord_index].remove(chosen_chord)
+			if remaining_chord_combos[chord_index]:
+				chosen_chord = random.choice(remaining_chord_combos[chord_index])
+				remaining_chord_combos[chord_index].remove(chosen_chord)
 
-			is_chord_valid = True
-			for rule_obj in self.chord_rules[chosen_chord]:
-				is_chord_rule_valid = rule_obj.function(*rule_obj.parameters)
-				if not is_chord_rule_valid:
-					is_chord_valid = False
-					break
-			else:
-				chosen_chords[chord_index] = chosen_chord
-				chord_index += 1
-				try:
-					remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
-				except IndexError:
-					continue
+				is_chord_valid = True
+				for rule_obj in self.chord_rules[chosen_chord]:
+					is_chord_rule_valid = rule_obj.function(*rule_obj.parameters)
+					if not is_chord_rule_valid:
+						is_chord_valid = False
+						break
+				else:
+					chosen_chords[chord_index] = chosen_chord
+					chord_index += 1
+					try:
+						remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
+					except IndexError:
+						continue
 
 			if not is_chord_valid and not remaining_chord_combos[chord_index]:
 				remaining_chord_combos[chord_index] = None
