@@ -90,6 +90,27 @@ class TestScore(unittest.TestCase):
 		for scale_parameters, scale_sequence in scale_members.items():
 			analyze_scale_members(robatim.Scale(*scale_parameters), scale_sequence)
 
+	def test_chord_pitches(self):
+
+		def check_chord(chord_symbol, chord_pitch_names):
+			new_chord = robatim.Chord(chord_symbol, 0)
+			pitch_str_sequence = []
+			for chord_pitch in new_chord.pitches:
+				pitch_str_sequence.append(str(chord_pitch))
+			self.assertEqual(chord_pitch_names, pitch_str_sequence)
+
+		robatim.Engraver.scale_obj = robatim.Scale("Bb", "ionian")
+		check_chord("I", ["Bb", "D", "F"])
+		check_chord("V7", ["F", "A", "C", "Eb"])
+		check_chord("II6", ["C", "Eb", "G"])
+		check_chord("VI", ["G", "Bb", "D"])
+
+		robatim.Engraver.scale_obj = robatim.Scale("F#", "aeolian")
+		check_chord("I", ["F#", "A", "C#"])
+		check_chord("IV6/5", ["B", "D", "F#", "A"])
+		check_chord("VII", ["E", "G#", "B"])
+		check_chord("I6/4", ["F#", "A", "C#"])
+
 
 if __name__ == "__main__":
 	unittest.main() 

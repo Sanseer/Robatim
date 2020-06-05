@@ -168,11 +168,11 @@ class Chord(Engraver):
 			else:
 				raise ValueError
 
-			if bass_figure in triads_figured_bass:
-				inversion_position = triads_figured_bass[bass_figure]
+			if bass_figure in self.triads_figured_bass:
+				self.inversion_position = self.triads_figured_bass[bass_figure]
 				is_triad = True
-			elif bass_figure in sevenths_figured_bass:
-				inversion_position = sevenths_figured_bass[bass_figure]
+			elif bass_figure in self.sevenths_figured_bass:
+				self.inversion_position = self.sevenths_figured_bass[bass_figure]
 				is_triad = False
 			else:
 				raise ValueError
@@ -288,7 +288,7 @@ class Phrase(Engraver):
 					self.base_melody[note_index] = attempted_note
 					self.base_degrees[note_index] = attempted_scale_degree
 					note_index += 1
-					
+
 					if note_index == base_melody_length:
 						note_index -= 1
 						yield True
