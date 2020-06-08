@@ -159,9 +159,15 @@ class Scale(Engraver):
 
 		return chord_pitches
 
-	def is_note_diatonic(self, midi_num: int):
+	def is_note_diatonic(self, midi_num: int) -> bool:
 		base_midi_num = midi_num % 12
 		return base_midi_num in self.scale_pitches_dict.values()
+
+	def get_degree(self, chosen_note: Note) -> int:
+		chosen_pitch_name = str(chosen_note)
+		for scale_degree, pitch_obj in enumerate(self.scale_pitches_seq):
+			if str(pitch_obj) == chosen_pitch_name:
+				return scale_degree 
 
 
 class Chord(Engraver):
@@ -206,13 +212,13 @@ class Chord(Engraver):
 
 class Note(Pitch):
 
-	def __init__(self, chosen_midi_num: int, scale_obj: Scale) -> None:
+	def __init__(self, chosen_midi_num: int) -> None:
 		self.midi_num = chosen_midi_num
 		base_midi_num = chosen_midi_num % 12
 		for pitch_obj, current_midi_num in self.scale_obj.scale_pitches_dict.items():
 			if base_midi_num == current_midi_num:
 				break
-		super().__init__(pitch_obj.pitch_symbol)
+		super().__init__(str(pitch_obj))
 
 	def change_pitch_accidental(self, old_pitch_obj: Pitch, pitch_increment: int) -> Pitch:
 		self.midi_num += pitch_increment
@@ -304,7 +310,7 @@ class Phrase(Engraver):
 		possible_notes = []
 		for midi_num in range(start, stop):
 			if self.scale_obj.is_note_diatonic(midi_num):
-				possible_notes.append(Note(midi_num, self.scale_obj))
+				possible_notes.append(Note(midi_num))
 		return possible_notes
 
 	def find_base_melody(

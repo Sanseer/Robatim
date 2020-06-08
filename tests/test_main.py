@@ -71,15 +71,27 @@ class TestScore(unittest.TestCase):
 		new_pitch = robatim.Pitch("Ab")
 		self.assertEqual(str(new_pitch.shift(-1, 0)), "G#")
 
-	def test_scale_pitches(self):
-		chosen_scale_obj = robatim.Scale("Ab") 
+	def test_scale_degrees(self):
+		chosen_scale_obj = robatim.Engraver.scale_obj = robatim.Scale("Ab") 
 		scale_sequence = ("Ab", "Bb", "C", "Db", "Eb", "F", "G")
 
-		def analyze_scale_members(chosen_scale_obj, scale_sequence):
-			for scale_pitch in chosen_scale_obj.scale_pitches:
-				self.assertIn(str(scale_pitch), scale_sequence)
+		self.assertTrue(chosen_scale_obj.is_note_diatonic(48))
+		self.assertTrue(chosen_scale_obj.is_note_diatonic(68))
+		self.assertTrue(chosen_scale_obj.is_note_diatonic(7))
+		self.assertTrue(chosen_scale_obj.is_note_diatonic(25))
 
-		analyze_scale_members(chosen_scale_obj, scale_sequence)
+		chosen_note = robatim.Note(10)
+		self.assertEqual(chosen_scale_obj.get_degree(chosen_note), 1)
+		chosen_note = robatim.Note(41)
+		self.assertEqual(chosen_scale_obj.get_degree(chosen_note), 5)
+		chosen_note = robatim.Note(87)
+		self.assertEqual(chosen_scale_obj.get_degree(chosen_note), 4)
+
+	def test_scale_pitches(self):
+
+		def analyze_scale_members(chosen_scale_obj, scale_sequence):
+			for scale_pitch in chosen_scale_obj.scale_pitches_seq:
+				self.assertIn(str(scale_pitch), scale_sequence)
 
 		scale_members = {
 			("G", "ionian"): ("G", "A", "B", "C", "D", "E", "F#"), 
