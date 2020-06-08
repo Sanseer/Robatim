@@ -13,7 +13,7 @@ class Engraver:
 	scale_obj = None
 	time_sig_obj = None
 	roman_numerals = ("I", "II", "III", "IV", "V", "VI", "VII")
-	note_letters = ("A", "B", "C", "D", "E", "F", "G")
+	note_letters = ("C", "D", "E", "F", "G", "A", "B")
 
 
 def collapse_magnitude(amount: int) -> int:
@@ -115,21 +115,38 @@ class Scale(Engraver):
 
 	def __init__(self, tonic: str = "C", mode: str = "ionian") -> None:
 
-		scale_index = self.mode_wheel.index(mode.lower())
-		old_pitch_obj = Pitch(tonic)
-		self.scale_pitches = [old_pitch_obj]
-
+		self.mode = mode
+		tonic_pitch_obj = Pitch(tonic)
+		tonic_pitch_letter = tonic_pitch_obj.pitch_letter
+		current_midi_num = 0
 		scale_increments = (2, 2, 1, 2, 2, 2, 1)
+
+		for current_pitch_letter, scale_increment in zip(self.note_letters, scale_increments):
+			if current_pitch_letter == tonic_pitch_letter:
+				break
+			current_midi_num += scale_increment
+
+		current_midi_num += tonic_pitch_obj.accidental_amount
+		current_midi_num %= 12
+		old_pitch_obj = tonic_pitch_obj
+		self.scale_pitches_seq = [old_pitch_obj]
+		self.scale_pitches_dict = {old_pitch_obj: current_midi_num}
+		scale_index = self.mode_wheel.index(self.mode.lower())
+
 		for _ in range(6):
-			new_pitch_obj = old_pitch_obj.shift(1, scale_increments[scale_index])
-			self.scale_pitches.append(new_pitch_obj)
+			current_increment = scale_increments[scale_index]
+			new_pitch_obj = old_pitch_obj.shift(1, current_increment)
+			self.scale_pitches_seq.append(new_pitch_obj)
+
+			current_midi_num = (current_midi_num + current_increment) % 12
+			self.scale_pitches_dict[new_pitch_obj] = current_midi_num 
 			old_pitch_obj = new_pitch_obj
 			scale_index = (scale_index + 1) % 7
 
 	def create_chord_pitches(self, chosen_roman_numeral: str, is_triad: bool) -> List[Pitch]:
 
 		root_index = self.roman_numerals.index(chosen_roman_numeral)
-		chord_pitches = [self.scale_pitches[root_index]]
+		chord_pitches = [self.scale_pitches_seq[root_index]]
 
 		if is_triad:
 			chordal_items = 3
@@ -138,9 +155,13 @@ class Scale(Engraver):
 		pitch_index = root_index
 		for _ in range(chordal_items - 1):
 			pitch_index = (pitch_index + 2) % 7 
-			chord_pitches.append(self.scale_pitches[pitch_index])
+			chord_pitches.append(self.scale_pitches_seq[pitch_index])
 
 		return chord_pitches
+
+	def is_note_diatonic(self, midi_num: int):
+		base_midi_num = midi_num % 12
+		return base_midi_num in self.scale_pitches_dict.values()
 
 
 class Chord(Engraver):
@@ -185,8 +206,17 @@ class Chord(Engraver):
 
 class Note(Pitch):
 
-	def __init__(self, pitch_symbol: str, octave_num: int) -> None:
-		super().__init__(pitch_symbol)
+	def __init__(self, chosen_midi_num: int, scale_obj: Scale) -> None:
+		self.midi_num = chosen_midi_num
+		base_midi_num = chosen_midi_num % 12
+		for pitch_obj, current_midi_num in self.scale_obj.scale_pitches_dict.items():
+			if base_midi_num == current_midi_num:
+				break
+		super().__init__(pitch_obj.pitch_symbol)
+
+	def change_pitch_accidental(self, old_pitch_obj: Pitch, pitch_increment: int) -> Pitch:
+		self.midi_num += pitch_increment
+		super().change_pitch_accidental()
 
 
 class Measure(Engraver):
@@ -256,7 +286,7 @@ class Phrase(Engraver):
 
 		base_melody_note_options = []
 
-		all_modal_notes = self.get_modal_melody_notes()
+		all_modal_notes = self.get_modal_notes(59, 85)
 		for current_measure in self.measures:
 			current_offset = 0
 			for measure_fraction in self.time_sig_obj.melodic_divisions:
@@ -269,6 +299,13 @@ class Phrase(Engraver):
 				current_offset += (self.measure_duration * measure_fraction)
 
 		return base_melody_note_options
+
+	def get_modal_notes(self, start: int, stop: int) -> List[Note, ...]:
+		possible_notes = []
+		for midi_num in range(start, stop):
+			if self.scale_obj.is_note_diatonic(midi_num):
+				possible_notes.append(Note(midi_num, self.scale_obj))
+		return possible_notes
 
 	def find_base_melody(
 	  self, base_melody_note_options: List[List[Note, ...], ...]) -> bool:
