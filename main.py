@@ -108,13 +108,14 @@ class Pitch(Engraver):
 
 class Scale(Engraver):
 
+	mode_wheel = (
+		"ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", 
+		"locrian",
+	)
+
 	def __init__(self, tonic: str = "C", mode: str = "ionian") -> None:
 
-		mode_wheel = (
-			"ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", 
-			"locrian",
-		)
-		scale_index = mode_wheel.index(mode.lower())
+		scale_index = self.mode_wheel.index(mode.lower())
 		old_pitch_obj = Pitch(tonic)
 		self.scale_pitches = [old_pitch_obj]
 
@@ -233,9 +234,12 @@ class Phrase(Engraver):
 			self.measures[measure_index].imprint_chord(current_chord)
 			relative_offset += current_chord.duration 
 
-	def add_melody_notes(self) -> None:
+	def add_melody(self) -> None:
 
-		base_melody_note_options = self.get_base_melody_options()
+		if self.style == "tonal":
+			self.imprint_progression()
+
+		base_melody_note_options = self.get_melody_options()
 		base_melody_finder = self.find_base_melody(base_melody_note_options)
 
 		while True: 
@@ -248,21 +252,21 @@ class Phrase(Engraver):
 		for current_measure, measure_notes in zip(self.measures, full_melody):
 			current_measure.imprint_notes(measure_notes)
 
-	def get_base_melody_options(self) -> List[List[Note, ...], ...]:
+	def get_melody_options(self) -> List[List[Note, ...], ...]:
 
-		melodic_divisions = self.time_sig_obj.melodic_divisions
 		base_melody_note_options = []
-		base_melody_duration = self.measure_duration / melodic_divisions
 
+		all_modal_notes = self.get_modal_melody_notes()
 		for current_measure in self.measures:
 			current_offset = 0
-			for _ in range(melodic_divisions):
-				base_melody_note_options.append([])
-				current_chord = current_measure.get_chord(current_offset)
-
-				for current_note in current_chord.get_melody_notes():
-					base_melody_note_options[-1].append(current_note)
-				current_offset += base_melody_duration
+			for measure_fraction in self.time_sig_obj.melodic_divisions:
+				if self.style == "tonal":
+					base_melody_note_options.append(
+						current_measure.get_chord(current_offset)
+					) 
+				elif self.style == "modal":
+					base_melody_note_options.append(all_modal_notes[:]) 
+				current_offset += (self.measure_duration * measure_fraction)
 
 		return base_melody_note_options
 
@@ -390,11 +394,25 @@ class Score(Engraver):
 	def __init__(self) -> None:
 		self.phrases = []
 
-	def create_theme(self) -> None:
-		Engraver.scale_obj = Scale("C")
+	def choose_random_tonic(self) -> str:
+		tonic_letter = random.choice(self.note_letters)
+		accidental_symbol = random.choice(("#", "", "b"))
+		return tonic_letter + accidental_symbol
+
+	def create_tonal_theme(self) -> None:
+		tonic_pitch = self.choose_random_tonic()
+		mode_choice = random.choice(("major", "minor"))
+		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
 		new_phrase = MiniPeriod(0, 0)
-		new_phrase.imprint_progression()
-		new_phrase.add_melody_notes()
+		new_phrase.add_melody()
+		self.phrases.append(new_phrase)
+
+	def create_modal_theme(self) -> None:
+		tonic_pitch = self.choose_random_tonic()
+		mode_choice = random.choice(Scale.mode_wheel)
+		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
+		new_phrase = MiniPeriod(0, 0)
+		new_phrase.add_melody()
 		self.phrases.append(new_phrase)
 
 	def export_score(self) -> None:
@@ -403,6 +421,6 @@ class Score(Engraver):
 
 if __name__ == "__main__":
 	my_score = Score()
-	my_score.create_theme()
+	my_score.create_modal_theme()
 	my_score.export_score()
 		
