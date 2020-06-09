@@ -35,7 +35,7 @@ class Pitch(Engraver):
 		self.accidental_symbol = pitch_symbol[1:]
 		self.accidental_amount = Pitch.accidental_symbol_to_amount(self.accidental_symbol)
 
-	def __str__(self) -> str:
+	def __repr__(self) -> str:
 		return self.pitch_letter + self.accidental_symbol 
 
 	@staticmethod
@@ -163,11 +163,19 @@ class Scale(Engraver):
 		base_midi_num = midi_num % 12
 		return base_midi_num in self.scale_pitches_dict.values()
 
-	def get_degree(self, chosen_note: Note) -> int:
-		chosen_pitch_name = str(chosen_note)
+	def get_absolute_degree(self, chosen_note: Note) -> int:
+		chosen_pitch_name = chosen_note.pitch_symbol
 		for scale_degree, pitch_obj in enumerate(self.scale_pitches_seq):
 			if str(pitch_obj) == chosen_pitch_name:
 				return scale_degree 
+
+	def get_relative_degree(self, starting_note: Note, attempted_note: Note) -> int:
+		if starting_note == attempted_note:
+			return 0
+		attempted_degree = self.get_absolute_degree(attempted_note)
+		midi_pitch_diff = attempted_note.midi_num - starting_note.midi_num
+		octave_amount = midi_pitch_diff // 12
+		return attempted_degree + (octave_amount * 7)
 
 
 class Chord(Engraver):
@@ -218,7 +226,32 @@ class Note(Pitch):
 		for pitch_obj, current_midi_num in self.scale_obj.scale_pitches_dict.items():
 			if base_midi_num == current_midi_num:
 				break
-		super().__init__(str(pitch_obj))
+		self.pitch_symbol = str(pitch_obj)
+		super().__init__(self.pitch_symbol)
+
+		self.octave_number = (self.midi_num // 12) - 1
+		if self.pitch_letter == "B" and self.accidental_amount > 0:
+			self.octave_number -= 1
+		elif self.pitch_letter == "C" and self.accidental_amount < 0:
+			self.octave_number += 1
+
+	def __repr__(self):
+		return f"{self.pitch_symbol}{self.octave_number}"
+
+	def __eq__(self, other):
+		return self.__str__() == other.__str__()
+
+	def __lt__(self, other):
+		return self.midi_num < other.midi_num
+
+	def __le__(self, other):
+		return self.midi_num <= other.midi_num
+
+	def __gt__(self, other):
+		return self.midi_num > other.midi_num
+
+	def __ge__(self, other):
+		return self.midi_num >= other.midi_num
 
 	def change_pitch_accidental(self, old_pitch_obj: Pitch, pitch_increment: int) -> Pitch:
 		self.midi_num += pitch_increment
@@ -328,7 +361,11 @@ class Phrase(Engraver):
 			if current_note_options: 
 				attempted_note = random.choice(current_note_options)
 				current_note_options.remove(attempted_note)
-				attempted_scale_degree = self.scale_obj.get_degree(attempted_note)
+				if note_index == 0:
+					starting_note = attempted_note
+				attempted_scale_degree = self.scale_obj.get_relative_degree(
+					starting_note, attempted_note
+				)
 
 				if self.test_melody_note(
 				  note_index, attempted_note, attempted_scale_degree):
