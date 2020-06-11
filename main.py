@@ -8,19 +8,37 @@ from fractions import Fraction
 
 class Engraver:
 
-	# 4/4 time signature
-	measure_duration = 1
 	scale_obj = None
 	time_sig_obj = None
+	style = None
 	roman_numerals = ("I", "II", "III", "IV", "V", "VI", "VII")
 	note_letters = ("C", "D", "E", "F", "G", "A", "B")
+
+	@property 
+	def measure_in_beats(self):
+		return self.time_sig_obj.measure_duration.fraction
+
+
+class TimeSignature:
+
+	def __init__(self, symbol: str) -> None:
+		self.symbol = symbol
+		if self.symbol == "6/8":
+			self.measure_duration = Duration(2)
+			self.melodic_divisions = [Fraction(1,2), Fraction(1,2)]
+
+
+class Duration(Engraver):
+
+	def __init__(self, num: int, denom: int = 1) -> None:
+		self.fraction = Fraction(num, denom)
 
 
 def collapse_magnitude(amount: int) -> int:
 	if amount > 0:
 		return 1
 	elif amount < 0:
-		return - 1
+		return -1
 	else:
 		return 0
 
@@ -277,138 +295,6 @@ class Measure(Engraver):
 			Chord(chord.symbol, chord.duration, current_offset, self.absolute_offset)
 		)
 
-ChordType = collections.namedtuple("ChordType", ["function", "duration"])
-
-class Phrase(Engraver):
-
-	def __init__(
-	  self, relative_offset: Union[int, float, Fraction],
-	  parent_absolute_offset: Union[int, float, Fraction], 
-	  num_measures: int = 8) -> None:
-		self.measures = []
-		self.relative_offset = relative_offset
-		self.absolute_offset = relative_offset + parent_absolute_offset
-		for index in range(num_measures):
-			self.measures.append(
-				Measure(index * self.measure_duration, self.absolute_offset)
-			)
-		self.base_melody = []
-
-	def imprint_progression(self) -> None:
-		progression = random.choice(self.progressions)
-		chosen_progression = progression.realize()
-		relative_offset = 0
-		for current_chord in chosen_progression:
-			measure_index = relative_offset // self.measure_duration
-			self.measures[measure_index].imprint_chord(current_chord)
-			relative_offset += current_chord.duration 
-
-	def add_melody(self) -> None:
-
-		if self.style == "tonal":
-			self.imprint_progression()
-
-		base_melody_note_options = self.get_melody_options()
-		base_melody_finder = self.find_base_melody(base_melody_note_options)
-
-		while True: 
-			if not next(base_melody_finder):
-				raise ValueError
-			full_melody = self.embellish_melody() 
-			if full_melody:
-				break 
-
-		for current_measure, measure_notes in zip(self.measures, full_melody):
-			current_measure.imprint_notes(measure_notes)
-
-	def get_melody_options(self) -> List[List[Note, ...], ...]:
-
-		base_melody_note_options = []
-
-		all_modal_notes = self.get_modal_notes(59, 85)
-		for current_measure in self.measures:
-			current_offset = 0
-			for measure_fraction in self.time_sig_obj.melodic_divisions:
-				if self.style == "tonal":
-					base_melody_note_options.append(
-						current_measure.get_chord(current_offset)
-					) 
-				elif self.style == "modal":
-					base_melody_note_options.append(all_modal_notes[:]) 
-				current_offset += (self.measure_duration * measure_fraction)
-
-		return base_melody_note_options
-
-	def get_modal_notes(self, start: int, stop: int) -> List[Note, ...]:
-		possible_notes = []
-		for midi_num in range(start, stop):
-			if self.scale_obj.is_note_diatonic(midi_num):
-				possible_notes.append(Note(midi_num))
-		return possible_notes
-
-	def find_base_melody(
-	  self, base_melody_note_options: List[List[Note, ...], ...]) -> bool:
-
-		reference_note_options = copy.deepcopy(base_melody_note_options)
-		base_melody_length = len(base_melody_note_options)
-		self.base_melody = [None for _ in range(base_melody_length)]
-		self.base_degrees = base_melody[:]
-
-		note_index = 0
-		current_note_options = base_melody_note_options[note_index]
-
-		while True:
-			if current_note_options: 
-				attempted_note = random.choice(current_note_options)
-				current_note_options.remove(attempted_note)
-				if note_index == 0:
-					starting_note = attempted_note
-				attempted_scale_degree = self.scale_obj.get_relative_degree(
-					starting_note, attempted_note
-				)
-
-				if self.test_melody_note(
-				  note_index, attempted_note, attempted_scale_degree):
-					self.base_melody[note_index] = attempted_note
-					self.base_degrees[note_index] = attempted_scale_degree
-					note_index += 1
-
-					if note_index == base_melody_length:
-						note_index -= 1
-						yield True
-						self.base_melody[note_index] = None
-						self.base_degrees[note_index] = None
-						continue
-
-			else:
-				base_melody_note_options[note_index] = (
-					reference_note_options[note_index][:]
-				)
-				if note_index == 0:
-					return False
-					
-				note_index -= 1
-				current_note_options = base_melody_note_options[note_index]
-				self.base_melody[note_index] = None
-				self.base_degrees[note_index] = None
-
-
-class MiniPeriod(Phrase): 
-
-	def __init__(
-	  self, relative_offset: Union[int, float, Fraction],
-	  parent_absolute_offset: Union[int, float, Fraction], 
-	  num_measures: int = 4) -> None:
-		super().__init__(relative_offset, parent_absolute_offset, num_measures)
-		self.progressions = (
-			Progression( # e.g., I II6 V I
-				ChordType("TONIC", self.measure_duration), 
-				ChordType("PREDOMINANT", self.measure_duration),
-				ChordType("DOMINANT", self.measure_duration), 
-				ChordType("TONIC", self.measure_duration),
-			),
-		)
-
 ChordRule = collections.namedtuple("ChordRule", ["function", "parameters"])
 
 class Progression:
@@ -468,6 +354,191 @@ class Progression:
 			final_chords.append(Chord(chord_symbol, chord_type.duration))
 		return final_chords
 
+ChordType = collections.namedtuple("ChordType", ["function", "duration"])
+
+class Phrase(Engraver):
+
+	def __init__(
+	  self, relative_offset: Union[int, float, Fraction],
+	  parent_absolute_offset: Union[int, float, Fraction], 
+	  num_measures: int = 8) -> None:
+		self.measures = []
+		self.relative_offset = relative_offset
+		self.absolute_offset = relative_offset + parent_absolute_offset
+		for index in range(num_measures):
+			self.measures.append(
+				Measure(index * self.measure_in_beats, self.absolute_offset)
+			)
+		self.base_melody = []
+
+	def imprint_progression(self) -> None:
+		progression = random.choice(self.progressions)
+		chosen_progression = progression.realize()
+		relative_offset = 0
+		for current_chord in chosen_progression:
+			measure_index = relative_offset // self.measure_in_beats
+			self.measures[measure_index].imprint_chord(current_chord)
+			relative_offset += current_chord.duration 
+
+	def add_melody(self) -> None:
+
+		if self.style == "tonal":
+			self.imprint_progression()
+
+		base_melody_note_options = self.get_melody_options()
+		base_melody_finder = self.find_base_melody(base_melody_note_options)
+
+		next(base_melody_finder)
+		# while True: 
+		# 	if not next(base_melody_finder):
+		# 		raise ValueError
+		# 	full_melody = self.embellish_melody() 
+		# 	if full_melody:
+		# 		break 
+
+		# for current_measure, measure_notes in zip(self.measures, full_melody):
+		# 	current_measure.imprint_notes(measure_notes)
+
+	def get_melody_options(self) -> List[List[Note, ...], ...]:
+
+		base_melody_note_options = []
+
+		all_modal_notes = self.get_modal_notes(59, 85)
+		for current_measure in self.measures:
+			current_offset = 0
+			for measure_fraction in self.time_sig_obj.melodic_divisions:
+				if self.style == "tonal":
+					base_melody_note_options.append(
+						current_measure.get_chord(current_offset)
+					) 
+				elif self.style == "modal":
+					base_melody_note_options.append(all_modal_notes[:]) 
+				current_offset += (self.measure_in_beats * measure_fraction)
+
+		return base_melody_note_options
+
+	def get_modal_notes(self, start: int, stop: int) -> List[Note, ...]:
+		possible_notes = []
+		for midi_num in range(start, stop):
+			if self.scale_obj.is_note_diatonic(midi_num):
+				possible_notes.append(Note(midi_num))
+		print(f"Possible melody notes: {possible_notes}")
+		return possible_notes
+
+	def find_base_melody(
+	  self, base_melody_note_options: List[List[Note, ...], ...]) -> bool:
+
+		reference_note_options = copy.deepcopy(base_melody_note_options)
+		base_melody_length = len(base_melody_note_options)
+		self.base_melody = [None for _ in range(base_melody_length)]
+		self.base_degrees = self.base_melody[:]
+
+		note_index = 0
+		current_note_options = base_melody_note_options[note_index]
+		tonic_pitch_symbol = str(self.scale_obj.scale_pitches_seq[0])
+		for current_note in reference_note_options[0]:
+			if tonic_pitch_symbol == current_note.pitch_symbol:
+				starting_note = current_note
+				break
+		print(f"Starting note: {starting_note}")
+
+		while True:
+			if current_note_options: 
+				attempted_note = random.choice(current_note_options)
+				current_note_options.remove(attempted_note)
+				attempted_scale_degree = self.scale_obj.get_relative_degree(
+					starting_note, attempted_note
+				)
+
+				if self.test_melody_note(
+				  note_index, attempted_note, attempted_scale_degree):
+					self.base_melody[note_index] = attempted_note
+					self.base_degrees[note_index] = attempted_scale_degree
+					note_index += 1
+
+					if note_index == base_melody_length:
+						note_index -= 1
+						print(self.base_degrees)
+						print(self.base_melody)
+						yield True
+						self.base_melody[note_index] = None
+						self.base_degrees[note_index] = None
+						continue
+					current_note_options = base_melody_note_options[note_index]
+
+			else:
+				base_melody_note_options[note_index] = (
+					reference_note_options[note_index][:]
+				)
+				if note_index == 0:
+					return False
+					
+				note_index -= 1
+				current_note_options = base_melody_note_options[note_index]
+				self.base_melody[note_index] = None
+				self.base_degrees[note_index] = None
+
+	def test_melody_note(
+	  self, note_index: int, attempted_note: Note, attempted_degree: int) -> bool:
+
+		if not -2 <= attempted_degree <= 9:
+			return False
+		if note_index == 0:
+			if attempted_degree not in {0, 2, 4}:
+				return False
+		if note_index == 1:
+			if abs(attempted_degree - self.base_degrees[0]) > 2:
+				return False 
+		if note_index == 2:
+			if not 0 < abs(attempted_degree - self.base_degrees[0]) <= 2:
+				return False
+		if note_index >= 2:
+			if self.base_degrees[-2] == self.base_degrees[-1] == attempted_degree:
+				return False
+			if abs(attempted_degree - self.base_degrees[note_index - 1]) > 4:
+				return False 
+
+		if note_index == 3:
+			motif_diff = self.base_degrees[1] - self.base_degrees[0]
+			if attempted_degree - self.base_degrees[2] != motif_diff:
+				return False
+		if note_index == 6:
+			if self.base_degrees[0] == 0:
+				if 0 in self.base_degrees[1:]:
+					return False
+			else:
+				if self.base_degrees[1:].count(0) > 2:
+					return False
+		if note_index == 7:
+			if attempted_degree != 0:
+				return False
+			for current_degree in self.base_degrees[6::-1]:
+				if current_degree == 0:
+					continue
+				elif current_degree in {-1, 1, 2}:
+					break
+				else:
+					return False
+
+		return True
+
+
+class MiniPeriod(Phrase): 
+
+	def __init__(
+	  self, relative_offset: Union[int, float, Fraction],
+	  parent_absolute_offset: Union[int, float, Fraction], 
+	  num_measures: int = 4) -> None:
+		super().__init__(relative_offset, parent_absolute_offset, num_measures)
+		self.progressions = (
+			Progression( # e.g., I II6 V I
+				ChordType("TONIC", self.measure_in_beats), 
+				ChordType("PREDOMINANT", self.measure_in_beats),
+				ChordType("DOMINANT", self.measure_in_beats), 
+				ChordType("TONIC", self.measure_in_beats),
+			),
+		)
+
 
 class Score(Engraver):
 
@@ -488,9 +559,12 @@ class Score(Engraver):
 		self.phrases.append(new_phrase)
 
 	def create_modal_theme(self) -> None:
+		Engraver.style = "modal"
 		tonic_pitch = self.choose_random_tonic()
 		mode_choice = random.choice(Scale.mode_wheel)
+		print(f"{tonic_pitch} {mode_choice}")
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
+		Engraver.time_sig_obj = TimeSignature("6/8")
 		new_phrase = MiniPeriod(0, 0)
 		new_phrase.add_melody()
 		self.phrases.append(new_phrase)
