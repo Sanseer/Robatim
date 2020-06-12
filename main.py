@@ -15,7 +15,7 @@ class Engraver:
 	note_letters = ("C", "D", "E", "F", "G", "A", "B")
 
 	@property 
-	def measure_in_beats(self):
+	def beats_per_measure(self):
 		return self.time_sig_obj.measure_duration.fraction
 
 
@@ -241,12 +241,15 @@ class Note(Pitch):
 	def __init__(self, chosen_midi_num: int) -> None:
 		self.midi_num = chosen_midi_num
 		base_midi_num = chosen_midi_num % 12
+
 		for pitch_obj, current_midi_num in self.scale_obj.scale_pitches_dict.items():
 			if base_midi_num == current_midi_num:
 				break
+		else:
+			raise ValueError
 		self.pitch_symbol = str(pitch_obj)
 		super().__init__(self.pitch_symbol)
-
+		
 		self.octave_number = (self.midi_num // 12) - 1
 		if self.pitch_letter == "B" and self.accidental_amount > 0:
 			self.octave_number -= 1
@@ -271,9 +274,43 @@ class Note(Pitch):
 	def __ge__(self, other):
 		return self.midi_num >= other.midi_num
 
-	def change_pitch_accidental(self, old_pitch_obj: Pitch, pitch_increment: int) -> Pitch:
+	def shift(self, letter_increment: int, pitch_increment: int) -> None:
+		self.change_pitch_letter(letter_increment)
+		self.change_pitch_accidental(pitch_increment)
+
+	def change_pitch_letter(self, letter_increment: int) -> Note:
+		if letter_increment == 0:
+			return
+		old_pitch_obj = Pitch(self.pitch_symbol)
+		new_pitch_obj = super().change_pitch_letter(
+			old_pitch_obj, letter_increment
+		)
+		self.pitch_symbol = str(new_pitch_obj)
+		super().__init__(self.pitch_symbol)
+
+		pitch_letter = old_pitch_obj.pitch_letter
+		letter_index = self.note_letters.index(pitch_letter)
+		if letter_increment < 0:
+			change_letter = "B"
+			letter_direction = -1
+		elif letter_increment > 0:
+			change_letter = "C"
+			letter_direction = 1
+
+		for _ in range(abs(letter_increment)):
+			letter_index = (letter_index + letter_direction) % 7 
+			pitch_letter = self.note_letters[letter_index]
+			if pitch_letter == change_letter:
+				self.octave_number += letter_direction
+
+	def change_pitch_accidental(self, pitch_increment: int) -> Note:
+		old_pitch_obj = Pitch(self.pitch_symbol)
 		self.midi_num += pitch_increment
-		super().change_pitch_accidental()
+		new_pitch_obj = super().change_pitch_accidental(
+			old_pitch_obj, pitch_increment
+		)
+		self.pitch_symbol = str(new_pitch_obj)
+		super().__init__(self.pitch_symbol)
 
 
 class Measure(Engraver):
@@ -367,7 +404,7 @@ class Phrase(Engraver):
 		self.absolute_offset = relative_offset + parent_absolute_offset
 		for index in range(num_measures):
 			self.measures.append(
-				Measure(index * self.measure_in_beats, self.absolute_offset)
+				Measure(index * self.beats_per_measure, self.absolute_offset)
 			)
 		self.base_melody = []
 
@@ -376,7 +413,7 @@ class Phrase(Engraver):
 		chosen_progression = progression.realize()
 		relative_offset = 0
 		for current_chord in chosen_progression:
-			measure_index = relative_offset // self.measure_in_beats
+			measure_index = relative_offset // self.beats_per_measure
 			self.measures[measure_index].imprint_chord(current_chord)
 			relative_offset += current_chord.duration 
 
@@ -413,7 +450,7 @@ class Phrase(Engraver):
 					) 
 				elif self.style == "modal":
 					base_melody_note_options.append(all_modal_notes[:]) 
-				current_offset += (self.measure_in_beats * measure_fraction)
+				current_offset += (self.beats_per_measure * measure_fraction)
 
 		return base_melody_note_options
 
@@ -433,14 +470,17 @@ class Phrase(Engraver):
 		self.base_melody = [None for _ in range(base_melody_length)]
 		self.base_degrees = self.base_melody[:]
 
-		note_index = 0
-		current_note_options = base_melody_note_options[note_index]
 		tonic_pitch_symbol = str(self.scale_obj.scale_pitches_seq[0])
 		for current_note in reference_note_options[0]:
 			if tonic_pitch_symbol == current_note.pitch_symbol:
 				starting_note = current_note
 				break
+		if starting_note.midi_num in {59, 60} and random.choice((True, False)):
+			starting_note.shift(7, 12)
 		print(f"Starting note: {starting_note}")
+
+		note_index = 0
+		current_note_options = base_melody_note_options[note_index]
 
 		while True:
 			if current_note_options: 
@@ -489,28 +529,25 @@ class Phrase(Engraver):
 		if note_index == 1:
 			if abs(attempted_degree - self.base_degrees[0]) > 2:
 				return False 
+
 		if note_index == 2:
-			if not 0 < abs(attempted_degree - self.base_degrees[0]) <= 2:
+			if abs(attempted_degree - self.base_degrees[0]) > 2:
 				return False
 		if note_index >= 2:
-			if self.base_degrees[-2] == self.base_degrees[-1] == attempted_degree:
+			if (self.base_degrees[note_index - 2] == 
+			  self.base_degrees[note_index - 1] == attempted_degree):
 				return False
 			if abs(attempted_degree - self.base_degrees[note_index - 1]) > 4:
 				return False 
-
 		if note_index == 3:
 			motif_diff = self.base_degrees[1] - self.base_degrees[0]
 			if attempted_degree - self.base_degrees[2] != motif_diff:
 				return False
-		if note_index == 6:
-			if self.base_degrees[0] == 0:
-				if 0 in self.base_degrees[1:]:
-					return False
-			else:
-				if self.base_degrees[1:].count(0) > 2:
-					return False
+				
 		if note_index == 7:
 			if attempted_degree != 0:
+				return False
+			if self.base_degrees[0] != 0 and self.base_degrees[1:].count(0) > 2:
 				return False
 			for current_degree in self.base_degrees[6::-1]:
 				if current_degree == 0:
@@ -532,10 +569,10 @@ class MiniPeriod(Phrase):
 		super().__init__(relative_offset, parent_absolute_offset, num_measures)
 		self.progressions = (
 			Progression( # e.g., I II6 V I
-				ChordType("TONIC", self.measure_in_beats), 
-				ChordType("PREDOMINANT", self.measure_in_beats),
-				ChordType("DOMINANT", self.measure_in_beats), 
-				ChordType("TONIC", self.measure_in_beats),
+				ChordType("TONIC", self.beats_per_measure), 
+				ChordType("PREDOMINANT", self.beats_per_measure),
+				ChordType("DOMINANT", self.beats_per_measure), 
+				ChordType("TONIC", self.beats_per_measure),
 			),
 		)
 
