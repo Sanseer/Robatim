@@ -13,6 +13,7 @@ class Engraver:
 	style = None
 	roman_numerals = ("I", "II", "III", "IV", "V", "VI", "VII")
 	note_letters = ("C", "D", "E", "F", "G", "A", "B")
+	scale_increments = (2, 2, 1, 2, 2, 2, 1)
 
 	@property 
 	def beats_per_measure(self):
@@ -86,11 +87,11 @@ class Pitch(Engraver):
 		# object parameter in both functions for consistency
 		# outward-facing methods pass pitch objects implicitly
 		# inward-facing methods pass pitch objects explicitly
-		pitch_letter_convert = self.change_pitch_letter(self, letter_increment)
-		final_pitch_obj = self.change_pitch_accidental(
-			pitch_letter_convert, pitch_increment
+		interim_obj = self.change_pitch_letter(self, letter_increment)
+		final_obj = self.change_pitch_accidental(
+			interim_obj, pitch_increment
 		)
-		return final_pitch_obj
+		return final_obj
 
 	def change_pitch_letter(self, old_pitch_obj: Pitch, letter_increment: int) -> Pitch:
 
@@ -137,9 +138,8 @@ class Scale(Engraver):
 		tonic_pitch_obj = Pitch(tonic)
 		tonic_pitch_letter = tonic_pitch_obj.pitch_letter
 		current_midi_num = 0
-		scale_increments = (2, 2, 1, 2, 2, 2, 1)
 
-		for current_pitch_letter, scale_increment in zip(self.note_letters, scale_increments):
+		for current_pitch_letter, scale_increment in zip(self.note_letters, self.scale_increments):
 			if current_pitch_letter == tonic_pitch_letter:
 				break
 			current_midi_num += scale_increment
@@ -152,7 +152,7 @@ class Scale(Engraver):
 		scale_index = self.mode_wheel.index(self.mode.lower())
 
 		for _ in range(6):
-			current_increment = scale_increments[scale_index]
+			current_increment = self.scale_increments[scale_index]
 			new_pitch_obj = old_pitch_obj.shift(1, current_increment)
 			self.scale_pitches_seq.append(new_pitch_obj)
 
@@ -238,7 +238,13 @@ class Chord(Engraver):
 
 class Note(Pitch):
 
-	def __init__(self, chosen_midi_num: int) -> None:
+	def __init__(self, note_designator: Union[int, str]) -> None:
+		if isinstance(note_designator, str):
+			self.create_note_from_note_symbol(note_designator)
+		elif isinstance(note_designator, int):
+			self.create_note_from_midi_num(note_designator)
+
+	def create_note_from_midi_num(self, chosen_midi_num) -> None:
 		self.midi_num = chosen_midi_num
 		base_midi_num = chosen_midi_num % 12
 
@@ -255,6 +261,20 @@ class Note(Pitch):
 			self.octave_number -= 1
 		elif self.pitch_letter == "C" and self.accidental_amount < 0:
 			self.octave_number += 1
+
+	def create_note_from_note_symbol(self, note_symbol: str) -> None:
+		self.octave_number = int(note_symbol[-1])
+		self.pitch_symbol = note_symbol[:-1]
+		super().__init__(self.pitch_symbol)
+		current_midi_num = (self.octave_number + 1) * 12
+
+		for note_letter, scale_increment in zip(self.note_letters, self.scale_increments):
+			if note_letter == self.pitch_letter:
+				break
+			current_midi_num += scale_increment
+		current_midi_num += self.accidental_amount
+
+		self.midi_num = current_midi_num
 
 	def __repr__(self):
 		return f"{self.pitch_symbol}{self.octave_number}"
@@ -274,19 +294,13 @@ class Note(Pitch):
 	def __ge__(self, other):
 		return self.midi_num >= other.midi_num
 
-	def shift(self, letter_increment: int, pitch_increment: int) -> None:
-		self.change_pitch_letter(letter_increment)
-		self.change_pitch_accidental(pitch_increment)
-
-	def change_pitch_letter(self, letter_increment: int) -> Note:
+	def change_pitch_letter(self, old_note_obj, letter_increment: int) -> Note:
 		if letter_increment == 0:
-			return
-		old_pitch_obj = Pitch(self.pitch_symbol)
+			return old_note_obj
+		old_pitch_obj = Pitch(old_note_obj.pitch_symbol)
 		new_pitch_obj = super().change_pitch_letter(
 			old_pitch_obj, letter_increment
 		)
-		self.pitch_symbol = str(new_pitch_obj)
-		super().__init__(self.pitch_symbol)
 
 		pitch_letter = old_pitch_obj.pitch_letter
 		letter_index = self.note_letters.index(pitch_letter)
@@ -297,20 +311,21 @@ class Note(Pitch):
 			change_letter = "C"
 			letter_direction = 1
 
+		new_octave_number = old_note_obj.octave_number
 		for _ in range(abs(letter_increment)):
 			letter_index = (letter_index + letter_direction) % 7 
 			pitch_letter = self.note_letters[letter_index]
 			if pitch_letter == change_letter:
-				self.octave_number += letter_direction
+				new_octave_number += letter_direction
 
-	def change_pitch_accidental(self, pitch_increment: int) -> Note:
-		old_pitch_obj = Pitch(self.pitch_symbol)
-		self.midi_num += pitch_increment
+		return Note(f"{new_pitch_obj}{new_octave_number}")
+
+	def change_pitch_accidental(self, old_note_obj, pitch_increment: int) -> Note:
+		old_pitch_obj = Pitch(old_note_obj.pitch_symbol)
 		new_pitch_obj = super().change_pitch_accidental(
 			old_pitch_obj, pitch_increment
 		)
-		self.pitch_symbol = str(new_pitch_obj)
-		super().__init__(self.pitch_symbol)
+		return Note(f"{new_pitch_obj}{old_note_obj.octave_number}")
 
 
 class Measure(Engraver):
@@ -476,7 +491,7 @@ class Phrase(Engraver):
 				starting_note = current_note
 				break
 		if starting_note.midi_num in {59, 60} and random.choice((True, False)):
-			starting_note.shift(7, 12)
+			starting_note = starting_note.shift(7, 12)
 		print(f"Starting note: {starting_note}")
 
 		note_index = 0
@@ -543,7 +558,7 @@ class Phrase(Engraver):
 			motif_diff = self.base_degrees[1] - self.base_degrees[0]
 			if attempted_degree - self.base_degrees[2] != motif_diff:
 				return False
-				
+
 		if note_index == 7:
 			if attempted_degree != 0:
 				return False
