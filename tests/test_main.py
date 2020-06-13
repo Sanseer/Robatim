@@ -44,6 +44,27 @@ class TestScore(unittest.TestCase):
 		new_pitch = robatim.Pitch("Fb")
 		self.assertEqual(str(new_pitch.change_pitch_letter(new_pitch, -3)), "C####")
 
+	def test_note_letter_change(self):
+
+		new_note = robatim.Note("C4")
+		self.assertEqual(str(new_note.change_pitch_letter(new_note, -1)), "B#3")
+		new_note = robatim.Note("B##2")
+		self.assertEqual(str(new_note.change_pitch_letter(new_note, 0)), "B##2")
+		new_note = robatim.Note("E#5")
+		self.assertEqual(str(new_note.change_pitch_letter(new_note, 1)), "F5")
+
+		new_note = robatim.Note("Fbb3")
+		self.assertEqual(str(new_note.change_pitch_letter(new_note, -1)), "Eb3")
+		new_note = robatim.Note("G#0")
+		self.assertEqual(str(new_note.change_pitch_letter(new_note, 1)), "Ab0")
+		new_note = robatim.Note("Db4")
+		self.assertEqual(str(new_note.change_pitch_letter(new_note, -1)), "C#4")
+
+		new_note = robatim.Note("A#6")
+		self.assertEqual(str(new_note.change_pitch_letter(new_note, 2)), "Cbb7")
+		new_note = robatim.Note("Fb5")
+		self.assertEqual(str(new_note.change_pitch_letter(new_note, -3)), "C####5")
+
 	def test_pitch_accidental_change(self):
 
 		new_pitch = robatim.Pitch("D#")
@@ -54,6 +75,17 @@ class TestScore(unittest.TestCase):
 		self.assertEqual(str(new_pitch.change_pitch_accidental(new_pitch, 3)), "F##")
 		new_pitch = robatim.Pitch("B#")
 		self.assertEqual(str(new_pitch.change_pitch_accidental(new_pitch, -1)), "B")
+
+	def test_note_accidental_change(self):
+
+		new_note = robatim.Note("D#4")
+		self.assertEqual(str(new_note.change_pitch_accidental(new_note, -2)), "Db4")
+		new_note = robatim.Note("A0")
+		self.assertEqual(str(new_note.change_pitch_accidental(new_note, 0)), "A0")
+		new_note = robatim.Note("Fb5")
+		self.assertEqual(str(new_note.change_pitch_accidental(new_note, 3)), "F##5")
+		new_note = robatim.Note("B#3")
+		self.assertEqual(str(new_note.change_pitch_accidental(new_note, -1)), "B3")	
 
 	def test_pitch_shift(self):
 
@@ -67,11 +99,28 @@ class TestScore(unittest.TestCase):
 		new_pitch = robatim.Pitch("Db")
 		self.assertEqual(str(new_pitch.shift(0, 0)), "Db")
 		new_pitch = robatim.Pitch("C##")
-		self.assertEqual(str(new_pitch.shift(0, -2)), "C")
+		self.assertEqual(str(new_pitch.shift(-2, -3)), "A##")
 		new_pitch = robatim.Pitch("Ab")
 		self.assertEqual(str(new_pitch.shift(-1, 0)), "G#")
 
+	def test_note_shift(self):
+
+		new_note = robatim.Note("G2")
+		self.assertEqual(str(new_note.shift(1, 3)), "A#2")
+		new_note = robatim.Note("E3")
+		self.assertEqual(str(new_note.shift(-2, -2)), "C##3")
+		new_note = robatim.Note("F#6")
+		self.assertEqual(str(new_note.shift(3, 5)), "B6")
+
+		new_note = robatim.Note("Db0")
+		self.assertEqual(str(new_note.shift(0, 0)), "Db0")
+		new_note = robatim.Note("C##4")
+		self.assertEqual(str(new_note.shift(-2, -3)), "A##3")
+		new_note = robatim.Note("Ab7")
+		self.assertEqual(str(new_note.shift(-1, 0)), "G#7")
+
 	def test_scale_degrees(self):
+		
 		chosen_scale_obj = robatim.Engraver.scale_obj = robatim.Scale("Ab") 
 		scale_sequence = ("Ab", "Bb", "C", "Db", "Eb", "F", "G")
 
@@ -81,11 +130,11 @@ class TestScore(unittest.TestCase):
 		self.assertTrue(chosen_scale_obj.is_note_diatonic(25))
 
 		chosen_note = robatim.Note(10)
-		self.assertEqual(chosen_scale_obj.get_degree(chosen_note), 1)
+		self.assertEqual(chosen_scale_obj.get_absolute_degree(chosen_note), 1)
 		chosen_note = robatim.Note(41)
-		self.assertEqual(chosen_scale_obj.get_degree(chosen_note), 5)
+		self.assertEqual(chosen_scale_obj.get_absolute_degree(chosen_note), 5)
 		chosen_note = robatim.Note(87)
-		self.assertEqual(chosen_scale_obj.get_degree(chosen_note), 4)
+		self.assertEqual(chosen_scale_obj.get_absolute_degree(chosen_note), 4)
 
 	def test_scale_pitches(self):
 
