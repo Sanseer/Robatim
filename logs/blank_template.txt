@@ -1,0 +1,11 @@
+\version "2.18.2"
+
+\header {
+HEADER_PLACEHOLDER
+}
+
+VARIABLE_PLACEHOLDER
+
+\score {
+SCORE_PLACEHOLDER
+}

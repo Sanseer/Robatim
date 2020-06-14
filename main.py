@@ -126,6 +126,16 @@ class Pitch(Engraver):
 		new_accidental_amount = old_pitch_obj.accidental_amount + pitch_increment
 		new_accidental_symbol = Pitch.accidental_amount_to_symbol(new_accidental_amount)
 		return Pitch(old_pitch_obj.pitch_letter + new_accidental_symbol)
+
+	def get_lily_format(self) -> str:
+		letter_mark = self.pitch_letter.lower()
+		if self.accidental_amount > 0:
+			accidental_mark = "is" * abs(self.accidental_amount)
+		elif self.accidental_amount < 0:
+			accidental_mark = "es" * abs(self.accidental_amount)
+		else:
+			accidental_mark = ""
+		return letter_mark + accidental_mark
   
 
 class Scale(Engraver):
@@ -336,7 +346,7 @@ class Note(Pitch):
 		)
 		return Note(f"{new_pitch_obj}{old_note_obj.octave_number}")
 
-	def convert_to_lily_note(self) -> str:
+	def get_lily_format(self) -> str:
 		if self.octave_number > 3:
 			octave_mark = "'" * (self.octave_number - 3)
 		elif self.octave_number < 3:
@@ -344,18 +354,11 @@ class Note(Pitch):
 		else:
 			octave_mark = ""
 
-		pitch_mark = self.pitch_letter.lower()
-		if self.accidental_amount > 0:
-			accidental_mark = "is" * abs(self.accidental_amount)
-		if self.accidental_amount < 0:
-			accidental_mark = "es" * abs(self.accidental_amount)
-		else:
-			accidental_mark = ""
+		pitch_mark = super().get_lily_format()
+		lily_duration = self.get_lily_duration()
+		return f"{pitch_mark}{octave_mark}{lily_duration}"
 
-		lily_duration = self.convert_to_lily_duration()
-		return f"{pitch_mark}{accidental_mark}{octave_mark}{lily_duration}"
-
-	def convert_to_lily_duration(self) -> str:
+	def get_lily_duration(self) -> str:
 		absolute_duration = self.beat_value * self.duration
 		if absolute_duration.numerator == 1:
 			return f"{absolute_duration.denominator}"
@@ -681,6 +684,45 @@ class Score(Engraver):
 		self.phrases.append(new_phrase)
 
 	def export_score(self) -> None:
+		self.export_lily_score()
+		self.export_midi_score()
+
+	def export_lily_score(self) -> None:
+		lily_note_string = self.create_lily_note_string()
+		tonic_pitch_obj = self.scale_obj.scale_pitches_seq[0]
+		header_text = "\ttitle = " 
+		header_text += f"\"Medley in {tonic_pitch_obj} {self.scale_obj.mode}\"\n"
+		header_text += "\tcomposer = \"Robatim\""
+
+		part_name = "melody"
+		lily_tonic_pitch = tonic_pitch_obj.get_lily_format()
+		variable_text_seq = [
+			part_name, "= { \\key", f"{lily_tonic_pitch}", f"\\{self.scale_obj.mode}", 
+			"\\time", f"{self.time_sig_obj.symbol}", f"{lily_note_string}", "}"
+		]
+		variable_text = " ".join(variable_text_seq)
+
+		score_text = "\t\\new PianoStaff <<\n"
+		score_text += "\t\t\\new Staff <<\n" 
+		score_text += "\t\t\t\\new Voice \\clef \"treble\" { \\"
+		score_text += part_name
+		score_text += " }\n\t\t>>\n"
+		score_text += "\t>>\n\t\\layout {}"
+
+		with open("logs/blank_template.txt", "r") as f:
+			lily_sheet = f.read()
+
+		lily_sheet = lily_sheet.replace("HEADER_PLACEHOLDER", header_text)
+		lily_sheet = lily_sheet.replace("VARIABLE_PLACEHOLDER", variable_text)
+		lily_sheet = lily_sheet.replace("SCORE_PLACEHOLDER", score_text)
+
+		with open("logs/lily_output.txt", "w") as f:
+			f.write(lily_sheet)
+
+	def export_midi_score(self):
+		pass
+
+	def create_lily_note_string(self):
 		all_phrase_markings = []
 		for current_phrase in self.phrases:
 			all_measure_markings = []
@@ -688,7 +730,7 @@ class Score(Engraver):
 				all_note_markings = []
 
 				for current_note in current_measure.notes:
-					note_mark = current_note.convert_to_lily_note()
+					note_mark = current_note.get_lily_format()
 					all_note_markings.append(note_mark)
 
 				all_note_markings = " ".join(all_note_markings)
@@ -697,8 +739,8 @@ class Score(Engraver):
 			all_measure_markings = " | ".join(all_measure_markings)
 			all_phrase_markings.append(all_measure_markings)
 		all_phrase_markings = " | ".join(all_phrase_markings)
-
 		print(all_phrase_markings)
+		return all_phrase_markings
 
 
 if __name__ == "__main__":
