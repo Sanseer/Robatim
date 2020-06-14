@@ -6,6 +6,8 @@ import random
 from typing import List, Tuple, Union
 from fractions import Fraction
 
+from midiutil import MIDIFile
+
 class Engraver:
 
 	scale_obj = None
@@ -35,6 +37,7 @@ class TimeSignature:
 		if self.symbol == "6/8":
 			self.beats_per_measure = 2
 			self.melodic_divisions = [Fraction(1,2), Fraction(1,2)]
+			self.tempo_range = range(38, 58)
 		self.beat_value = self.beat_values[self.symbol]
 
 
@@ -490,8 +493,6 @@ class Phrase(Engraver):
 		next(base_melody_finder)
 		if not is_embellished:
 			self.set_base_rhythm()
-			for current_measure in self.measures:
-				print(current_measure.notes)
 
 		# while True: 
 		# 	if not next(base_melody_finder):
@@ -720,7 +721,25 @@ class Score(Engraver):
 			f.write(lily_sheet)
 
 	def export_midi_score(self):
-		pass
+		my_midi = MIDIFile(1)
+		chosen_tempo = random.choice(self.time_sig_obj.tempo_range)
+		print(f"Tempo: {chosen_tempo}")
+		my_midi.addTempo(0, 0, chosen_tempo)
+		my_midi.addProgramChange(0, 0, 0, 73)
+
+		for current_phrase in self.phrases:
+			for current_measure in current_phrase.measures:
+				for current_note in current_measure.notes:
+					my_midi.addNote(
+						0, 0, current_note.midi_num, current_note.absolute_offset, 
+						current_note.duration, 100
+					)
+
+		try: 
+			with open("theme.mid", "wb") as midi_output:
+				my_midi.writeFile(midi_output)
+		except PermissionError:
+			print("You must close the previous midi file to overwrite it.")
 
 	def create_lily_note_string(self):
 		all_phrase_markings = []
@@ -739,7 +758,6 @@ class Score(Engraver):
 			all_measure_markings = " | ".join(all_measure_markings)
 			all_phrase_markings.append(all_measure_markings)
 		all_phrase_markings = " | ".join(all_phrase_markings)
-		print(all_phrase_markings)
 		return all_phrase_markings
 
 
