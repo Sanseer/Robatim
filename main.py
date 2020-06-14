@@ -17,22 +17,25 @@ class Engraver:
 
 	@property 
 	def beats_per_measure(self):
-		return self.time_sig_obj.measure_duration.fraction
+		return self.time_sig_obj.beats_per_measure
+
+	@property 
+	def beat_value(self):
+		return self.time_sig_obj.beat_value
 
 
 class TimeSignature:
 
+	beat_values = {
+		"6/8": Fraction(3, 8),
+	}
+
 	def __init__(self, symbol: str) -> None:
 		self.symbol = symbol
 		if self.symbol == "6/8":
-			self.measure_duration = Duration(2)
+			self.beats_per_measure = 2
 			self.melodic_divisions = [Fraction(1,2), Fraction(1,2)]
-
-
-class Duration(Engraver):
-
-	def __init__(self, num: int, denom: int = 1) -> None:
-		self.fraction = Fraction(num, denom)
+		self.beat_value = self.beat_values[self.symbol]
 
 
 def collapse_magnitude(amount: int) -> int:
@@ -208,9 +211,9 @@ class Chord(Engraver):
 	  self, chord_symbol: str, duration: Union[int, float, Fraction], 
 	  relative_offset: Union[int, float, Fraction] = 0, 
 	  parent_absolute_offset: Union[int, float, Fraction] = 0) -> None:
+		self.duration = duration
 		self.relative_offset = relative_offset
 		self.absolute_offset = relative_offset + parent_absolute_offset
-		self.duration = duration
 		self.pitches = []
 
 		if "V" in chord_symbol or "I" in chord_symbol:
@@ -238,11 +241,17 @@ class Chord(Engraver):
 
 class Note(Pitch):
 
-	def __init__(self, note_designator: Union[int, str]) -> None:
+	def __init__(self, note_designator: Union[int, str], 
+	  duration: Union[int, float, Fraction] = 0, 
+	  relative_offset: Union[int, float, Fraction] = 0, 
+	  parent_absolute_offset: Union[int, float, Fraction] = 0) -> None:
 		if isinstance(note_designator, str):
 			self.create_note_from_note_symbol(note_designator)
 		elif isinstance(note_designator, int):
 			self.create_note_from_midi_num(note_designator)
+		self.duration = duration
+		self.relative_offset = relative_offset
+		self.absolute_offset = relative_offset + parent_absolute_offset
 
 	def create_note_from_midi_num(self, chosen_midi_num) -> None:
 		self.midi_num = chosen_midi_num
@@ -327,6 +336,32 @@ class Note(Pitch):
 		)
 		return Note(f"{new_pitch_obj}{old_note_obj.octave_number}")
 
+	def convert_to_lily_note(self) -> str:
+		if self.octave_number > 3:
+			octave_mark = "'" * (self.octave_number - 3)
+		elif self.octave_number < 3:
+			octave_mark = "," * (3 - self.octave_number)
+		else:
+			octave_mark = ""
+
+		pitch_mark = self.pitch_letter.lower()
+		if self.accidental_amount > 0:
+			accidental_mark = "is" * abs(self.accidental_amount)
+		if self.accidental_amount < 0:
+			accidental_mark = "es" * abs(self.accidental_amount)
+		else:
+			accidental_mark = ""
+
+		lily_duration = self.convert_to_lily_duration()
+		return f"{pitch_mark}{accidental_mark}{octave_mark}{lily_duration}"
+
+	def convert_to_lily_duration(self) -> str:
+		absolute_duration = self.beat_value * self.duration
+		if absolute_duration.numerator == 1:
+			return f"{absolute_duration.denominator}"
+		elif absolute_duration.numerator == 3:
+			return f"{absolute_duration.denominator // 2}." 
+
 
 class Measure(Engraver):
 
@@ -344,7 +379,16 @@ class Measure(Engraver):
 		else:
 			current_offset = 0
 		self.chords.append(
-			Chord(chord.symbol, chord.duration, current_offset, self.absolute_offset)
+			Chord(str(chord), chord.duration, current_offset, self.absolute_offset)
+		)
+
+	def imprint_note(self, note: Note) -> None:
+		if self.notes:
+			current_offset = self.notes[-1].relative_offset + self.notes[-1].duration
+		else:
+			current_offset = 0
+		self.notes.append(
+			Note(str(note), note.duration, current_offset, self.absolute_offset)
 		)
 
 ChordRule = collections.namedtuple("ChordRule", ["function", "parameters"])
@@ -432,7 +476,7 @@ class Phrase(Engraver):
 			self.measures[measure_index].imprint_chord(current_chord)
 			relative_offset += current_chord.duration 
 
-	def add_melody(self) -> None:
+	def add_melody(self, is_embellished: bool) -> None:
 
 		if self.style == "tonal":
 			self.imprint_progression()
@@ -441,6 +485,11 @@ class Phrase(Engraver):
 		base_melody_finder = self.find_base_melody(base_melody_note_options)
 
 		next(base_melody_finder)
+		if not is_embellished:
+			self.set_base_rhythm()
+			for current_measure in self.measures:
+				print(current_measure.notes)
+
 		# while True: 
 		# 	if not next(base_melody_finder):
 		# 		raise ValueError
@@ -574,6 +623,16 @@ class Phrase(Engraver):
 
 		return True
 
+	def set_base_rhythm(self):
+
+		base_melody_iter = iter(self.base_melody)
+		for current_measure in self.measures:
+			for measure_fraction in self.time_sig_obj.melodic_divisions:
+				current_note_symbol = str(next(base_melody_iter))
+				current_measure.imprint_note(
+					Note(current_note_symbol, self.beats_per_measure * measure_fraction)
+				)
+
 
 class MiniPeriod(Phrase): 
 
@@ -610,7 +669,7 @@ class Score(Engraver):
 		new_phrase.add_melody()
 		self.phrases.append(new_phrase)
 
-	def create_modal_theme(self) -> None:
+	def create_modal_theme(self, is_embellished: bool = True) -> None:
 		Engraver.style = "modal"
 		tonic_pitch = self.choose_random_tonic()
 		mode_choice = random.choice(Scale.mode_wheel)
@@ -618,15 +677,32 @@ class Score(Engraver):
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
 		Engraver.time_sig_obj = TimeSignature("6/8")
 		new_phrase = MiniPeriod(0, 0)
-		new_phrase.add_melody()
+		new_phrase.add_melody(is_embellished)
 		self.phrases.append(new_phrase)
 
 	def export_score(self) -> None:
-		pass
+		all_phrase_markings = []
+		for current_phrase in self.phrases:
+			all_measure_markings = []
+			for current_measure in current_phrase.measures:
+				all_note_markings = []
+
+				for current_note in current_measure.notes:
+					note_mark = current_note.convert_to_lily_note()
+					all_note_markings.append(note_mark)
+
+				all_note_markings = " ".join(all_note_markings)
+				all_measure_markings.append(all_note_markings)
+
+			all_measure_markings = " | ".join(all_measure_markings)
+			all_phrase_markings.append(all_measure_markings)
+		all_phrase_markings = " | ".join(all_phrase_markings)
+
+		print(all_phrase_markings)
 
 
 if __name__ == "__main__":
 	my_score = Score()
-	my_score.create_modal_theme()
+	my_score.create_modal_theme(False)
 	my_score.export_score()
 		
