@@ -362,6 +362,17 @@ class Note(Pitch):
 		)
 		return Note(f"{new_pitch_obj}{old_note_obj.octave_number}")
 
+	def scalar_shift(self, scale_increment: int) -> None:
+		for scale_index, pitch_obj in enumerate(self.scale_obj.scale_pitches_seq):
+			if str(pitch_obj) == self.pitch_symbol:
+				break
+		final_index = (scale_index + 1) % 7
+
+		final_pitch_obj = self.scale_obj.scale_pitches_seq[final_index]
+		interim_obj = self.change_pitch_letter(self, scale_increment)
+		accidental_diff = final_pitch_obj.accidental_amount - interim_obj.accidental_amount
+		return self.change_pitch_accidental(interim_obj, accidental_diff)
+
 	def get_lily_format(self) -> str:
 		if self.octave_number > 3:
 			octave_mark = "'" * (self.octave_number - 3)
@@ -505,7 +516,7 @@ class Phrase(Engraver):
 		else:
 			rest_ending = False
 
-		self.choose_embellish_rhythms()
+		self.choose_embellish_rhythms(True)
 		while True:
 			full_melody = self.embellish_melody()
 			if full_melody:
@@ -714,7 +725,7 @@ class Phrase(Engraver):
 					Note(current_note_symbol, self.beats_per_measure * measure_fraction)
 				)
 
-	def choose_embellish_rhythms(self, rest_ending):
+	def choose_embellish_rhythms(self, rest_ending: bool) -> None:
 
 		if rest_ending:
 			possible_rhythms = [
@@ -750,14 +761,17 @@ class Phrase(Engraver):
 				full_melody.append("REST")
 			else:
 				full_melody.append(None)
-				chosen_contours.appen(None)
-				embellish_contour_options.append(
-					self.create_contour_options(embellish_rhythm)
-				)
+				chosen_contours.append(None)
+				possible_contours = self.create_contour_options(note_index, embellish_rhythm)
+				if not possible_contours:
+					print("Embellishment not possible.")
+					return []
+				embellish_contour_options.append(possible_contours)
 
+		note_index = 0
+		print(f"Embellish contour options: {embellish_contour_options}")
 		reference_contour_options = copy.deepcopy(embellish_contour_options)
 		current_contour_options = embellish_contour_options[note_index]
-		note_index = 0
 
 		while True:
 			if current_contour_options:
@@ -765,14 +779,16 @@ class Phrase(Engraver):
 				current_contour_options.remove(chosen_contour)
 				chosen_contours[note_index] = chosen_contour
 
-				starting_degree = self.base_melody[note_index]
+				starting_note = self.base_melody[note_index]
 				full_melody[note_index] = self.realize_melody_contour(
-					starting_degree, chosen_contour
+					starting_note, chosen_contour
 				)
 
-				if self.test_melody_contour(note_index, full_melody, chosen_contours):
+				if (self.test_contour(note_index, chosen_contours) and 
+				  self.test_embellishment(note_index, full_melody)):
 					note_index += 1
 					if None not in full_melody:
+						print(f"Full melody: {full_melody}")
 						return full_melody
 					current_contour_options = embellish_contour_options[note_index]
 				else:
@@ -788,6 +804,47 @@ class Phrase(Engraver):
 				current_contour_options = embellish_contour_options[note_index]
 				full_melody[note_index] = None
 				chosen_contours[note_index] = None
+
+	def create_contour_options(
+	  self, note_index: int, embellish_rhythm: tuple) -> List[Tuple[int, ...], ...]:
+		embellish_length = len(embellish_rhythm)
+		all_contour_options = {
+			0: ((0, 1), (0, -1, -2), (0, -2, -1), (0, 1, 0)),
+			-1: ((0, 0), (0, 1), (0, -1), (0, -1, -2), (0, 1, 0)),
+			-2: ((0, -1), (0, -1, -2), (0, -1, 0)),
+			-3: ((0, 0),),
+			-4: ((0, -2, -3),),
+			1: ((0, 2),),
+			2: ((0, 1), (0, 0, 1), (0, 1, 0), (0, 1, 2)),
+			3: ((0, -1, -2),),
+		}
+
+		possible_contours = []
+		current_scale_degree = self.base_degrees[note_index]
+		next_scale_degree = self.base_degrees[note_index + 1]
+		leap_distance = next_scale_degree - current_scale_degree
+		for melodic_idea in all_contour_options[leap_distance]:
+			if len(melodic_idea) == embellish_length:
+				possible_contours.append(melodic_idea)
+
+		return possible_contours
+
+	def realize_melody_contour(
+	  self, starting_note: Note, chosen_contour: Tuple[int, ...]) -> List[Note, ...]:
+
+		realized_melody_fragment = []
+		for melody_shift in chosen_contour:
+			new_note = starting_note.scalar_shift(melody_shift)
+			realized_melody_fragment.append(new_note)
+		return realized_melody_fragment
+
+	def test_contour(
+	  self, note_index: int, chosen_contour: Tuple[int, ...]) -> bool:
+		return True
+
+	def test_embellishment(
+	  self, note_index: int, full_melody: List[List[Note, ...], ...]) -> bool:
+		return True
 
 
 class MiniPeriod(Phrase): 
@@ -831,7 +888,7 @@ class Score(Engraver):
 		tonic_pitch = self.choose_random_tonic()
 		mode_choice = random.choice(Scale.mode_wheel)
 		print(f"{tonic_pitch} {mode_choice}")
-		
+
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
 		Engraver.time_sig_obj = TimeSignature("6/8")
 		self.tempo = random.choice(self.time_sig_obj.tempo_range)
@@ -919,6 +976,6 @@ class Score(Engraver):
 
 if __name__ == "__main__":
 	my_score = Score()
-	my_score.create_modal_theme(False)
+	my_score.create_modal_theme()
 	my_score.export_score()
 		
