@@ -25,6 +25,13 @@ class Engraver:
 	def beat_value(self):
 		return self.time_sig_obj.beat_value
 
+	def get_lily_duration(self, chosen_duration) -> str:
+		absolute_duration = self.beat_value * chosen_duration
+		if absolute_duration.numerator == 1:
+			return f"{absolute_duration.denominator}"
+		elif absolute_duration.numerator == 3:
+			return f"{absolute_duration.denominator // 2}." 
+
 
 class TimeSignature:
 
@@ -38,6 +45,7 @@ class TimeSignature:
 			self.beats_per_measure = 2
 			self.melodic_divisions = [Fraction(1,2), Fraction(1,2)]
 			self.tempo_range = range(38, 58)
+			self.rhythms = {"I1": ((3, 1, 2), (4, 2))}
 		self.beat_value = self.beat_values[self.symbol]
 
 
@@ -363,15 +371,8 @@ class Note(Pitch):
 			octave_mark = ""
 
 		pitch_mark = super().get_lily_format()
-		lily_duration = self.get_lily_duration()
+		lily_duration = self.get_lily_duration(self.duration)
 		return f"{pitch_mark}{octave_mark}{lily_duration}"
-
-	def get_lily_duration(self) -> str:
-		absolute_duration = self.beat_value * self.duration
-		if absolute_duration.numerator == 1:
-			return f"{absolute_duration.denominator}"
-		elif absolute_duration.numerator == 3:
-			return f"{absolute_duration.denominator // 2}." 
 
 
 class Measure(Engraver):
@@ -498,16 +499,23 @@ class Phrase(Engraver):
 		next(base_melody_finder)
 		if not is_embellished:
 			self.set_base_rhythm()
+			return
+		if self.base_degrees[-2] == 0:
+			rest_ending = random.choice((True, False))
+		else:
+			rest_ending = False
 
-		# while True: 
-		# 	if not next(base_melody_finder):
-		# 		raise ValueError
-		# 	full_melody = self.embellish_melody() 
-		# 	if full_melody:
-		# 		break 
+		self.choose_embellish_rhythms()
+		while True:
+			full_melody = self.embellish_melody()
+			if full_melody:
+				break
+			if not next(base_melody_finder):
+				raise ValueError
 
-		# for current_measure, measure_notes in zip(self.measures, full_melody):
-		# 	current_measure.imprint_notes(measure_notes)
+		for current_measure, measure_notes in zip(self.measures, full_melody):
+			for measure_note in measure_notes:
+				current_measure.imprint_note(measure_note)
 
 	def get_melody_options(self) -> List[List[Note, ...], ...]:
 
@@ -599,9 +607,6 @@ class Phrase(Engraver):
 		if note_index == 0:
 			if attempted_degree not in {0, 2, 4}:
 				return False
-			if (self.scale_obj.mode not in {"ionian", "aeolian"} 
-			  and attempted_degree != 0):
-				return False
 		if (1 <= note_index <= 2 and 
 		  abs(attempted_degree - self.base_degrees[0]) > 2):
 			return False 
@@ -626,8 +631,14 @@ class Phrase(Engraver):
 
 		if note_index == 3:
 			motif_diff = self.base_degrees[1] - self.base_degrees[0]
-			if attempted_degree - self.base_degrees[2] != motif_diff:
+			if current_leap != motif_diff:
 				return False
+			if attempted_degree < 0:
+				return False
+			for current_degree in self.base_degrees[:note_index]:
+				if current_degree < 0:
+					return False
+
 		if note_index >= 3:
 			used_motifs = set()
 			base_degrees = self.base_degrees[:]
@@ -640,7 +651,25 @@ class Phrase(Engraver):
 					return False
 				elif new_motif != (0, 0): 
 					used_motifs.add(new_motif)
-
+		if note_index == 4:
+			if attempted_degree in {self.base_degrees[0], self.base_degrees[2]}:
+				return False
+		if note_index == 5:
+			new_motif_direction = collapse_magnitude(current_leap)
+			old_motif_direction = collapse_magnitude(
+				self.base_degrees[1] - self.base_degrees[0]
+			)
+			if new_motif_direction != old_motif_direction:
+				return False
+			if attempted_degree in {self.base_degrees[1], self.base_degrees[3]}:
+				return False
+		if note_index == 6:
+			if attempted_degree != 0 and current_leap != 0:
+				motif_shift = self.base_degrees[2] - self.base_degrees[0]
+				if self.base_degrees[4] - self.base_degrees[2] != motif_shift:
+					return False
+				if attempted_degree - self.base_degrees[4] != motif_shift:
+					return False
 		if note_index == 7:
 			if attempted_degree != 0:
 				return False
@@ -685,6 +714,81 @@ class Phrase(Engraver):
 					Note(current_note_symbol, self.beats_per_measure * measure_fraction)
 				)
 
+	def choose_embellish_rhythms(self, rest_ending):
+
+		if rest_ending:
+			possible_rhythms = [
+				["I1", "I1", "I1", "I1", "I1", "I1", "REST", "REST"]
+			]
+		else:
+			possible_rhythms = [
+				["I1", "I1", "I1", "I1", "I1", "I1", "I1", "REST"]
+			]
+
+		embellish_symbols = random.choice(possible_rhythms)
+		self.embellish_rhythms = []
+		used_symbols = {}
+
+		for embellish_symbol in embellish_symbols:
+			if embellish_symbol in used_symbols:
+				self.embellish_rhythms.append(used_symbols[embellish_symbol])
+			elif embellish_symbol == "REST":
+				self.embellish_rhythms.append("REST")
+			else:
+				rhythm_choices = self.time_sig_obj.rhythms[embellish_symbol]
+				rhythm_choice = random.choice(rhythm_choices)
+				used_symbols[embellish_symbol] = rhythm_choice
+				self.embellish_rhythms.append(rhythm_choice)
+
+	def embellish_melody(self):
+		embellish_contour_options = []
+		full_melody = []
+		chosen_contours = []
+
+		for note_index, embellish_rhythm in enumerate(self.embellish_rhythms):
+			if embellish_rhythm == "REST":
+				full_melody.append("REST")
+			else:
+				full_melody.append(None)
+				chosen_contours.appen(None)
+				embellish_contour_options.append(
+					self.create_contour_options(embellish_rhythm)
+				)
+
+		reference_contour_options = copy.deepcopy(embellish_contour_options)
+		current_contour_options = embellish_contour_options[note_index]
+		note_index = 0
+
+		while True:
+			if current_contour_options:
+				chosen_contour = random.choice(current_contour_options)
+				current_contour_options.remove(chosen_contour)
+				chosen_contours[note_index] = chosen_contour
+
+				starting_degree = self.base_melody[note_index]
+				full_melody[note_index] = self.realize_melody_contour(
+					starting_degree, chosen_contour
+				)
+
+				if self.test_melody_contour(note_index, full_melody, chosen_contours):
+					note_index += 1
+					if None not in full_melody:
+						return full_melody
+					current_contour_options = embellish_contour_options[note_index]
+				else:
+					full_melody[note_index] = None
+					chosen_contours[note_index] = None
+			else:
+				embellish_contour_options[note_index] = (
+					reference_contour_options[note_index][:]
+				)
+				if note_index == 0:
+					return []
+				note_index -= 1
+				current_contour_options = embellish_contour_options[note_index]
+				full_melody[note_index] = None
+				chosen_contours[note_index] = None
+
 
 class MiniPeriod(Phrase): 
 
@@ -707,6 +811,7 @@ class Score(Engraver):
 
 	def __init__(self) -> None:
 		self.phrases = []
+		self.tempo = None 
 
 	def choose_random_tonic(self) -> str:
 		tonic_letter = random.choice(self.note_letters)
@@ -726,8 +831,10 @@ class Score(Engraver):
 		tonic_pitch = self.choose_random_tonic()
 		mode_choice = random.choice(Scale.mode_wheel)
 		print(f"{tonic_pitch} {mode_choice}")
+		
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
 		Engraver.time_sig_obj = TimeSignature("6/8")
+		self.tempo = random.choice(self.time_sig_obj.tempo_range)
 		new_phrase = MiniPeriod(0, 0)
 		new_phrase.add_melody(is_embellished)
 		self.phrases.append(new_phrase)
@@ -747,7 +854,9 @@ class Score(Engraver):
 		lily_tonic_pitch = tonic_pitch_obj.get_lily_format()
 		variable_text_seq = [
 			part_name, "= { \\key", f"{lily_tonic_pitch}", f"\\{self.scale_obj.mode}", 
-			"\\time", f"{self.time_sig_obj.symbol}", f"{lily_note_string}", "}"
+			"\\time", f"{self.time_sig_obj.symbol}", "\\tempo", 
+			f"{self.get_lily_duration(1)}", f"= {self.tempo}", 
+			f"{lily_note_string}", "}"
 		]
 		variable_text = " ".join(variable_text_seq)
 
@@ -770,9 +879,8 @@ class Score(Engraver):
 
 	def export_midi_score(self):
 		my_midi = MIDIFile(1)
-		chosen_tempo = random.choice(self.time_sig_obj.tempo_range)
-		print(f"Tempo: {chosen_tempo}")
-		my_midi.addTempo(0, 0, chosen_tempo)
+		print(f"Tempo: {self.tempo}")
+		my_midi.addTempo(0, 0, self.tempo)
 		my_midi.addProgramChange(0, 0, 0, 73)
 
 		for current_phrase in self.phrases:
