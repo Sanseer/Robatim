@@ -22,14 +22,6 @@ class Engraver:
 	def beats_per_measure(self):
 		return self.time_sig_obj.beats_per_measure
 
-	def get_lily_duration(self, chosen_duration) -> str:
-		beat_value = self.time_sig_obj.beat_value
-		absolute_duration = beat_value * chosen_duration
-		if absolute_duration.numerator == 1:
-			return f"{absolute_duration.denominator}"
-		elif absolute_duration.numerator == 3:
-			return f"{absolute_duration.denominator // 2}." 
-
 
 class TimeSignature:
 
@@ -44,6 +36,9 @@ class TimeSignature:
 			self.melodic_divisions = [Fraction(1,2), Fraction(1,2)]
 			self.tempo_range = range(38, 58)
 			self.rhythms = {"I1": ((3, 1, 2), (4, 2))}
+			self.rest_ending = {
+				2: (("Note", 1), ("REST", 1))
+			}
 		self.beat_value = self.beat_values[self.symbol]
 
 
@@ -263,7 +258,25 @@ class Chord(Engraver):
 			)
 
 
-class Note(Pitch):
+class Duration(Engraver):
+
+	def __init__(self, duration: Union[int, float, Fraction] = 0, 
+	  relative_offset: Union[int, float, Fraction] = 0, 
+	  parent_absolute_offset: Union[int, float, Fraction] = 0) -> None:
+		self.duration = duration
+		self.relative_offset = relative_offset
+		self.absolute_offset = relative_offset + parent_absolute_offset
+
+	def get_lily_duration(self) -> str:
+		beat_value = self.time_sig_obj.beat_value
+		absolute_duration = beat_value * self.duration
+		if absolute_duration.numerator == 1:
+			return f"{absolute_duration.denominator}"
+		elif absolute_duration.numerator == 3:
+			return f"{absolute_duration.denominator // 2}." 
+
+
+class Note(Pitch, Duration):
 
 	def __init__(self, note_designator: Union[int, str], 
 	  duration: Union[int, float, Fraction] = 0, 
@@ -380,8 +393,14 @@ class Note(Pitch):
 			octave_mark = ""
 
 		pitch_mark = super().get_lily_format()
-		lily_duration = self.get_lily_duration(self.duration)
+		lily_duration = self.get_lily_duration()
 		return f"{pitch_mark}{octave_mark}{lily_duration}"
+
+
+class Rest(Duration):
+
+	def get_lily_format(self):
+		return f"r{self.get_lily_duration()}"
 
 
 class Measure(Engraver):
@@ -403,14 +422,19 @@ class Measure(Engraver):
 			Chord(str(chord), chord.duration, current_offset, self.absolute_offset)
 		)
 
-	def imprint_note(self, note: Note) -> None:
+	def imprint_temporal_obj(self, chosen_obj: Union[Note, Rest]) -> None:
 		if self.notes:
 			current_offset = self.notes[-1].relative_offset + self.notes[-1].duration
 		else:
 			current_offset = 0
-		self.notes.append(
-			Note(str(note), note.duration, current_offset, self.absolute_offset)
-		)
+		if isinstance(chosen_obj, Note):
+			self.notes.append(
+				Note(str(chosen_obj), chosen_obj.duration, current_offset, self.absolute_offset)
+			)
+		elif isinstance(chosen_obj, Rest):
+			self.notes.append(
+				Rest(chosen_obj.duration, current_offset, self.absolute_offset)
+			)
 
 ChordRule = collections.namedtuple("ChordRule", ["function", "parameters"])
 
@@ -511,10 +535,7 @@ class Phrase(Engraver):
 		if not is_embellished:
 			self.imprint_base_melody()
 			return
-		if self.base_degrees[-2] == 0:
-			rest_ending = random.choice((True, False))
-		else:
-			rest_ending = False
+		rest_ending = self.base_degrees[-2] == 0
 
 		self.choose_embellish_rhythms(rest_ending)
 		while True:
@@ -524,10 +545,13 @@ class Phrase(Engraver):
 			if not next(base_melody_finder):
 				raise ValueError
 
-		for current_measure, measure_notes in zip(self.measures, full_melody):
-			for measure_note in measure_notes:
-				if isinstance(measure_note, Note):
-					current_measure.imprint_note(measure_note)
+		full_melody_iter = iter(full_melody)
+		for current_measure in self.measures:
+			for _ in self.time_sig_obj.melodic_divisions:
+				note_group = next(full_melody_iter)
+				for measure_note in note_group:
+					if isinstance(measure_note, Note):
+						current_measure.imprint_temporal_obj(measure_note)
 		rest_ending_count = full_melody.count("REST")
 		self.finalize_theme(rest_ending_count)
 
@@ -682,6 +706,8 @@ class Phrase(Engraver):
 			if attempted_degree in {self.base_degrees[1], self.base_degrees[3]}:
 				return False
 		if note_index == 6:
+			if attempted_degree != 0 and self.time_sig_obj.symbol == "6/8":
+				return False
 			if attempted_degree != 0 and current_leap != 0:
 				motif_shift = self.base_degrees[2] - self.base_degrees[0]
 				if self.base_degrees[4] - self.base_degrees[2] != motif_shift:
@@ -728,7 +754,7 @@ class Phrase(Engraver):
 		for current_measure in self.measures:
 			for measure_fraction in self.time_sig_obj.melodic_divisions:
 				current_note_symbol = str(next(base_melody_iter))
-				current_measure.imprint_note(
+				current_measure.imprint_temporal_obj(
 					Note(current_note_symbol, self.beats_per_measure * measure_fraction)
 				)
 
@@ -775,7 +801,6 @@ class Phrase(Engraver):
 				embellish_contour_options.append(possible_contours)
 
 		note_index = 0
-		print(f"Embellish contour options: {embellish_contour_options}")
 		reference_contour_options = copy.deepcopy(embellish_contour_options)
 		current_contour_options = embellish_contour_options[note_index]
 
@@ -794,7 +819,6 @@ class Phrase(Engraver):
 				  self.test_embellishment(note_index, full_melody)):
 					note_index += 1
 					if None not in full_melody:
-						print(f"Full melody: {full_melody}")
 						return self.add_embellish_durations(full_melody)
 					current_contour_options = embellish_contour_options[note_index]
 				else:
@@ -869,16 +893,17 @@ class Phrase(Engraver):
 				finalized_duration = embellish_fraction * measure_fraction * self.beats_per_measure
 				finalized_melody[-1].append(Note(str(current_note), finalized_duration))
 
+		print(f"Finalized melody: {finalized_melody}")
 		return finalized_melody
 
 	def finalize_theme(self, rest_ending_count: int) -> None:
 		rest_ending_symbols = self.time_sig_obj.rest_ending[rest_ending_count]
-		self.measures[-1].imprint_note(
-			Note(str(self.starting_note)), rest_ending_symbols[0][1]
+		self.measures[-1].imprint_temporal_obj(
+			Note(str(self.starting_note), rest_ending_symbols[0][1]) 
 		)
 		for symbol, duration in rest_ending_symbols[1:]:
 			if symbol == "REST":
-				self.measures[-1].imprint_rest(Rest(duration))
+				self.measures[-1].imprint_temporal_obj(Rest(duration))
 
 
 class MiniPeriod(Phrase): 
@@ -943,10 +968,11 @@ class Score(Engraver):
 
 		part_name = "melody"
 		lily_tonic_pitch = tonic_pitch_obj.get_lily_format()
+		beat_obj = Duration(1)
 		variable_text_seq = [
 			part_name, "= { \\key", f"{lily_tonic_pitch}", f"\\{self.scale_obj.mode}", 
 			"\\time", f"{self.time_sig_obj.symbol}", "\\tempo", 
-			f"{self.get_lily_duration(1)}", f"= {self.tempo}", 
+			f"{beat_obj.get_lily_duration()}", f"= {self.tempo}", 
 			f"{lily_note_string}", "}"
 		]
 		variable_text = " ".join(variable_text_seq)
@@ -968,26 +994,6 @@ class Score(Engraver):
 		with open("logs/lily_output.txt", "w") as f:
 			f.write(lily_sheet)
 
-	def export_midi_score(self):
-		my_midi = MIDIFile(1)
-		print(f"Tempo: {self.tempo}")
-		my_midi.addTempo(0, 0, self.tempo)
-		my_midi.addProgramChange(0, 0, 0, 73)
-
-		for current_phrase in self.phrases:
-			for current_measure in current_phrase.measures:
-				for current_note in current_measure.notes:
-					my_midi.addNote(
-						0, 0, current_note.midi_num, current_note.absolute_offset, 
-						current_note.duration, 100
-					)
-
-		try: 
-			with open("theme.mid", "wb") as midi_output:
-				my_midi.writeFile(midi_output)
-		except PermissionError:
-			print("You must close the previous midi file to overwrite it.")
-
 	def create_lily_note_string(self):
 		all_phrase_markings = []
 		for current_phrase in self.phrases:
@@ -995,9 +1001,9 @@ class Score(Engraver):
 			for current_measure in current_phrase.measures:
 				all_note_markings = []
 
-				for current_note in current_measure.notes:
-					note_mark = current_note.get_lily_format()
-					all_note_markings.append(note_mark)
+				for current_obj in current_measure.notes:
+					obj_mark = current_obj.get_lily_format()
+					all_note_markings.append(obj_mark)
 
 				all_note_markings = " ".join(all_note_markings)
 				all_measure_markings.append(all_note_markings)
@@ -1006,6 +1012,29 @@ class Score(Engraver):
 			all_phrase_markings.append(all_measure_markings)
 		all_phrase_markings = " | ".join(all_phrase_markings)
 		return all_phrase_markings
+
+	def export_midi_score(self):
+		my_midi = MIDIFile(1, eventtime_is_ticks=True)
+		print(f"Tempo: {self.tempo}")
+		my_midi.addTempo(0, 0, self.tempo)
+		my_midi.addProgramChange(0, 0, 0, 73)
+
+		for current_phrase in self.phrases:
+			for current_measure in current_phrase.measures:
+				for current_obj in current_measure.notes:
+					offset_in_ticks = int(current_obj.absolute_offset * 960)
+					duration_in_ticks = int(current_obj.duration * 960)
+					if isinstance(current_obj, Note):
+						my_midi.addNote(
+							0, 0, current_obj.midi_num, offset_in_ticks, 
+							duration_in_ticks, 100
+						)
+
+		try: 
+			with open("theme.mid", "wb") as midi_output:
+				my_midi.writeFile(midi_output)
+		except PermissionError:
+			print("You must close the previous midi file to overwrite it.")
 
 
 if __name__ == "__main__":
