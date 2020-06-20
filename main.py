@@ -5,6 +5,7 @@ import copy
 import random
 from typing import List, Tuple, Union
 from fractions import Fraction
+import itertools
 
 from midiutil import MIDIFile
 
@@ -21,12 +22,9 @@ class Engraver:
 	def beats_per_measure(self):
 		return self.time_sig_obj.beats_per_measure
 
-	@property 
-	def beat_value(self):
-		return self.time_sig_obj.beat_value
-
 	def get_lily_duration(self, chosen_duration) -> str:
-		absolute_duration = self.beat_value * chosen_duration
+		beat_value = self.time_sig_obj.beat_value
+		absolute_duration = beat_value * chosen_duration
 		if absolute_duration.numerator == 1:
 			return f"{absolute_duration.denominator}"
 		elif absolute_duration.numerator == 3:
@@ -489,6 +487,8 @@ class Phrase(Engraver):
 				Measure(index * self.beats_per_measure, self.absolute_offset)
 			)
 		self.base_melody = []
+		self.starting_note = None
+		self.embellish_rhythms = []
 
 	def imprint_progression(self) -> None:
 		progression = random.choice(self.progressions)
@@ -504,19 +504,19 @@ class Phrase(Engraver):
 		if self.style == "tonal":
 			self.imprint_progression()
 
-		base_melody_note_options = self.get_melody_options()
+		base_melody_note_options = self.get_base_melody_options()
 		base_melody_finder = self.find_base_melody(base_melody_note_options)
 
 		next(base_melody_finder)
 		if not is_embellished:
-			self.set_base_rhythm()
+			self.imprint_base_melody()
 			return
 		if self.base_degrees[-2] == 0:
 			rest_ending = random.choice((True, False))
 		else:
 			rest_ending = False
 
-		self.choose_embellish_rhythms(True)
+		self.choose_embellish_rhythms(rest_ending)
 		while True:
 			full_melody = self.embellish_melody()
 			if full_melody:
@@ -526,19 +526,26 @@ class Phrase(Engraver):
 
 		for current_measure, measure_notes in zip(self.measures, full_melody):
 			for measure_note in measure_notes:
-				current_measure.imprint_note(measure_note)
+				if isinstance(measure_note, Note):
+					current_measure.imprint_note(measure_note)
+		rest_ending_count = full_melody.count("REST")
+		self.finalize_theme(rest_ending_count)
 
-	def get_melody_options(self) -> List[List[Note, ...], ...]:
+	def get_base_melody_options(self) -> List[List[Note, ...], ...]:
 
 		base_melody_note_options = []
 
-		all_modal_notes = self.get_modal_notes(59, 85)
+		start_midi_num = 59
+		stop_midi_num = 85
+		if self.style == "modal":
+			all_modal_notes = self.get_modal_notes(start_midi_num, stop_midi_num)
 		for current_measure in self.measures:
 			current_offset = 0
 			for measure_fraction in self.time_sig_obj.melodic_divisions:
 				if self.style == "tonal":
+					current_chord = current_measure.get_chord(current_offset)
 					base_melody_note_options.append(
-						current_measure.get_chord(current_offset)
+						current_chord.get_chord_notes(start_midi_num, stop_midi_num)
 					) 
 				elif self.style == "modal":
 					base_melody_note_options.append(all_modal_notes[:]) 
@@ -558,8 +565,7 @@ class Phrase(Engraver):
 	  self, base_melody_note_options: List[List[Note, ...], ...]) -> bool:
 
 		reference_note_options = copy.deepcopy(base_melody_note_options)
-		base_melody_length = len(base_melody_note_options)
-		self.base_melody = [None for _ in range(base_melody_length)]
+		self.base_melody = [None for _ in base_melody_note_options]
 		self.base_degrees = self.base_melody[:]
 
 		tonic_pitch_symbol = str(self.scale_obj.scale_pitches_seq[0])
@@ -570,6 +576,7 @@ class Phrase(Engraver):
 		if starting_note.midi_num in {59, 60} and random.choice((True, False)):
 			starting_note = starting_note.shift(7, 12)
 		print(f"Starting note: {starting_note}")
+		self.starting_note = starting_note
 
 		note_index = 0
 		current_note_options = base_melody_note_options[note_index]
@@ -588,7 +595,7 @@ class Phrase(Engraver):
 					self.base_degrees[note_index] = attempted_scale_degree
 					note_index += 1
 
-					if note_index == base_melody_length:
+					if None not in self.base_melody:
 						note_index -= 1
 						print(self.base_degrees)
 						print(self.base_melody)
@@ -715,7 +722,7 @@ class Phrase(Engraver):
 
 		return True
 
-	def set_base_rhythm(self):
+	def imprint_base_melody(self):
 
 		base_melody_iter = iter(self.base_melody)
 		for current_measure in self.measures:
@@ -737,7 +744,6 @@ class Phrase(Engraver):
 			]
 
 		embellish_symbols = random.choice(possible_rhythms)
-		self.embellish_rhythms = []
 		used_symbols = {}
 
 		for embellish_symbol in embellish_symbols:
@@ -789,7 +795,7 @@ class Phrase(Engraver):
 					note_index += 1
 					if None not in full_melody:
 						print(f"Full melody: {full_melody}")
-						return full_melody
+						return self.add_embellish_durations(full_melody)
 					current_contour_options = embellish_contour_options[note_index]
 				else:
 					full_melody[note_index] = None
@@ -806,7 +812,7 @@ class Phrase(Engraver):
 				chosen_contours[note_index] = None
 
 	def create_contour_options(
-	  self, note_index: int, embellish_rhythm: tuple) -> List[Tuple[int, ...], ...]:
+	  self, note_index: int, embellish_rhythm: Tuple[int, ...]) -> List[Tuple[int, ...], ...]:
 		embellish_length = len(embellish_rhythm)
 		all_contour_options = {
 			0: ((0, 1), (0, -1, -2), (0, -2, -1), (0, 1, 0)),
@@ -845,6 +851,34 @@ class Phrase(Engraver):
 	def test_embellishment(
 	  self, note_index: int, full_melody: List[List[Note, ...], ...]) -> bool:
 		return True
+
+	def add_embellish_durations(
+	  self, unspaced_melody: List[List[Note, ...], ...]) -> List[List[Note, ...], ...]:
+		finalized_melody = []
+		melodic_divisions_iter = itertools.cycle(self.time_sig_obj.melodic_divisions)
+		for note_group, embellish_rhythm in zip(unspaced_melody, self.embellish_rhythms):
+			measure_fraction = next(melodic_divisions_iter)
+			if note_group == "REST":
+				finalized_melody.append("REST")
+				continue
+			finalized_melody.append([])
+			embellish_rhythm_sum = sum(embellish_rhythm)
+
+			for current_note, embellish_value in zip(note_group, embellish_rhythm):
+				embellish_fraction = Fraction(embellish_value, embellish_rhythm_sum)  
+				finalized_duration = embellish_fraction * measure_fraction * self.beats_per_measure
+				finalized_melody[-1].append(Note(str(current_note), finalized_duration))
+
+		return finalized_melody
+
+	def finalize_theme(self, rest_ending_count: int) -> None:
+		rest_ending_symbols = self.time_sig_obj.rest_ending[rest_ending_count]
+		self.measures[-1].imprint_note(
+			Note(str(self.starting_note)), rest_ending_symbols[0][1]
+		)
+		for symbol, duration in rest_ending_symbols[1:]:
+			if symbol == "REST":
+				self.measures[-1].imprint_rest(Rest(duration))
 
 
 class MiniPeriod(Phrase): 
