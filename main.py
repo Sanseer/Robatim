@@ -377,7 +377,7 @@ class Note(Pitch, Duration):
 		for scale_index, pitch_obj in enumerate(self.scale_obj.scale_pitches_seq):
 			if str(pitch_obj) == self.pitch_symbol:
 				break
-		final_index = (scale_index + 1) % 7
+		final_index = (scale_index + scale_increment) % 7
 
 		final_pitch_obj = self.scale_obj.scale_pitches_seq[final_index]
 		interim_obj = self.change_pitch_letter(self, scale_increment)

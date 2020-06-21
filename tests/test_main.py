@@ -172,6 +172,22 @@ class TestScore(unittest.TestCase):
 		check_chord("VII", ["E", "G#", "B"])
 		check_chord("I6/4", ["F#", "A", "C#"])
 
+	def test_scalar_shift(self):
+
+		robatim.Engraver.scale_obj = robatim.Scale("G", "lydian")
+		starting_note = robatim.Note("G4")
+		self.assertEqual(str(starting_note.scalar_shift(1)), "A4")
+		self.assertEqual(str(starting_note.scalar_shift(-1)), "F#4")
+		self.assertEqual(str(starting_note.scalar_shift(9)), "B5")
+		self.assertEqual(str(starting_note.scalar_shift(-11	)), "C#3")
+
+		robatim.Engraver.scale_obj = robatim.Scale("F", "phrygian")
+		starting_note = robatim.Note("F3")
+		self.assertEqual(str(starting_note.scalar_shift(5)), "Db4")
+		self.assertEqual(str(starting_note.scalar_shift(0)), "F3")
+		self.assertEqual(str(starting_note.scalar_shift(-5)), "Ab2")
+		self.assertEqual(str(starting_note.scalar_shift(14)), "F5")
+
 
 if __name__ == "__main__":
 	unittest.main() 
