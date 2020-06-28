@@ -250,9 +250,9 @@ class Chord(Engraver):
 	}
 
 	def __init__(
-	  self, chord_symbol: str, duration: Union[int, float, Fraction], 
-	  relative_offset: Union[int, float, Fraction] = 0, 
-	  parent_absolute_offset: Union[int, float, Fraction] = 0) -> None:
+	  self, chord_symbol: str, duration: Union[int, Fraction], 
+	  relative_offset: Union[int, Fraction] = 0, 
+	  parent_absolute_offset: Union[int, Fraction] = 0) -> None:
 		self.duration = duration
 		self.relative_offset = relative_offset
 		self.absolute_offset = relative_offset + parent_absolute_offset
@@ -283,9 +283,9 @@ class Chord(Engraver):
 
 class Duration(Engraver):
 
-	def __init__(self, duration: Union[int, float, Fraction] = 0, 
-	  relative_offset: Union[int, float, Fraction] = 0, 
-	  parent_absolute_offset: Union[int, float, Fraction] = 0) -> None:
+	def __init__(self, duration: Union[int, Fraction] = 0, 
+	  relative_offset: Union[int, Fraction] = 0, 
+	  parent_absolute_offset: Union[int, Fraction] = 0) -> None:
 		self.duration = duration
 		self.relative_offset = relative_offset
 		self.absolute_offset = relative_offset + parent_absolute_offset
@@ -302,9 +302,9 @@ class Duration(Engraver):
 class Note(Pitch, Duration):
 
 	def __init__(self, note_designator: Union[int, str], 
-	  duration: Union[int, float, Fraction] = 0, 
-	  relative_offset: Union[int, float, Fraction] = 0, 
-	  parent_absolute_offset: Union[int, float, Fraction] = 0) -> None:
+	  duration: Union[int, Fraction] = 0, 
+	  relative_offset: Union[int, Fraction] = 0, 
+	  parent_absolute_offset: Union[int, Fraction] = 0) -> None:
 		if isinstance(note_designator, str):
 			self.create_note_from_note_symbol(note_designator)
 		elif isinstance(note_designator, int):
@@ -429,8 +429,8 @@ class Rest(Duration):
 class Measure(Engraver):
 
 	def __init__(
-	  self, relative_offset: Union[int, float, Fraction], 
-	  parent_absolute_offset: Union[int, float, Fraction]) -> None:
+	  self, relative_offset: Union[int, Fraction], 
+	  parent_absolute_offset: Union[int, Fraction]) -> None:
 		self.notes = []
 		self.chords = []
 		self.relative_offset = relative_offset
@@ -523,8 +523,8 @@ ChordType = collections.namedtuple("ChordType", ["function", "duration"])
 class Phrase(Engraver):
 
 	def __init__(
-	  self, relative_offset: Union[int, float, Fraction],
-	  parent_absolute_offset: Union[int, float, Fraction], 
+	  self, relative_offset: Union[int, Fraction],
+	  parent_absolute_offset: Union[int, Fraction], 
 	  num_measures: int = 8) -> None:
 		self.measures = []
 		self.relative_offset = relative_offset
@@ -991,8 +991,8 @@ class Phrase(Engraver):
 class MiniPeriod(Phrase): 
 
 	def __init__(
-	  self, relative_offset: Union[int, float, Fraction],
-	  parent_absolute_offset: Union[int, float, Fraction], 
+	  self, relative_offset: Union[int, Fraction],
+	  parent_absolute_offset: Union[int, Fraction], 
 	  num_measures: int = 4) -> None:
 		super().__init__(relative_offset, parent_absolute_offset, num_measures)
 		self.progressions = (
