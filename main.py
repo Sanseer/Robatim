@@ -561,7 +561,9 @@ class Phrase(Engraver):
 			return
 		self.has_rest_ending = self.base_degrees[-2] == 0
 
-		self.choose_embellish_rhythms()
+		rhythm_finder = self.choose_embellish_rhythms()
+		self.embellish_rhythms = next(rhythm_finder)
+		print(f"Embellish rhythms: {self.embellish_rhythms}")
 		while True:
 			full_melody = self.embellish_melody()
 			if full_melody:
@@ -569,7 +571,8 @@ class Phrase(Engraver):
 			if not next(base_melody_finder):
 				raise ValueError
 			self.has_rest_ending = self.base_degrees[-2] == 0
-			self.choose_embellish_rhythms()
+			self.embellish_rhythms = next(rhythm_finder)
+			print(f"Embellish rhythms: {self.embellish_rhythms}")
 
 		full_melody_iter = iter(full_melody)
 		for current_measure in self.measures:
@@ -786,29 +789,38 @@ class Phrase(Engraver):
 
 	def choose_embellish_rhythms(self) -> None:
 
-		if self.has_rest_ending:
-			possible_rhythms = [
-				["I1", "I1", "I1", "I1", "I1", "I1", "REST", "REST"]
-			]
-		else:
-			possible_rhythms = [
-				["I1", "I1", "I1", "I1", "I1", "I1", "I1", "REST"]
-			]
-
+		possible_rhythms = [
+			["I1", "I1", "I1", "I1", "I1", "I1", "REST", "REST"]
+		]
 		embellish_symbols = random.choice(possible_rhythms)
-		used_symbols = {}
-		self.embellish_rhythms = []
+		has_rest_ending_rhythm = self.realize_embellish_rhythm(embellish_symbols)
+		possible_rhythms = [
+			["I1", "I1", "I1", "I1", "I1", "I1", "I1", "REST"]
+		]
+		embellish_symbols = random.choice(possible_rhythms)
+		no_rest_ending_rhythm = self.realize_embellish_rhythm(embellish_symbols)
 
-		for embellish_symbol in embellish_symbols:
-			if embellish_symbol in used_symbols:
-				self.embellish_rhythms.append(used_symbols[embellish_symbol])
-			elif embellish_symbol == "REST":
-				self.embellish_rhythms.append("REST")
+		while True:
+			if self.has_rest_ending:
+				yield has_rest_ending_rhythm
 			else:
-				rhythm_choices = self.time_sig_obj.rhythms[embellish_symbol]
-				rhythm_choice = random.choice(rhythm_choices)
-				used_symbols[embellish_symbol] = rhythm_choice
-				self.embellish_rhythms.append(rhythm_choice)
+				yield no_rest_ending_rhythm
+
+	def realize_embellish_rhythm(self, embellish_symbols: List[str]) -> List[Tuple[int, ...]]:
+			used_symbols = {}
+			embellish_rhythms = []
+
+			for embellish_symbol in embellish_symbols:
+				if embellish_symbol in used_symbols:
+					embellish_rhythms.append(used_symbols[embellish_symbol])
+				elif embellish_symbol == "REST":
+					embellish_rhythms.append("REST")
+				else:
+					rhythm_choices = self.time_sig_obj.rhythms[embellish_symbol]
+					rhythm_choice = random.choice(rhythm_choices)
+					used_symbols[embellish_symbol] = rhythm_choice
+					embellish_rhythms.append(rhythm_choice)
+			return embellish_rhythms
 
 	def embellish_melody(self):
 		embellish_contour_options = []
@@ -860,6 +872,7 @@ class Phrase(Engraver):
 					reference_contour_options[note_index][:]
 				)
 				if note_index == 0:
+					print("Embellishment failed.")
 					return []
 				note_index -= 1
 				current_contour_options = embellish_contour_options[note_index]
