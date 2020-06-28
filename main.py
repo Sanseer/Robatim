@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections
 import copy
 import random
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 from fractions import Fraction
 import itertools
 
@@ -25,21 +25,36 @@ class Engraver:
 
 class TimeSignature:
 
-	beat_values = {
-		"6/8": Fraction(3, 8),
+	all_beat_values = {
+		"6/8": Fraction(3, 8),  "4/4": Fraction(1, 4)
+	}
+	all_beats_per_measure = { 
+		"6/8": 2, "4/4": 4
+	}
+	all_melodic_divisions = {
+		"6/8": (Fraction(1,2), Fraction(1,2)), 
+		"4/4": (Fraction(1,2), Fraction(1,2)),
+	}
+	all_tempo_ranges = {
+		"6/8": range(38, 58), "4/4": range(90, 124)
+	}
+	all_rhythms = {
+		"6/8": {"I1": ((4, 2), (3, 1, 2), (4, 1, 1))},
+		"4/4": {"I1": ((3, 1), (2, 1, 1), (1, 1))}
+	}
+	all_rest_endings = {
+		"6/8": {2: (("NOTE", 1), ("REST", 1))},
+		"4/4": {1: (("NOTE", 1), ("REST", 1)), 2: (("NOTE", 2), ("REST", 2))}
 	}
 
 	def __init__(self, symbol: str) -> None:
 		self.symbol = symbol
-		if self.symbol == "6/8":
-			self.beats_per_measure = 2
-			self.melodic_divisions = [Fraction(1,2), Fraction(1,2)]
-			self.tempo_range = range(38, 58)
-			self.rhythms = {"I1": ((3, 1, 2), (4, 2))}
-			self.rest_ending = {
-				2: (("Note", 1), ("REST", 1))
-			}
-		self.beat_value = self.beat_values[self.symbol]
+		self.beats_per_measure = self.all_beats_per_measure[symbol]
+		self.melodic_divisions = self.all_melodic_divisions[symbol] 
+		self.tempo_range = self.all_tempo_ranges[symbol] 
+		self.rhythms = self.all_rhythms[symbol] 
+		self.rest_ending = self.all_rest_endings[symbol] 
+		self.beat_value = self.all_beat_values[self.symbol]
 
 
 def collapse_magnitude(amount: int) -> int:
@@ -706,7 +721,7 @@ class Phrase(Engraver):
 			if attempted_degree in {self.base_degrees[1], self.base_degrees[3]}:
 				return False
 		if note_index == 6:
-			if attempted_degree != 0 and self.time_sig_obj.symbol == "6/8":
+			if attempted_degree != 0 and self.time_sig_obj.symbol in {"6/8", "3/4"}:
 				return False
 			if attempted_degree != 0 and current_leap != 0:
 				motif_shift = self.base_degrees[2] - self.base_degrees[0]
@@ -804,6 +819,10 @@ class Phrase(Engraver):
 		reference_contour_options = copy.deepcopy(embellish_contour_options)
 		current_contour_options = embellish_contour_options[note_index]
 
+		features = {}
+		features["repeat_ending"] = random.choice(("exact", "accelerate"))
+		print(f"Features: {features}")
+
 		while True:
 			if current_contour_options:
 				chosen_contour = random.choice(current_contour_options)
@@ -815,7 +834,7 @@ class Phrase(Engraver):
 					starting_note, chosen_contour
 				)
 
-				if (self.test_contour(note_index, chosen_contours) and 
+				if (self.test_contour(note_index, chosen_contours, features) and 
 				  self.test_embellishment(note_index, full_melody)):
 					note_index += 1
 					if None not in full_melody:
@@ -844,7 +863,7 @@ class Phrase(Engraver):
 			-2: ((0, -1), (0, -1, -2), (0, -1, 0)),
 			-3: ((0, 0),),
 			-4: ((0, -2, -3),),
-			1: ((0, 2),),
+			1: ((0, 2), (0, 1, 2)),
 			2: ((0, 1), (0, 0, 1), (0, 1, 0), (0, 1, 2)),
 			3: ((0, -1, -2),),
 		}
@@ -869,11 +888,43 @@ class Phrase(Engraver):
 		return realized_melody_fragment
 
 	def test_contour(
-	  self, note_index: int, chosen_contour: Tuple[int, ...]) -> bool:
+	  self, note_index: int, chosen_contours: Tuple[int, ...], features: Dict) -> bool:
+		if (note_index in {2, 3} and chosen_contours[note_index] != 
+		  chosen_contours[note_index - 2]):
+			return False
+		if note_index in {4, 5}:
+			if features["repeat_ending"] == "exact":
+				if chosen_contours[note_index] != chosen_contours[note_index - 2]:
+					return False
+			elif features["repeat_ending"] == "accelerate": 
+				if note_index == 5 and chosen_contours[5] != chosen_contours[4]:
+					return False
+				if chosen_contours[4] not in chosen_contours[2:4]:
+					return False
 		return True
 
 	def test_embellishment(
 	  self, note_index: int, full_melody: List[List[Note, ...], ...]) -> bool:
+		if note_index >= 2 and note_index % 2 == 0:
+			last_previous_note = full_melody[note_index - 1][-1]
+			current_first_note = full_melody[note_index][0]
+			bar_leap = current_first_note.midi_num - last_previous_note.midi_num
+			if abs(bar_leap >= 3): 
+				leap_direction = collapse_magnitude(bar_leap)
+				for current_note in full_melody[note_index]:
+					resolve_leap = current_note.midi_num - current_first_note.midi_num  
+					if resolve_leap != 0:
+						resolve_direction = collapse_magnitude(resolve_leap)
+						if leap_direction == resolve_direction:
+							return False
+						if bar_leap == 3 and abs(resolve_leap) > 2:
+							return False
+						if bar_leap >= 4 and abs(resolve_leap) > 1:
+							return False 
+						break
+
+		if note_index == 5 and full_melody[note_index][-1] == self.starting_note:
+			return False
 		return True
 
 	def add_embellish_durations(
@@ -898,12 +949,15 @@ class Phrase(Engraver):
 
 	def finalize_theme(self, rest_ending_count: int) -> None:
 		rest_ending_symbols = self.time_sig_obj.rest_ending[rest_ending_count]
+		starting_note_str = str(self.starting_note)
 		self.measures[-1].imprint_temporal_obj(
-			Note(str(self.starting_note), rest_ending_symbols[0][1]) 
+			Note(starting_note_str, rest_ending_symbols[0][1]) 
 		)
 		for symbol, duration in rest_ending_symbols[1:]:
 			if symbol == "REST":
 				self.measures[-1].imprint_temporal_obj(Rest(duration))
+			elif symbol == "NOTE":
+				self.measures[-1].imprint_temporal_obj(Note(starting_note_str, duration))
 
 
 class MiniPeriod(Phrase): 
@@ -946,10 +1000,11 @@ class Score(Engraver):
 		Engraver.style = "modal"
 		tonic_pitch = self.choose_random_tonic()
 		mode_choice = random.choice(Scale.mode_wheel)
-		print(f"{tonic_pitch} {mode_choice}")
 
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
-		Engraver.time_sig_obj = TimeSignature("6/8")
+		chosen_time_sig = random.choice(("6/8", "4/4"))
+		print(f"{tonic_pitch} {mode_choice} in {chosen_time_sig}")
+		Engraver.time_sig_obj = TimeSignature(chosen_time_sig)
 		self.tempo = random.choice(self.time_sig_obj.tempo_range)
 		new_phrase = MiniPeriod(0, 0)
 		new_phrase.add_melody(is_embellished)
