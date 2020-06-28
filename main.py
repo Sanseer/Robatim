@@ -26,25 +26,33 @@ class Engraver:
 class TimeSignature:
 
 	all_beat_values = {
-		"6/8": Fraction(3, 8),  "4/4": Fraction(1, 4)
+		"6/8": Fraction(3, 8),  "4/4": Fraction(1, 4),
+		"2/2": Fraction(1, 2)
 	}
 	all_beats_per_measure = { 
-		"6/8": 2, "4/4": 4
+		"6/8": 2, "4/4": 4, "2/2": 2
 	}
 	all_melodic_divisions = {
 		"6/8": (Fraction(1,2), Fraction(1,2)), 
 		"4/4": (Fraction(1,2), Fraction(1,2)),
+		"2/2": (Fraction(1,2), Fraction(1,2)),
 	}
 	all_tempo_ranges = {
-		"6/8": range(38, 58), "4/4": range(90, 124)
+		"6/8": range(38, 58), "4/4": range(90, 125),
+		"2/2": range(56, 101),
 	}
 	all_rhythms = {
 		"6/8": {"I1": ((4, 2), (3, 1, 2), (4, 1, 1))},
-		"4/4": {"I1": ((3, 1), (2, 1, 1), (1, 1))}
+		"4/4": {"I1": ((3, 1), (2, 1, 1), (1, 1))},
+		"2/2": {"I1": ((3, 1), (2, 1, 1), (1, 1))},
 	}
 	all_rest_endings = {
 		"6/8": {2: (("NOTE", 1), ("REST", 1))},
-		"4/4": {1: (("NOTE", 1), ("REST", 1)), 2: (("NOTE", 2), ("REST", 2))}
+		"4/4": {1: (("NOTE", 1), ("REST", 1)), 2: (("NOTE", 2), ("REST", 2))},
+		"2/2": {
+			1: (("NOTE", Fraction(1, 2)), ("REST", Fraction(1, 2))), 
+			2: (("NOTE", 1), ("REST", 1))
+		}
 	}
 
 	def __init__(self, symbol: str) -> None:
@@ -528,6 +536,7 @@ class Phrase(Engraver):
 		self.base_melody = []
 		self.starting_note = None
 		self.embellish_rhythms = []
+		self.has_rest_ending = False
 
 	def imprint_progression(self) -> None:
 		progression = random.choice(self.progressions)
@@ -550,15 +559,17 @@ class Phrase(Engraver):
 		if not is_embellished:
 			self.imprint_base_melody()
 			return
-		rest_ending = self.base_degrees[-2] == 0
+		self.has_rest_ending = self.base_degrees[-2] == 0
 
-		self.choose_embellish_rhythms(rest_ending)
+		self.choose_embellish_rhythms()
 		while True:
 			full_melody = self.embellish_melody()
 			if full_melody:
 				break
 			if not next(base_melody_finder):
 				raise ValueError
+			self.has_rest_ending = self.base_degrees[-2] == 0
+			self.choose_embellish_rhythms()
 
 		full_melody_iter = iter(full_melody)
 		for current_measure in self.measures:
@@ -773,9 +784,9 @@ class Phrase(Engraver):
 					Note(current_note_symbol, self.beats_per_measure * measure_fraction)
 				)
 
-	def choose_embellish_rhythms(self, rest_ending: bool) -> None:
+	def choose_embellish_rhythms(self) -> None:
 
-		if rest_ending:
+		if self.has_rest_ending:
 			possible_rhythms = [
 				["I1", "I1", "I1", "I1", "I1", "I1", "REST", "REST"]
 			]
@@ -786,6 +797,7 @@ class Phrase(Engraver):
 
 		embellish_symbols = random.choice(possible_rhythms)
 		used_symbols = {}
+		self.embellish_rhythms = []
 
 		for embellish_symbol in embellish_symbols:
 			if embellish_symbol in used_symbols:
@@ -923,8 +935,11 @@ class Phrase(Engraver):
 							return False 
 						break
 
-		if note_index == 5 and full_melody[note_index][-1] == self.starting_note:
-			return False
+		if note_index in {5, 6} and full_melody[note_index][-1] == self.starting_note:
+			if self.has_rest_ending and note_index == 5:
+				return False
+			if not self.has_rest_ending and note_index == 6:
+				return False
 		return True
 
 	def add_embellish_durations(
@@ -1002,7 +1017,7 @@ class Score(Engraver):
 		mode_choice = random.choice(Scale.mode_wheel)
 
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
-		chosen_time_sig = random.choice(("6/8", "4/4"))
+		chosen_time_sig = random.choice(("6/8", "6/8", "4/4", "2/2"))
 		print(f"{tonic_pitch} {mode_choice} in {chosen_time_sig}")
 		Engraver.time_sig_obj = TimeSignature(chosen_time_sig)
 		self.tempo = random.choice(self.time_sig_obj.tempo_range)
