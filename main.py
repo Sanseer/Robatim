@@ -672,7 +672,7 @@ class Phrase(Engraver):
 					reference_note_options[note_index][:]
 				)
 				if note_index == 0:
-					return False
+					yield False
 					
 				note_index -= 1
 				current_note_options = base_melody_note_options[note_index]
@@ -907,14 +907,14 @@ class Phrase(Engraver):
 	  self, note_index: int, embellish_rhythm: Tuple[int, ...]) -> List[Tuple[int, ...], ...]:
 		embellish_length = len(embellish_rhythm)
 		all_contour_options = {
-			0: ((0, 1), (0, -1, -2), (0, -2, -1), (0, 1, 0)),
-			-1: ((0, 0), (0, 1), (0, -1), (0, -1, -2), (0, 1, 0)),
-			-2: ((0, -1), (0, -1, -2), (0, -1, 0)),
+			0: ((0, 1), (0, -1), (0, -1, -2), (0, -2, -1), (0, 2, 1), (0, 1, 0)),
+			-1: ((0, 0), (0, 1), (0, -1), (0, -2), (0, -1, -2), (0, 1, 0), (0, 2, 1)),
+			-2: ((0, -1), (0, -1, -2), (0, -1, 0), (0, 1, -1)),
 			-3: ((0, 0),),
-			-4: ((0, -2, -3),),
+			-4: ((0, -2), (0, -2, -3)),
 			1: ((0, 2), (0, 1, 2)),
 			2: ((0, 1), (0, 0, 1), (0, 1, 0), (0, 1, 2)),
-			3: ((0, -1, -2),),
+			3: ((0, 4), (0, -1, -2),),
 		}
 
 		possible_contours = []
