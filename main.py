@@ -27,19 +27,20 @@ class TimeSignature:
 
 	all_beat_values = {
 		"6/8": Fraction(3, 8),  "4/4": Fraction(1, 4),
-		"2/2": Fraction(1, 2)
+		"2/2": Fraction(1, 2), "3/4": Fraction(1, 4),
 	}
 	all_beats_per_measure = { 
-		"6/8": 2, "4/4": 4, "2/2": 2
+		"6/8": 2, "4/4": 4, "2/2": 2, "3/4": 3,
 	}
 	all_melodic_divisions = {
-		"6/8": (Fraction(1,2), Fraction(1,2)), 
-		"4/4": (Fraction(1,2), Fraction(1,2)),
-		"2/2": (Fraction(1,2), Fraction(1,2)),
+		"6/8": (Fraction(1, 2), Fraction(1, 2)), 
+		"4/4": (Fraction(1, 2), Fraction(1, 2)),
+		"2/2": (Fraction(1, 2), Fraction(1, 2)),
+		"3/4": (Fraction(2, 3), Fraction(1, 3)),
 	}
 	all_tempo_ranges = {
 		"6/8": range(38, 58), "4/4": range(90, 125),
-		"2/2": range(56, 101),
+		"2/2": range(56, 101), "3/4": range(80, 141),
 	}
 	all_rhythms = {
 		"6/8": {
@@ -54,6 +55,12 @@ class TimeSignature:
 			"I1": ((6, 2), (4, 2, 2), (4, 4)),
 			"I2": ((4, 4), (4, 2, 2))
 		},
+		"3/4": {
+			"I1": ((1, 1), (1,)),
+			"I2": ((2, 2), (2,)),
+			"I3": ((1, 1), (1,)),
+			"I4": ((2, 2), (2,))
+		},
 	}
 	all_rest_endings = {
 		"6/8": {2: (("NOTE", 1), ("REST", 1))},
@@ -61,7 +68,7 @@ class TimeSignature:
 		"2/2": {
 			1: (("NOTE", Fraction(1, 2)), ("REST", Fraction(1, 2))), 
 			2: (("NOTE", 1), ("REST", 1))
-		}
+		}, "3/4": {2: (("NOTE", 2), ("REST", 1))}
 	}
 
 	def __init__(self, symbol: str) -> None:
@@ -798,23 +805,30 @@ class Phrase(Engraver):
 
 	def choose_embellish_rhythms(self) -> None:
 
-		possible_rhythms = [
-			["I1", "I1", "I1", "I1", "I1", "I1", "REST", "REST"],
-			["I1", "I2", "I1", "I2", "I1", "I1", "REST", "REST"],
-			["I1", "I2", "I1", "I2", "I2", "I2", "REST", "REST"],
-			["I1", "I2", "I1", "I2", "I1", "I2", "REST", "REST"],
-		]
-		embellish_symbols = random.choice(possible_rhythms)
-		has_rest_ending_rhythm = self.realize_embellish_rhythm(embellish_symbols)
-		possible_rhythms = [
-			["I1", "I1", "I1", "I1", "I1", "I1", "I1", "REST"],
-			["I1", "I2", "I1", "I2", "I1", "I1", "I1", "REST"],
-			["I1", "I2", "I1", "I2", "I2", "I2", "I1", "REST"],
-			["I1", "I2", "I1", "I2", "I2", "I2", "I2", "REST"],
-			["I1", "I2", "I1", "I2", "I1", "I2", "I1", "REST"],
-		]
-		embellish_symbols = random.choice(possible_rhythms)
-		no_rest_ending_rhythm = self.realize_embellish_rhythm(embellish_symbols)
+		if self.time_sig_obj.symbol == "3/4":
+			possible_rhythms = [
+				["I1", "I2", "I1", "I2", "I1", "I2", "REST", "REST"],
+				["I1", "I2", "I1", "I2", "I3", "I2", "REST", "REST"],
+				["I1", "I2", "I1", "I2", "I1", "I4", "REST", "REST"],
+				["I1", "I2", "I1", "I2", "I3", "I4", "REST", "REST"]
+			]
+			has_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
+		else:
+			possible_rhythms = [
+				["I1", "I1", "I1", "I1", "I1", "I1", "REST", "REST"],
+				["I1", "I2", "I1", "I2", "I1", "I1", "REST", "REST"],
+				["I1", "I2", "I1", "I2", "I2", "I2", "REST", "REST"],
+				["I1", "I2", "I1", "I2", "I1", "I2", "REST", "REST"],
+			]
+			has_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
+			possible_rhythms = [
+				["I1", "I1", "I1", "I1", "I1", "I1", "I1", "REST"],
+				["I1", "I2", "I1", "I2", "I1", "I1", "I1", "REST"],
+				["I1", "I2", "I1", "I2", "I2", "I2", "I1", "REST"],
+				["I1", "I2", "I1", "I2", "I2", "I2", "I2", "REST"],
+				["I1", "I2", "I1", "I2", "I1", "I2", "I1", "REST"],
+			]
+			no_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
 
 		while True:
 			if self.has_rest_ending:
@@ -822,7 +836,8 @@ class Phrase(Engraver):
 			else:
 				yield no_rest_ending_rhythm
 
-	def realize_embellish_rhythm(self, embellish_symbols: List[str]) -> List[Tuple[int, ...]]:
+	def realize_embellish_rhythm(self, possible_rhythms: List[List[str]]) -> List[Tuple[int, ...]]:
+			embellish_symbols = random.choice(possible_rhythms)
 			rhythm_mapping = {}
 			embellish_rhythms = []
 
@@ -907,13 +922,13 @@ class Phrase(Engraver):
 	  self, note_index: int, embellish_rhythm: Tuple[int, ...]) -> List[Tuple[int, ...], ...]:
 		embellish_length = len(embellish_rhythm)
 		all_contour_options = {
-			0: ((0, 1), (0, -1), (0, -1, -2), (0, -2, -1), (0, 2, 1), (0, 1, 0)),
-			-1: ((0, 0), (0, 1), (0, -1), (0, -2), (0, -1, -2), (0, 1, 0), (0, 2, 1)),
-			-2: ((0, -1), (0, -1, -2), (0, -1, 0), (0, 1, -1)),
+			0: ((0,), (0, 1), (0, -1), (0, -1, -2), (0, -2, -1), (0, 2, 1), (0, 1, 0)),
+			-1: ((0,), (0, 0), (0, 1), (0, -1), (0, -2), (0, -1, -2), (0, 1, 0), (0, 2, 1)),
+			-2: ((0,), (0, -1), (0, -1, -2), (0, -1, 0), (0, 1, -1)),
 			-3: ((0, 0),),
 			-4: ((0, -2), (0, -2, -3)),
-			1: ((0, 2), (0, 1, 2)),
-			2: ((0, 1), (0, 0, 1), (0, 1, 0), (0, 1, 2)),
+			1: ((0,), (0, 2), (0, 1, 2)),
+			2: ((0,), (0, 1), (0, 0, 1), (0, 1, 0), (0, 1, 2)),
 			3: ((0, 4), (0, -1, -2),),
 		}
 
@@ -1054,7 +1069,7 @@ class Score(Engraver):
 		mode_choice = random.choice(Scale.mode_wheel)
 
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
-		chosen_time_sig = random.choice(("6/8", "6/8", "4/4", "2/2"))
+		chosen_time_sig = random.choice(("6/8", "3/4", "4/4", "2/2"))
 		print(f"{tonic_pitch} {mode_choice} in {chosen_time_sig}")
 		Engraver.time_sig_obj = TimeSignature(chosen_time_sig)
 		self.tempo = random.choice(self.time_sig_obj.tempo_range)
