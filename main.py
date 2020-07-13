@@ -39,8 +39,8 @@ class TimeSignature:
 		"3/4": (Fraction(2, 3), Fraction(1, 3)),
 	}
 	all_tempo_ranges = {
-		"6/8": range(38, 58), "4/4": range(90, 125),
-		"2/2": range(56, 101), "3/4": range(80, 141),
+		"6/8": range(38, 59), "4/4": range(90, 125),
+		"2/2": range(53, 101), "3/4": range(80, 141),
 	}
 	all_rhythms = {
 		"6/8": {
@@ -600,7 +600,7 @@ class Phrase(Engraver):
 		rest_ending_count = full_melody.count("REST")
 		self.finalize_theme(rest_ending_count)
 
-	def get_base_melody_options(self) -> List[List[Note, ...], ...]:
+	def get_base_melody_options(self) -> List[List[Note]]:
 
 		base_melody_note_options = []
 
@@ -622,7 +622,7 @@ class Phrase(Engraver):
 
 		return base_melody_note_options
 
-	def get_modal_notes(self, start: int, stop: int) -> List[Note, ...]:
+	def get_modal_notes(self, start: int, stop: int) -> List[Note]:
 		possible_notes = []
 		for midi_num in range(start, stop):
 			if self.scale_obj.is_note_diatonic(midi_num):
@@ -631,7 +631,7 @@ class Phrase(Engraver):
 		return possible_notes
 
 	def find_base_melody(
-	  self, base_melody_note_options: List[List[Note, ...], ...]) -> bool:
+	  self, base_melody_note_options: List[List[Note]]) -> bool:
 
 		reference_note_options = copy.deepcopy(base_melody_note_options)
 		self.base_melody = [None for _ in base_melody_note_options]
@@ -836,7 +836,8 @@ class Phrase(Engraver):
 			else:
 				yield no_rest_ending_rhythm
 
-	def realize_embellish_rhythm(self, possible_rhythms: List[List[str]]) -> List[Tuple[int, ...]]:
+	def realize_embellish_rhythm(
+	  self, possible_rhythms: List[List[str]]) -> List[Union[Tuple[int, ...], str]]:
 			embellish_symbols = random.choice(possible_rhythms)
 			rhythm_mapping = {}
 			embellish_rhythms = []
@@ -849,7 +850,7 @@ class Phrase(Engraver):
 				rhythm_choices = self.time_sig_obj.rhythms[embellish_symbol]
 				while True:
 					rhythm_choice = random.choice(rhythm_choices)
-					if rhythm_choice not in rhythm_mapping:
+					if rhythm_choice not in rhythm_mapping.values():
 						rhythm_mapping[embellish_symbol] = rhythm_choice
 						break
 
@@ -919,17 +920,17 @@ class Phrase(Engraver):
 				chosen_contours[note_index] = None
 
 	def create_contour_options(
-	  self, note_index: int, embellish_rhythm: Tuple[int, ...]) -> List[Tuple[int, ...], ...]:
+	  self, note_index: int, embellish_rhythm: Tuple[int, ...]) -> List[Tuple[int, ...]]:
 		embellish_length = len(embellish_rhythm)
 		all_contour_options = {
 			0: ((0,), (0, 1), (0, -1), (0, -1, -2), (0, -2, -1), (0, 2, 1), (0, 1, 0)),
 			-1: ((0,), (0, 0), (0, 1), (0, -1), (0, -2), (0, -1, -2), (0, 1, 0), (0, 2, 1)),
-			-2: ((0,), (0, -1), (0, -1, -2), (0, -1, 0), (0, 1, -1)),
+			-2: ((0,), (0, -1), (0, -3), (0, 0, -1), (0, -1, -2), (0, -1, 0), (0, 1, -1)),
 			-3: ((0, 0),),
 			-4: ((0, -2), (0, -2, -3)),
 			1: ((0,), (0, 2), (0, 1, 2)),
 			2: ((0,), (0, 1), (0, 0, 1), (0, 1, 0), (0, 1, 2)),
-			3: ((0, 4), (0, -1, -2),),
+			3: ((0, 4), (0, -1, -2), (0, 1, 2)),
 		}
 
 		possible_contours = []
@@ -943,7 +944,7 @@ class Phrase(Engraver):
 		return possible_contours
 
 	def realize_melody_contour(
-	  self, starting_note: Note, chosen_contour: Tuple[int, ...]) -> List[Note, ...]:
+	  self, starting_note: Note, chosen_contour: Tuple[int, ...]) -> List[Note]:
 
 		realized_melody_fragment = []
 		for melody_shift in chosen_contour:
@@ -952,7 +953,8 @@ class Phrase(Engraver):
 		return realized_melody_fragment
 
 	def test_contour(
-	  self, note_index: int, chosen_contours: Tuple[int, ...], features: Dict) -> bool:
+	  self, note_index: int, chosen_contours: List[Union[Tuple[int, ...], None]], 
+	  features: Dict[str, str]) -> bool:
 		if (note_index in {2, 3} and chosen_contours[note_index] != 
 		  chosen_contours[note_index - 2]):
 			return False
@@ -968,7 +970,7 @@ class Phrase(Engraver):
 		return True
 
 	def test_embellishment(
-	  self, note_index: int, full_melody: List[List[Note, ...], ...]) -> bool:
+	  self, note_index: int, full_melody: List[Union[List[Note], str, None]]) -> bool:
 		if note_index >= 2 and note_index % 2 == 0:
 			last_previous_note = full_melody[note_index - 1][-1]
 			current_first_note = full_melody[note_index][0]
@@ -995,7 +997,7 @@ class Phrase(Engraver):
 		return True
 
 	def add_embellish_durations(
-	  self, unspaced_melody: List[List[Note, ...], ...]) -> List[List[Note, ...], ...]:
+	  self, unspaced_melody: List[Union[List[Note], str]]) -> List[Union[List[Note], str]]:
 		finalized_melody = []
 		melodic_divisions_iter = itertools.cycle(self.time_sig_obj.melodic_divisions)
 		for note_group, embellish_rhythm in zip(unspaced_melody, self.embellish_rhythms):
@@ -1017,10 +1019,8 @@ class Phrase(Engraver):
 	def finalize_theme(self, rest_ending_count: int) -> None:
 		rest_ending_symbols = self.time_sig_obj.rest_ending[rest_ending_count]
 		starting_note_str = str(self.starting_note)
-		self.measures[-1].imprint_temporal_obj(
-			Note(starting_note_str, rest_ending_symbols[0][1]) 
-		)
-		for symbol, duration in rest_ending_symbols[1:]:
+
+		for symbol, duration in rest_ending_symbols:
 			if symbol == "REST":
 				self.measures[-1].imprint_temporal_obj(Rest(duration))
 			elif symbol == "NOTE":
@@ -1116,7 +1116,7 @@ class Score(Engraver):
 		with open("logs/lily_output.txt", "w") as f:
 			f.write(lily_sheet)
 
-	def create_lily_note_string(self):
+	def create_lily_note_string(self) -> str:
 		all_phrase_markings = []
 		for current_phrase in self.phrases:
 			all_measure_markings = []
