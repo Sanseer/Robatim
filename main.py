@@ -314,6 +314,44 @@ class Duration(Engraver):
 		elif absolute_duration.numerator == 3:
 			return f"{absolute_duration.denominator // 2}." 
 
+class Interval:
+
+	def __init__(
+	  self, interval_quality: str, generic_interval: int) -> None:
+		self.interval_quality = interval_quality
+		self.generic_interval = generic_interval
+
+		# unison should be zero for symmetry with negative intervals
+		if self.generic_interval == 0:
+			self.possible_qualities = ["P", "A"]
+		elif self.generic_interval % 7 in {0, 3, 4,}:
+			self.possible_qualities = ["d", "P", "A"]
+		elif self.generic_interval % 7 in {1, 2, 5, 6}:
+			self.possible_qualities = ["d", "m", "M", "A"]
+
+	def __repr__(self):
+		return f"{self.interval_quality}{abs(self.generic_interval) + 1}"
+
+	def shift_interval_quality(self, increment) -> Interval:
+		quality_span = len(self.possible_qualities)
+
+		if self.interval_quality in self.possible_qualities:
+			quality_num = self.possible_qualities.index(self.interval_quality)
+		elif "d" in self.interval_quality:
+			quality_num = (self.interval_quality.count("d") * -1) + 1
+		elif "A" in self.interval_quality:
+			quality_num = quality_span + self.interval_quality.count("A") - 2
+
+		quality_num += increment
+		if 0 <= quality_num < quality_span:
+			new_interval_quality = self.possible_qualities[quality_num] 
+		elif quality_num < 0:
+			new_interval_quality = "d" * abs(quality_num - 1) 
+		elif quality_num >= quality_span:
+			new_interval_quality = "A" * (quality_num - quality_span + 2)
+
+		return Interval(new_interval_quality, self.generic_interval)
+
 
 class Note(Pitch, Duration):
 
@@ -378,6 +416,82 @@ class Note(Pitch, Duration):
 
 	def __ge__(self, other):
 		return self.midi_num >= other.midi_num
+
+	def __sub__(self, starting_note: Note) -> Interval:
+
+		if self.octave_number == starting_note.octave_number:
+			ending_pitch_index = self.note_letters.index(self.pitch_letter)
+			starting_pitch_index = self.note_letters.index(starting_note.pitch_letter)
+			if ending_pitch_index > starting_pitch_index:
+				letter_direction = 1
+			elif starting_pitch_index > ending_pitch_index:
+				letter_direction = -1 
+
+		elif self.octave_number > starting_note.octave_number:
+			letter_direction = 1
+		elif starting_note.octave_number > self.octave_number:
+			letter_direction = -1
+		current_note = starting_note
+
+		generic_interval = 0
+		while current_note.octave_number != self.octave_number:
+			current_note = current_note.change_pitch_letter(
+				current_note, letter_direction
+			)
+			generic_interval += letter_direction
+
+		while current_note.pitch_letter != self.pitch_letter:
+			current_note = current_note.change_pitch_letter(
+				current_note, letter_direction
+			) 
+			generic_interval += letter_direction
+
+		""" In a major scale, intervals from the tonic up to another
+		scale degree are major or perfect and intervals from the tonic
+		down to another scale degree are minor or perfect"""
+		guide_scale = Scale(starting_note.pitch_symbol, "ionian")
+		guide_scale_pitches = guide_scale.scale_pitches_seq
+
+		current_pitch = guide_scale_pitches[0]
+		scale_index = 0
+
+		while current_pitch.pitch_letter != self.pitch_letter:
+			scale_index = (scale_index + letter_direction) %  7
+			current_pitch = guide_scale_pitches[scale_index]
+
+		if scale_index in {0, 3, 4}:
+			interval_quality = "P"
+		elif scale_index in {1, 2, 5, 6}:
+			if letter_direction < 0:
+				interval_quality = "m"
+			elif letter_direction > 0:
+				interval_quality = "M"
+		current_interval = Interval(interval_quality, generic_interval)
+
+		if self.pitch_letter == starting_note.pitch_letter:
+			if self > starting_note:
+				symbol_direction = 1
+			elif starting_note > self:
+				symbol_direction = -1
+			else:
+				symbol_direction = 0
+		else:
+			symbol_direction = letter_direction
+
+		accidental_diff = self.accidental_amount - current_pitch.accidental_amount
+		accidental_direction = collapse_magnitude(accidental_diff)
+		interval_direction = accidental_direction * symbol_direction
+
+		while self.pitch_symbol != str(current_pitch):
+			current_pitch = current_pitch.change_pitch_accidental(
+				current_pitch, accidental_direction
+			)
+			current_interval = current_interval.shift_interval_quality(
+				interval_direction
+			)
+
+		return current_interval
+
 
 	def change_pitch_letter(self, old_note_obj, letter_increment: int) -> Note:
 		if letter_increment == 0:
