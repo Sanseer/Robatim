@@ -188,6 +188,43 @@ class TestScore(unittest.TestCase):
 		self.assertEqual(str(starting_note.scalar_shift(-5)), "Ab2")
 		self.assertEqual(str(starting_note.scalar_shift(14)), "F5")
 
+	def test_interval_shift(self):
+
+		new_interval = robatim.Interval("P", 0)
+		altered_interval = new_interval.shift_interval_quality(1)
+		self.assertEqual(str(altered_interval), "A1")
+		new_interval = robatim.Interval("m", 1)
+		altered_interval = new_interval.shift_interval_quality(0)
+		self.assertEqual(str(altered_interval), "m2")
+		new_interval = robatim.Interval("A", 6)
+		altered_interval = new_interval.shift_interval_quality(-1)
+		self.assertEqual(str(altered_interval), "M7")
+
+		new_interval = robatim.Interval("A", 4)
+		altered_interval = new_interval.shift_interval_quality(-2)
+		self.assertEqual(str(altered_interval), "d5")
+		new_interval = robatim.Interval("dd", 3)
+		altered_interval = new_interval.shift_interval_quality(-1)
+		self.assertEqual(str(altered_interval), "ddd4")
+		new_interval = robatim.Interval("M", 2)
+		altered_interval = new_interval.shift_interval_quality(2)
+		self.assertEqual(str(altered_interval), "AA3")
+
+	def test_note_subtraction(self):
+
+		self.assertEqual(str(robatim.Note("A2") - robatim.Note("A3")), "P8")
+		self.assertEqual(str(robatim.Note("Fbb1") - robatim.Note("Fbb1")), "P1")
+		self.assertEqual(str(robatim.Note("B5") - robatim.Note("B#5")), "A1")
+		self.assertEqual(str(robatim.Note("G#5") - robatim.Note("Gb5")), "AA1")
+
+		self.assertEqual(str(robatim.Note("E4") - robatim.Note("C4")), "M3")
+		self.assertEqual(str(robatim.Note("Db4")- robatim.Note("G3")), "d5")
+		self.assertEqual(str(robatim.Note("G2") - robatim.Note("F3")), "m7")
+
+		self.assertEqual(str(robatim.Note("Fb5") - robatim.Note("C##4")), "ddd11")
+		self.assertEqual(str(robatim.Note("D1") - robatim.Note("E#2")), "A9")
+		self.assertEqual(str(robatim.Note("B3") - robatim.Note("F#6")), "P19")
+
 
 if __name__ == "__main__":
 	unittest.main() 
