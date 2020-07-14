@@ -328,6 +328,26 @@ class Interval:
 			self.possible_qualities = ["d", "P", "A"]
 		elif self.generic_interval % 7 in {1, 2, 5, 6}:
 			self.possible_qualities = ["d", "m", "M", "A"]
+		if not self.validate_interval_quality():
+			raise ValueError
+
+	def validate_interval_quality(self) -> None:
+		if self.interval_quality[0] not in self.possible_qualities:
+			return False
+		if len(self.interval_quality) == 1:
+			if self.interval_quality not in {"d", "m", "M", "P", "A"}:
+				return False
+		else:
+			if "d" in self.interval_quality:
+				chosen_character = "d"
+			elif "A" in self.interval_quality:
+				chosen_character = "A"
+			else:
+				return False
+
+			if chosen_character * len(self.interval_quality) != self.interval_quality:
+				return False
+		return True
 
 	def __repr__(self):
 		return f"{self.interval_quality}{abs(self.generic_interval) + 1}"
