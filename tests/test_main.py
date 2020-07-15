@@ -210,6 +210,16 @@ class TestScore(unittest.TestCase):
 		altered_interval = new_interval.shift_interval_quality(2)
 		self.assertEqual(str(altered_interval), "AA3")
 
+	def test_interval_input(self):
+		
+		self.assertRaises(ValueError, robatim.Interval, "d", 0)
+		self.assertRaises(ValueError, robatim.Interval, "M", 4)
+		self.assertRaises(ValueError, robatim.Interval, "P", -1)
+
+		self.assertRaises(ValueError, robatim.Interval, "MM", 15)
+		self.assertRaises(ValueError, robatim.Interval, "m", -11)
+		self.assertRaises(ValueError, robatim.Interval, "PP", 0)
+
 	def test_note_subtraction(self):
 
 		self.assertEqual(str(robatim.Note("A2") - robatim.Note("A3")), "P8")
@@ -220,6 +230,7 @@ class TestScore(unittest.TestCase):
 		self.assertEqual(str(robatim.Note("E4") - robatim.Note("C4")), "M3")
 		self.assertEqual(str(robatim.Note("Db4")- robatim.Note("G3")), "d5")
 		self.assertEqual(str(robatim.Note("G2") - robatim.Note("F3")), "m7")
+		self.assertEqual(str(robatim.Note("Ab4") - robatim.Note("D5")), "A4")
 
 		self.assertEqual(str(robatim.Note("Fb5") - robatim.Note("C##4")), "ddd11")
 		self.assertEqual(str(robatim.Note("D1") - robatim.Note("E#2")), "A9")
