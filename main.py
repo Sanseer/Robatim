@@ -90,6 +90,28 @@ def collapse_magnitude(amount: int) -> int:
 		return 0
 
 
+def find_slopes(sequence: List[int]) -> List[List[int]]:
+	all_slopes = []
+	current_slope = [sequence[0]]
+	current_sign = collapse_magnitude(sequence[1] - sequence[0])
+	
+	for previous_value, current_value in zip(sequence, sequence[1:]):
+		current_direction = collapse_magnitude(current_value - previous_value)
+		if current_direction in {0, current_sign}:
+			current_slope.append(current_value)
+		else:
+			if current_sign == 0:
+				current_sign = current_direction
+				current_slope.append(current_value)
+			else:
+				current_sign = current_direction
+				all_slopes.append(current_slope)
+				current_slope = [previous_value, current_value]
+
+	all_slopes.append(current_slope)
+	return all_slopes
+
+
 class Pitch(Engraver):
 	
 	def __init__(self, pitch_symbol: str) -> None:
@@ -314,6 +336,7 @@ class Duration(Engraver):
 		elif absolute_duration.numerator == 3:
 			return f"{absolute_duration.denominator // 2}." 
 
+
 class Interval:
 
 	def __init__(
@@ -511,7 +534,6 @@ class Note(Pitch, Duration):
 			)
 
 		return current_interval
-
 
 	def change_pitch_letter(self, old_note_obj, letter_increment: int) -> Note:
 		if letter_increment == 0:
@@ -923,6 +945,25 @@ class Phrase(Engraver):
 
 			if (attempted_degree not in special_degree_set and 
 			  not special_degree_set & set(self.base_degrees)):
+				return False
+
+			temp_base_degrees = self.base_degrees[:]
+			temp_base_degrees[-1] = 0
+
+			dissonant_intervals = {"M7", "m7", "d5", "A4"}
+			temp_note_index = 0
+			slopes = find_slopes(temp_base_degrees)
+			for slope in slopes[:-1]:
+				new_note1 = self.base_melody[temp_note_index]
+				temp_note_index += (len(slope) - 1)  
+				new_note2 = self.base_melody[temp_note_index]
+				current_interval = new_note2 - new_note1
+				if str(current_interval) in dissonant_intervals:
+					return False
+
+			new_note1 = self.base_melody[temp_note_index]
+			current_interval = self.starting_note - new_note1
+			if str(current_interval) in dissonant_intervals:
 				return False
 
 		return True

@@ -225,6 +225,23 @@ class TestScore(unittest.TestCase):
 		self.assertEqual(str(robatim.Note("D1") - robatim.Note("E#2")), "A9")
 		self.assertEqual(str(robatim.Note("B3") - robatim.Note("F#6")), "P19")
 
+	def test_slope_finder(self):
+		 self.assertEqual(
+		 	robatim.find_slopes([0, 1, 2, 1, 0]), [[0, 1, 2], [2, 1, 0]]
+		 )
+		 self.assertEqual(
+		 	robatim.find_slopes([-1, 2, 3, 4, 1, 0, 2, 5]),
+		 	[[-1, 2, 3, 4], [4, 1, 0], [0, 2, 5]]
+		 )
+		 self.assertEqual(
+		 	robatim.find_slopes([4, 4, 3, 3, 2, 2, 0]),
+		 	[[4, 4, 3, 3, 2, 2, 0]]
+		 )
+		 self.assertEqual(
+		 	robatim.find_slopes([4, 2, 2, 0, 1, -1, 0, 0]),
+		 	[[4, 2, 2, 0], [0, 1], [1, -1], [-1, 0, 0]]
+		 )
+
 
 if __name__ == "__main__":
 	unittest.main() 
