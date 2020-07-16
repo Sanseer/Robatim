@@ -209,15 +209,10 @@ class Scale(Engraver):
 		"ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", 
 		"locrian",
 	)
-	special_degrees = {
-		"ionian": 0, "dorian": 5, "phrygian": 1, "lydian": 3, "mixolydian": 6, 
-		"aeolian": 2, "locrian": 4,
-	}
 
 	def __init__(self, tonic: str = "C", mode: str = "ionian") -> None:
 
 		self.mode = mode
-		self.special_degree = self.special_degrees[mode]
 		tonic_pitch_obj = Pitch(tonic)
 		tonic_pitch_letter = tonic_pitch_obj.pitch_letter
 		current_midi_num = 0
@@ -709,6 +704,7 @@ class Phrase(Engraver):
 		self.starting_note = None
 		self.embellish_rhythms = []
 		self.has_rest_ending = False
+		self.theme_type = None
 
 	def imprint_progression(self) -> None:
 		progression = random.choice(self.progressions)
@@ -805,6 +801,10 @@ class Phrase(Engraver):
 
 		note_index = 0
 		current_note_options = base_melody_note_options[note_index]
+		self.theme_type = random.choice(
+			("early_sentence", "late_sentence", "bounce")
+		)  
+		print(f"Theme type: {self.theme_type}")
 
 		while True:
 			if current_note_options: 
@@ -814,8 +814,7 @@ class Phrase(Engraver):
 					starting_note, attempted_note
 				)
 
-				if self.test_melody_note(
-				  note_index, attempted_note, attempted_scale_degree):
+				if self.test_melody_note(note_index, attempted_scale_degree):
 					self.base_melody[note_index] = attempted_note
 					self.base_degrees[note_index] = attempted_scale_degree
 					note_index += 1
@@ -835,6 +834,7 @@ class Phrase(Engraver):
 					reference_note_options[note_index][:]
 				)
 				if note_index == 0:
+					print("Failed base melody.")
 					yield False
 					
 				note_index -= 1
@@ -842,45 +842,30 @@ class Phrase(Engraver):
 				self.base_melody[note_index] = None
 				self.base_degrees[note_index] = None
 
-	def test_melody_note(
-	  self, note_index: int, attempted_note: Note, attempted_degree: int) -> bool:
+	def test_melody_note(self, note_index: int, attempted_degree: int) -> bool:
 
-		if not -2 <= attempted_degree <= 9:
+		if not -2 <= attempted_degree <= 7:
 			return False
 		if note_index == 0:
-			if attempted_degree not in {0, 2, 4}:
+			if attempted_degree not in {0, 2, 4, 7}:
 				return False
-		if (1 <= note_index <= 2 and 
-		  abs(attempted_degree - self.base_degrees[0]) > 2):
-			return False 
+		if note_index >= 1:
+			current_leap = attempted_degree - self.base_degrees[note_index - 1]
+			if abs(current_leap) > 4:
+				return False 
 
 		if note_index >= 2:
+			previous_leap = self.base_degrees[note_index - 1] - self.base_degrees[note_index - 2]
 			if (self.base_degrees[note_index - 2] == 
 			  self.base_degrees[note_index - 1] == attempted_degree):
 				return False
-			current_leap = attempted_degree - self.base_degrees[note_index - 1]
-			previous_leap = self.base_degrees[note_index - 1] - self.base_degrees[note_index - 2]
-			if abs(current_leap) > 4:
-				return False 
 			elif (abs(previous_leap) > 2 and 
 			  collapse_magnitude(previous_leap) == collapse_magnitude(current_leap)):
 				return False
-			elif abs(previous_leap) == 4 and abs(current_leap) != 1:
-				return False
-			elif abs(previous_leap) == 3 and not 1 <= abs(current_leap) <= 2:
+			elif 3 <= abs(previous_leap) <= 4 and not 1 <= abs(current_leap) <= 2:
 				return False
 			if attempted_degree != 0 and self.base_degrees.count(attempted_degree) > 3:
 				return False
-
-		if note_index == 3:
-			motif_diff = self.base_degrees[1] - self.base_degrees[0]
-			if current_leap != motif_diff:
-				return False
-			if attempted_degree < 0:
-				return False
-			for current_degree in self.base_degrees[:note_index]:
-				if current_degree < 0:
-					return False
 
 		if note_index >= 3:
 			used_motifs = set()
@@ -894,31 +879,61 @@ class Phrase(Engraver):
 					return False
 				elif new_motif != (0, 0): 
 					used_motifs.add(new_motif)
-		if note_index == 4:
-			if attempted_degree in {self.base_degrees[0], self.base_degrees[2]}:
+
+		if (1 <= note_index <= 2 and self.theme_type == "early_sentence" and 
+		  abs(attempted_degree - self.base_degrees[0]) > 2):
+			return False
+
+		if self.theme_type == "early_sentence":
+			if note_index == 0 and attempted_degree == 7:
 				return False
-		if note_index == 5:
-			new_motif_direction = collapse_magnitude(current_leap)
-			old_motif_direction = collapse_magnitude(
-				self.base_degrees[1] - self.base_degrees[0]
-			)
-			if new_motif_direction != old_motif_direction:
+			if note_index == 3:
+				motif_diff = self.base_degrees[1] - self.base_degrees[0]
+				if current_leap != motif_diff:
+					return False
+			if (note_index == 4 and 
+			  attempted_degree in {self.base_degrees[0], self.base_degrees[2]}):
 				return False
-			if attempted_degree in {self.base_degrees[1], self.base_degrees[3]}:
+			if note_index == 5:
+				new_motif_direction = collapse_magnitude(current_leap)
+				old_motif_direction = collapse_magnitude(
+					self.base_degrees[1] - self.base_degrees[0]
+				)
+				if new_motif_direction != old_motif_direction:
+					return False
+				if attempted_degree in {self.base_degrees[1], self.base_degrees[3]}:
+					return False
+
+		if self.theme_type == "late_sentence":
+			if note_index == 1 and attempted_degree != self.base_degrees[0]:
 				return False
+			if note_index == 2 and abs(current_leap) > 2:
+				return False 
+			if note_index == 5:
+				motif_diff = self.base_degrees[3] - self.base_degrees[2]
+				if current_leap != motif_diff:
+					return False
+			if (3 <= note_index <= 4 and 
+			  not -2 <= attempted_degree - self.base_degrees[2] <= 0):
+				return False
+
+		if self.theme_type == "bounce":
+			if attempted_degree != 0 and note_index == 3:
+				return False
+			if note_index == 7:
+				temp_base_degrees = self.base_degrees
+				temp_base_degrees[-1] = 0
+
+				if max(temp_base_degrees[:4]) <= max(temp_base_degrees[4:]):
+					return False
+				if max(temp_base_degrees) != temp_base_degrees[1]:
+					return False
+
 		if note_index == 6:
 			if attempted_degree != 0 and self.time_sig_obj.symbol in {"6/8", "3/4"}:
 				return False
-			if attempted_degree != 0 and current_leap != 0:
-				motif_shift = self.base_degrees[2] - self.base_degrees[0]
-				if self.base_degrees[4] - self.base_degrees[2] != motif_shift:
-					return False
-				if attempted_degree - self.base_degrees[4] != motif_shift:
-					return False
 		if note_index == 7:
 			if attempted_degree != 0:
-				return False
-			if self.base_degrees[0] != 0 and self.base_degrees.count(0) > 2:
 				return False
 			for current_degree in self.base_degrees[6::-1]:
 				if current_degree == 0:
@@ -927,25 +942,6 @@ class Phrase(Engraver):
 					break
 				else:
 					return False
-
-			negative_degree = False
-			negative_turns = 0
-			for current_degree in self.base_degrees[6::-1]:
-				if current_degree < 0:
-					if not negative_degree:
-						negative_turns += 1
-					negative_degree = True
-				else:
-					negative_degree = False
-			if negative_turns > 2:
-				return False
-
-			special_degree = self.scale_obj.special_degree
-			special_degree_set = {special_degree, special_degree + 7, special_degree - 7}
-
-			if (attempted_degree not in special_degree_set and 
-			  not special_degree_set & set(self.base_degrees)):
-				return False
 
 			temp_base_degrees = self.base_degrees[:]
 			temp_base_degrees[-1] = 0
