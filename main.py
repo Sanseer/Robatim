@@ -930,6 +930,8 @@ class Phrase(Engraver):
 					return False
 
 		if note_index == 6:
+			if self.base_degrees[1:6].count(0) > 1:
+				return False
 			if attempted_degree != 0 and self.time_sig_obj.symbol in {"6/8", "3/4"}:
 				return False
 		if note_index == 7:
@@ -979,25 +981,22 @@ class Phrase(Engraver):
 		if self.time_sig_obj.symbol == "3/4":
 			possible_rhythms = [
 				["I1", "I2", "I1", "I2", "I1", "I2", "REST", "REST"],
-				["I1", "I2", "I1", "I2", "I3", "I2", "REST", "REST"],
-				["I1", "I2", "I1", "I2", "I1", "I4", "REST", "REST"],
-				["I1", "I2", "I1", "I2", "I3", "I4", "REST", "REST"]
+				["I1", "I2", "I3", "I4", "I3", "I4", "REST", "REST"]
 			]
 			has_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
 		else:
 			possible_rhythms = [
 				["I1", "I1", "I1", "I1", "I1", "I1", "REST", "REST"],
-				["I1", "I2", "I1", "I2", "I1", "I1", "REST", "REST"],
-				["I1", "I2", "I1", "I2", "I2", "I2", "REST", "REST"],
+				["I1", "I1", "I2", "I1", "I1", "I1", "REST", "REST"],
 				["I1", "I2", "I1", "I2", "I1", "I2", "REST", "REST"],
+				["I1", "I2", "I1", "I2", "I2", "I2", "REST", "REST"],
+				["I1", "I1", "I1", "I1", "I2", "I2", "REST", "REST"],
 			]
 			has_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
 			possible_rhythms = [
 				["I1", "I1", "I1", "I1", "I1", "I1", "I1", "REST"],
-				["I1", "I2", "I1", "I2", "I1", "I1", "I1", "REST"],
-				["I1", "I2", "I1", "I2", "I2", "I2", "I1", "REST"],
+				["I1", "I1", "I1", "I1", "I1", "I1", "I2", "REST"],
 				["I1", "I2", "I1", "I2", "I2", "I2", "I2", "REST"],
-				["I1", "I2", "I1", "I2", "I1", "I2", "I1", "REST"],
 			]
 			no_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
 
@@ -1009,7 +1008,16 @@ class Phrase(Engraver):
 
 	def realize_embellish_rhythm(
 	  self, possible_rhythms: List[List[str]]) -> List[Union[Tuple[int, ...], str]]:
-			embellish_symbols = random.choice(possible_rhythms)
+			if self.theme_type == "early_sentence":
+				while True:
+					embellish_symbols = random.choice(possible_rhythms)
+					if embellish_symbols[0] != embellish_symbols[2]:
+						continue
+					if embellish_symbols[1] != embellish_symbols[3]:
+						continue
+					break
+			else:
+				embellish_symbols = random.choice(possible_rhythms)
 			rhythm_mapping = {}
 			embellish_rhythms = []
 
@@ -1050,14 +1058,6 @@ class Phrase(Engraver):
 		reference_contour_options = copy.deepcopy(embellish_contour_options)
 		current_contour_options = embellish_contour_options[note_index]
 
-		features = {}
-		if self.embellish_rhythms[0] == self.embellish_rhythms[1]:
-			features["motif_rhythm"] = "single"
-		else:
-			features["motif_rhythm"] = "double"
-		features["repeat_ending"] = random.choice(("exact", "accelerate"))
-		print(f"Features: {features}")
-
 		while True:
 			if current_contour_options:
 				chosen_contour = random.choice(current_contour_options)
@@ -1069,7 +1069,7 @@ class Phrase(Engraver):
 					starting_note, chosen_contour
 				)
 
-				if (self.test_contour(note_index, chosen_contours, features) and 
+				if (self.test_contour(note_index, chosen_contours) and 
 				  self.test_embellishment(note_index, full_melody)):
 					note_index += 1
 					if None not in full_melody:
@@ -1124,20 +1124,11 @@ class Phrase(Engraver):
 		return realized_melody_fragment
 
 	def test_contour(
-	  self, note_index: int, chosen_contours: List[Union[Tuple[int, ...], None]], 
-	  features: Dict[str, str]) -> bool:
-		if (note_index in {2, 3} and chosen_contours[note_index] != 
-		  chosen_contours[note_index - 2]):
-			return False
-		if note_index in {4, 5} and features["motif_rhythm"] == "single":
-			if features["repeat_ending"] == "exact":
-				if chosen_contours[note_index] != chosen_contours[note_index - 2]:
-					return False
-			elif features["repeat_ending"] == "accelerate": 
-				if note_index == 5 and chosen_contours[5] != chosen_contours[4]:
-					return False
-				if chosen_contours[4] not in chosen_contours[2:4]:
-					return False
+	  self, note_index: int, chosen_contours: List[Union[Tuple[int, ...], None]]) -> bool:
+		if self.theme_type == "early_sentence":
+			if (note_index in {2, 3} and chosen_contours[note_index] != 
+			  chosen_contours[note_index - 2]):
+				return False
 		return True
 
 	def test_embellishment(
