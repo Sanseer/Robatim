@@ -703,8 +703,13 @@ class Phrase(Engraver):
 		self.base_melody = []
 		self.starting_note = None
 		self.embellish_rhythms = []
-		self.has_rest_ending = False
 		self.theme_type = None
+
+		if self.time_sig_obj.symbol in {"6/8", "3/4"}:
+			self.has_rest_ending = True
+		else:
+			self.has_rest_ending = random.choice((True, False))
+		print(f"Has rest ending? {self.has_rest_ending}")
 
 	def imprint_progression(self) -> None:
 		progression = random.choice(self.progressions)
@@ -727,7 +732,6 @@ class Phrase(Engraver):
 		if not is_embellished:
 			self.imprint_base_melody()
 			return
-		self.has_rest_ending = self.base_degrees[-2] == 0
 
 		rhythm_finder = self.choose_embellish_rhythms()
 		self.embellish_rhythms = next(rhythm_finder)
@@ -738,7 +742,6 @@ class Phrase(Engraver):
 				break
 			if not next(base_melody_finder):
 				raise ValueError
-			self.has_rest_ending = self.base_degrees[-2] == 0
 			self.embellish_rhythms = next(rhythm_finder)
 			print(f"Embellish rhythms: {self.embellish_rhythms}")
 
@@ -932,7 +935,9 @@ class Phrase(Engraver):
 		if note_index == 6:
 			if self.base_degrees[1:6].count(0) > 1:
 				return False
-			if attempted_degree != 0 and self.time_sig_obj.symbol in {"6/8", "3/4"}:
+			if attempted_degree != 0 and self.has_rest_ending:
+				return False
+			if attempted_degree == 0 and not self.has_rest_ending:
 				return False
 		if note_index == 7:
 			if attempted_degree != 0:
