@@ -90,6 +90,14 @@ def collapse_magnitude(amount: int) -> int:
 		return 0
 
 
+def collapse_sequence(nested_sequence: List[List[int]]):
+	unnested_sequence = []
+	for group in nested_sequence:
+		for item in group:
+			unnested_sequence.append(item)
+	return unnested_sequence
+
+
 def find_slopes(sequence: List[int]) -> List[List[int]]:
 	all_slopes = []
 	current_slope = [sequence[0]]
@@ -696,11 +704,14 @@ class Phrase(Engraver):
 		self.measures = []
 		self.relative_offset = relative_offset
 		self.absolute_offset = relative_offset + parent_absolute_offset
+
 		for index in range(num_measures):
 			self.measures.append(
 				Measure(index * self.beats_per_measure, self.absolute_offset)
 			)
 		self.base_melody = []
+		self.full_melody = []
+
 		self.starting_note = None
 		self.embellish_rhythms = []
 		self.theme_type = None
@@ -737,22 +748,21 @@ class Phrase(Engraver):
 		self.embellish_rhythms = next(rhythm_finder)
 		print(f"Embellish rhythms: {self.embellish_rhythms}")
 		while True:
-			full_melody = self.embellish_melody()
-			if full_melody:
+			if self.embellish_melody():
 				break
 			if not next(base_melody_finder):
 				raise ValueError
 			self.embellish_rhythms = next(rhythm_finder)
 			print(f"Embellish rhythms: {self.embellish_rhythms}")
 
-		full_melody_iter = iter(full_melody)
+		full_melody_iter = iter(self.full_melody)
 		for current_measure in self.measures:
 			for _ in self.time_sig_obj.melodic_divisions:
 				note_group = next(full_melody_iter)
 				for measure_note in note_group:
 					if isinstance(measure_note, Note):
 						current_measure.imprint_temporal_obj(measure_note)
-		rest_ending_count = full_melody.count("REST")
+		rest_ending_count = self.full_melody.count("REST")
 		self.finalize_theme(rest_ending_count)
 
 	def get_base_melody_options(self) -> List[List[Note]]:
@@ -953,23 +963,31 @@ class Phrase(Engraver):
 			temp_base_degrees = self.base_degrees[:]
 			temp_base_degrees[-1] = 0
 
-			dissonant_intervals = {"M7", "m7", "d5", "A4"}
-			temp_note_index = 0
-			slopes = find_slopes(temp_base_degrees)
-			for slope in slopes[:-1]:
-				new_note1 = self.base_melody[temp_note_index]
-				temp_note_index += (len(slope) - 1)  
-				new_note2 = self.base_melody[temp_note_index]
-				current_interval = new_note2 - new_note1
-				if str(current_interval) in dissonant_intervals:
-					return False
-
-			new_note1 = self.base_melody[temp_note_index]
-			current_interval = self.starting_note - new_note1
-			if str(current_interval) in dissonant_intervals:
+			if self.has_dissonant_interval(temp_base_degrees, self.base_melody):
 				return False
 
 		return True
+
+	def has_dissonant_interval(
+	  self, numbered_sequence: List[int], note_sequence: List[Note]) -> bool:
+
+		dissonant_intervals = {"M7", "m7", "d5", "A4"}
+		temp_note_index = 0
+		slopes = find_slopes(numbered_sequence)
+		for slope in slopes[:-1]:
+			new_note1 = note_sequence[temp_note_index]
+			temp_note_index += (len(slope) - 1)  
+			new_note2 = note_sequence[temp_note_index]
+			current_interval = new_note2 - new_note1
+			if str(current_interval) in dissonant_intervals:
+				return True
+
+		new_note1 = note_sequence[temp_note_index]
+		current_interval = self.starting_note - new_note1
+		if str(current_interval) in dissonant_intervals:
+			return True
+
+		return False
 
 	def imprint_base_melody(self):
 
@@ -1044,19 +1062,19 @@ class Phrase(Engraver):
 
 	def embellish_melody(self):
 		embellish_contour_options = []
-		full_melody = []
+		self.full_melody = []
 		chosen_contours = []
 
 		for note_index, embellish_rhythm in enumerate(self.embellish_rhythms):
 			if embellish_rhythm == "REST":
-				full_melody.append("REST")
+				self.full_melody.append("REST")
 			else:
-				full_melody.append(None)
+				self.full_melody.append(None)
 				chosen_contours.append(None)
 				possible_contours = self.create_contour_options(note_index, embellish_rhythm)
 				if not possible_contours:
 					print("Embellishment not possible.")
-					return []
+					return False
 				embellish_contour_options.append(possible_contours)
 
 		note_index = 0
@@ -1070,18 +1088,19 @@ class Phrase(Engraver):
 				chosen_contours[note_index] = chosen_contour
 
 				starting_note = self.base_melody[note_index]
-				full_melody[note_index] = self.realize_melody_contour(
+				self.full_melody[note_index] = self.realize_melody_contour(
 					starting_note, chosen_contour
 				)
 
 				if (self.test_contour(note_index, chosen_contours) and 
-				  self.test_embellishment(note_index, full_melody)):
+				  self.test_embellishment(note_index)):
 					note_index += 1
-					if None not in full_melody:
-						return self.add_embellish_durations(full_melody)
+					if None not in self.full_melody:
+						self.add_embellish_durations()
+						return True
 					current_contour_options = embellish_contour_options[note_index]
 				else:
-					full_melody[note_index] = None
+					self.full_melody[note_index] = None
 					chosen_contours[note_index] = None
 			else:
 				embellish_contour_options[note_index] = (
@@ -1089,10 +1108,10 @@ class Phrase(Engraver):
 				)
 				if note_index == 0:
 					print("Embellishment failed.")
-					return []
+					return False
 				note_index -= 1
 				current_contour_options = embellish_contour_options[note_index]
-				full_melody[note_index] = None
+				self.full_melody[note_index] = None
 				chosen_contours[note_index] = None
 
 	def create_contour_options(
@@ -1136,15 +1155,14 @@ class Phrase(Engraver):
 				return False
 		return True
 
-	def test_embellishment(
-	  self, note_index: int, full_melody: List[Union[List[Note], str, None]]) -> bool:
+	def test_embellishment(self, note_index: int) -> bool:
 		if note_index >= 2 and note_index % 2 == 0:
-			last_previous_note = full_melody[note_index - 1][-1]
-			current_first_note = full_melody[note_index][0]
+			last_previous_note = self.full_melody[note_index - 1][-1]
+			current_first_note = self.full_melody[note_index][0]
 			bar_leap = current_first_note.midi_num - last_previous_note.midi_num
 			if abs(bar_leap >= 3): 
 				leap_direction = collapse_magnitude(bar_leap)
-				for current_note in full_melody[note_index]:
+				for current_note in self.full_melody[note_index]:
 					resolve_leap = current_note.midi_num - current_first_note.midi_num  
 					if resolve_leap != 0:
 						resolve_direction = collapse_magnitude(resolve_leap)
@@ -1156,18 +1174,30 @@ class Phrase(Engraver):
 							return False 
 						break
 
-		if note_index in {5, 6} and full_melody[note_index][-1] == self.starting_note:
-			if self.has_rest_ending and note_index == 5:
+		if self.has_rest_ending and note_index == 5:
+			temp_melody = collapse_sequence(self.full_melody[:note_index])
+			temp_melody.append(self.starting_note)
+			temp_midi_nums = [new_note.midi_num for new_note in temp_melody]
+			if self.full_melody[note_index][-1] == self.starting_note:
 				return False
-			if not self.has_rest_ending and note_index == 6:
+			if self.has_dissonant_interval(temp_midi_nums, temp_melody):
 				return False
+
+		if not self.has_rest_ending and note_index == 6:
+			temp_melody = collapse_sequence(self.full_melody[:note_index])
+			temp_melody.append(self.starting_note)
+			temp_midi_nums = [new_note.midi_num for new_note in temp_melody]
+			if self.full_melody[note_index][-1] == self.starting_note:
+				return False
+			if self.has_dissonant_interval(temp_midi_nums, temp_melody):
+				return False
+
 		return True
 
-	def add_embellish_durations(
-	  self, unspaced_melody: List[Union[List[Note], str]]) -> List[Union[List[Note], str]]:
+	def add_embellish_durations(self) -> List[Union[List[Note], str]]:
 		finalized_melody = []
 		melodic_divisions_iter = itertools.cycle(self.time_sig_obj.melodic_divisions)
-		for note_group, embellish_rhythm in zip(unspaced_melody, self.embellish_rhythms):
+		for note_group, embellish_rhythm in zip(self.full_melody, self.embellish_rhythms):
 			measure_fraction = next(melodic_divisions_iter)
 			if note_group == "REST":
 				finalized_melody.append("REST")
@@ -1181,7 +1211,7 @@ class Phrase(Engraver):
 				finalized_melody[-1].append(Note(str(current_note), finalized_duration))
 
 		print(f"Finalized melody: {finalized_melody}")
-		return finalized_melody
+		self.full_melody = finalized_melody
 
 	def finalize_theme(self, rest_ending_count: int) -> None:
 		rest_ending_symbols = self.time_sig_obj.rest_ending[rest_ending_count]
@@ -1194,7 +1224,7 @@ class Phrase(Engraver):
 				self.measures[-1].imprint_temporal_obj(Note(starting_note_str, duration))
 
 
-class MiniPeriod(Phrase): 
+class MiniTheme(Phrase): 
 
 	def __init__(
 	  self, relative_offset: Union[int, Fraction],
@@ -1240,7 +1270,7 @@ class Score(Engraver):
 		print(f"{tonic_pitch} {mode_choice} in {chosen_time_sig}")
 		Engraver.time_sig_obj = TimeSignature(chosen_time_sig)
 		self.tempo = random.choice(self.time_sig_obj.tempo_range)
-		new_phrase = MiniPeriod(0, 0)
+		new_phrase = MiniTheme(0, 0)
 		new_phrase.add_melody(is_embellished)
 		self.phrases.append(new_phrase)
 
