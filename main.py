@@ -251,22 +251,6 @@ class Scale(Engraver):
 			old_pitch_obj = new_pitch_obj
 			scale_index = (scale_index + 1) % 7
 
-	def create_chord_pitches(self, chosen_roman_numeral: str, is_triad: bool) -> List[Pitch]:
-
-		root_index = self.roman_numerals.index(chosen_roman_numeral)
-		chord_pitches = [self.scale_pitches_seq[root_index]]
-
-		if is_triad:
-			chordal_items = 3
-		else:
-			chordal_items = 4
-		pitch_index = root_index
-		for _ in range(chordal_items - 1):
-			pitch_index = (pitch_index + 2) % 7 
-			chord_pitches.append(self.scale_pitches_seq[pitch_index])
-
-		return chord_pitches
-
 	def is_note_diatonic(self, midi_num: int) -> bool:
 		base_midi_num = midi_num % 12
 		return base_midi_num in self.scale_pitches_dict.values()
@@ -293,6 +277,15 @@ class Chord(Engraver):
 		"7": 0, "7/5/3": 0, "6/5": 1, "6/5/3": 1, "4/3": 2, "6/4/3": 2, 
 		"6/4/2": 3, "4/2": 3, "2": 3,
 	}
+	triad_intervals = {
+		"MAJ": ("M3", "P5"), "MIN": ("m3", "P5"), "AUG": ("M3", "A5"),
+		"DIM": ("m3", "d5"),
+	}
+	seventh_chord_intervals = {
+		"MAJ": ("M3", "P5", "M7"), "MAJ-MIN": ("M3", "P5", "m7"), 
+		"MIN": ("m3", "P5", "m7"), "HALF-DIM": ("m3", "d5", "m7"),
+		"DIM": ("m3", "d5", "d7"), 
+	}
 
 	def __init__(
 	  self, chord_symbol: str, duration: Union[int, Fraction], 
@@ -301,29 +294,45 @@ class Chord(Engraver):
 		self.duration = duration
 		self.relative_offset = relative_offset
 		self.absolute_offset = relative_offset + parent_absolute_offset
-		self.pitches = []
 
-		if "V" in chord_symbol or "I" in chord_symbol:
-			for num in range(3, 0, -1):
-				attempted_roman_numeral = chord_symbol[:num]
-				if attempted_roman_numeral in self.roman_numerals:
-					bass_figure = chord_symbol[num:]
-					break
-			else:
-				raise ValueError
+		roman_symbol, chord_quality = chord_symbol.split("_")
+		for accidental_index, character in enumerate(roman_symbol):
+			if character not in {"#", "b"}:
+				break
+		else:
+			raise ValueError
 
-			if bass_figure in self.triads_figured_bass:
-				self.inversion_position = self.triads_figured_bass[bass_figure]
-				is_triad = True
-			elif bass_figure in self.sevenths_figured_bass:
-				self.inversion_position = self.sevenths_figured_bass[bass_figure]
-				is_triad = False
-			else:
-				raise ValueError
+		accidental_symbol = roman_symbol[0:accidental_index]
+		roman_symbol = roman_symbol[accidental_index:]
+		for num in range(3, 0, -1):
+			roman_numeral = roman_symbol[:num]
+			if roman_numeral in self.roman_numerals:
+				bass_figure = roman_symbol[num:]
+				break
+		else:
+			raise ValueError
 
-			self.pitches = self.scale_obj.create_chord_pitches(
-				attempted_roman_numeral, is_triad
-			)
+		scale_degree = self.roman_numerals.index(roman_numeral)
+		tonic_pitch = self.scale_obj.scale_pitches_seq[0]
+		reference_scale = Scale(str(tonic_pitch), "ionian")
+		root_pitch = reference_scale.scale_pitches_seq[scale_degree]
+		accidental_amount = Pitch.accidental_symbol_to_amount(accidental_symbol)
+		root_pitch = root_pitch.change_pitch_accidental(accidental_amount)
+
+		if bass_figure in self.triads_figured_bass:
+			self.inversion_position = self.triads_figured_bass[bass_figure]
+			chosen_intervals = self.triad_intervals[chord_quality]
+		elif bass_figure in self.sevenths_figured_bass:
+			self.inversion_position = self.sevenths_figured_bass[bass_figure]
+			chosen_intervals = self.seventh_chord_intervals[chord_quality]
+		else:
+			raise ValueError
+
+		self.pitches = [root_pitch]
+		for interval_symbol in chosen_intervals:
+			new_interval = Interval.create_from_symbol(interval_symbol)
+			new_pitch = chordal_members[0] + new_interval
+			self.pitches.append(new_pitch)
 
 
 class Duration(Engraver):
@@ -1349,27 +1358,31 @@ class Score(Engraver):
 		self.phrases = []
 		self.tempo = None 
 
-	def choose_random_tonic(self) -> str:
-		tonic_letter = random.choice(self.note_letters)
+	@classmethod
+	def choose_random_tonic(cls) -> str:
+		tonic_letter = random.choice(cls.note_letters)
 		accidental_symbol = random.choice(("#", "", "b"))
 		return tonic_letter + accidental_symbol
 
-	def create_tonal_theme(self) -> None:
-		tonic_pitch = self.choose_random_tonic()
+	def create_tonal_theme(self, is_embellished: bool = True) -> None:
+		Engraver.style = "tonal"
 		mode_choice = random.choice(("major", "minor"))
+		tonic_pitch = self.choose_random_tonic()
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
-		new_phrase = MiniTheme(0, 0)
-		new_phrase.add_melody()
-		self.phrases.append(new_phrase)
+		print(f"{tonic_pitch} {mode_choice}")
+		self.setup_theme(is_embellished)
 
 	def create_modal_theme(self, is_embellished: bool = True) -> None:
 		Engraver.style = "modal"
-		tonic_pitch = self.choose_random_tonic()
 		mode_choice = random.choice(Scale.mode_wheel)
-
+		tonic_pitch = self.choose_random_tonic()
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
+		print(f"{tonic_pitch} {mode_choice}")
+		self.setup_theme(is_embellished)
+
+	def setup_theme(self, is_embellished: bool) -> None:
 		chosen_time_sig = random.choice(("6/8", "3/4", "4/4", "2/2"))
-		print(f"{tonic_pitch} {mode_choice} in {chosen_time_sig}")
+		print(f"Time sig = {chosen_time_sig}")
 		Engraver.time_sig_obj = TimeSignature(chosen_time_sig)
 		self.tempo = random.choice(self.time_sig_obj.tempo_range)
 		new_phrase = MiniTheme(0, 0)
