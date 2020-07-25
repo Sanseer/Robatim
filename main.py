@@ -1,9 +1,8 @@
 from __future__ import annotations
 # allows use of an annotation before function definition (Python 3.7+)
-import collections
 import copy
 import random
-from typing import Dict, List, Tuple, Union
+from typing import List, Tuple, Union, NamedTuple, Callable
 from fractions import Fraction
 import itertools
 
@@ -221,6 +220,11 @@ class Scale(Engraver):
 	def __init__(self, tonic: str = "C", mode: str = "ionian") -> None:
 
 		self.mode = mode
+		special_degrees = {
+			"ionian": 0, "dorian": 5, "phrygian": 1, "lydian": 3, "mixolydian": 6,
+			"aeolian": 2, "locrian": 4,
+		}
+		self.special_degree = special_degrees[mode]
 		tonic_pitch_obj = Pitch(tonic)
 		tonic_pitch_letter = tonic_pitch_obj.pitch_letter
 		current_midi_num = 0
@@ -634,47 +638,119 @@ class Measure(Engraver):
 				Rest(chosen_obj.duration, current_offset, self.absolute_offset)
 			)
 
-ChordRule = collections.namedtuple("ChordRule", ["function", "parameters"])
 
-class Progression:
+class ChordRule(NamedTuple):
+	function: Callable[..., bool]
+	parameters: Tuple
 
-	all_chords = {
-		"TONIC": ("I", "I6"), 
-		"PREDOMINANT": ("VI", "IV6", "IV", "II6", "II"),
-		"DOMINANT": ("I64", "V42", "V43", "VII6", "V65", "V6", "V"),
+	@staticmethod
+	def is_start_chord(progression_obj, chord_index, verdict):
+		if chord_index != 0:
+			return True
+		return verdict
+
+	@staticmethod
+	def is_end_chord(progression_obj, chord_index, verdict):
+		if chord_index != progression_obj.length - 1:
+			return True
+		return verdict
+
+	@staticmethod
+	def can_succeed(progression_obj, chord_index, predecessors):
+		if chord_index == 0:
+			return True
+		return progression_obj.chord_symbols[chord_index - 1] in predecessors
+
+class Progression(Engraver):
+
+	chord_rules = {
+		"I_MAJ": (
+			ChordRule(ChordRule.is_start_chord, (True,)),
+			ChordRule(ChordRule.is_end_chord, (True,)),
+			ChordRule(ChordRule.can_succeed, ({"V6_MAJ", "VII6_DIM"},))
+		), "I6_MAJ": (
+			ChordRule(ChordRule.is_start_chord, (False,)),
+			ChordRule(ChordRule.is_end_chord, (False,)),
+			ChordRule(ChordRule.can_succeed, ({"VII6_DIM", "IV6_MIN"},))
+		), "V_MAJ": (
+			ChordRule(
+				ChordRule.can_succeed, 
+				({"IV6_MAJ", "IV6_MIN", "II6_MIN", "II6_DIM"},)
+			),
+		), "V6_MAJ": (
+			ChordRule(
+				ChordRule.can_succeed, 
+				({"I_MAJ", "I6_MAJ", "I_MIN", "I6_MIN"},)
+			),
+		), "VII6_DIM": (
+			ChordRule(
+				ChordRule.can_succeed, 
+				({"I_MAJ", "I6_MAJ", "I_MIN", "I6_MIN"},)
+			),
+		), "IV6_MIN": (
+			ChordRule(ChordRule.can_succeed, ({"I_MAJ"},)),
+		), "II6_MIN": (
+			ChordRule(ChordRule.can_succeed, ({"I_MAJ"},)),
+		), "I_MIN": (
+			ChordRule(ChordRule.is_start_chord, (True,)),
+			ChordRule(ChordRule.is_end_chord, (True,)),
+			ChordRule(ChordRule.can_succeed, ({"V6_MAJ", "VII6_DIM"},))
+		), "I6_MIN": (
+			ChordRule(ChordRule.is_start_chord, (False,)),
+			ChordRule(ChordRule.is_end_chord, (False,)),
+			ChordRule(ChordRule.can_succeed, ({"VII6_DIM", "IV6_MAJ"},))
+		), "IV6_MAJ": (
+			ChordRule(ChordRule.can_succeed, ({"I_MIN"},)),
+		), "II6_DIM": (
+			ChordRule(ChordRule.can_succeed, ({"I_MIN"},)),
+		),
 	}
-
-	chord_rules = {}
 	
 	def __init__(self, *args: Tuple[ChordType, ...]) -> None:
 		self.chord_types = args
+		self.length = len(self.chord_types)
+		self.chord_symbols = []
 
 	def realize(self) -> List[Chord, ...]:
 
+		if self.scale_obj.mode == "major":
+			all_chords = {
+				"TONIC": ("I_MAJ", "I6_MAJ"), 
+				"PREDOMINANT": ("IV6_MIN", "II6_MIN"),
+				"DOMINANT": ("V6_MAJ", "VII6_DIM", "V_MAJ"),
+			}
+		elif self.scale_obj.mode == "minor":
+			all_chords = {
+				"TONIC": ("I_MIN", "I6_MIN"),
+				"PREDOMINANT": ("IV6_MAJ", "II6_DIM"),
+				"DOMINANT": ("V6_MAJ", "VII6_DIM", "V_MAJ"),
+			}
+
 		reference_chord_combos = []
-		chosen_chords = []
 		remaining_chord_combos = []
 		for chord_type in self.chord_types:
-			possible_chords = list(self.all_chords[chord_type.function])
+			possible_chords = list(all_chords[chord_type.function])
 			reference_chord_combos.append(possible_chords)
-			chosen_chords.append(None)
+			self.chord_symbols.append(None)
 			remaining_chord_combos.append(None)
 
 		chord_index = 0
 		remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
-		while None in chosen_chords:
+		while None in self.chord_symbols:
 			if remaining_chord_combos[chord_index]:
 				chosen_chord = random.choice(remaining_chord_combos[chord_index])
 				remaining_chord_combos[chord_index].remove(chosen_chord)
 
 				is_chord_valid = True
 				for rule_obj in self.chord_rules[chosen_chord]:
-					is_chord_rule_valid = rule_obj.function(*rule_obj.parameters)
+					is_chord_rule_valid = rule_obj.function(
+						self, chord_index, *rule_obj.parameters
+					)
 					if not is_chord_rule_valid:
 						is_chord_valid = False
 						break
 				else:
-					chosen_chords[chord_index] = chosen_chord
+					self.chord_symbols[chord_index] = chosen_chord
 					chord_index += 1
 					try:
 						remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
@@ -686,14 +762,13 @@ class Progression:
 				if chord_index == 0:
 					raise IndexError
 				chord_index -= 1
-				chosen_chords[chord_index] = None
+				self.chord_symbols[chord_index] = None
 
 		final_chords = []
-		for chord_symbol, chord_type in zip(chosen_chords, self.chord_types):
+		for chord_symbol, chord_type in zip(self.chord_symbols, self.chord_types):
 			final_chords.append(Chord(chord_symbol, chord_type.duration))
 		return final_chords
 
-ChordType = collections.namedtuple("ChordType", ["function", "duration"])
 
 class Phrase(Engraver):
 
@@ -1132,9 +1207,12 @@ class Phrase(Engraver):
 		current_scale_degree = self.base_degrees[note_index]
 		next_scale_degree = self.base_degrees[note_index + 1]
 		leap_distance = next_scale_degree - current_scale_degree
-		for melodic_idea in all_contour_options[leap_distance]:
-			if len(melodic_idea) == embellish_length:
-				possible_contours.append(melodic_idea)
+		try: 
+			for melodic_idea in all_contour_options[leap_distance]:
+				if len(melodic_idea) == embellish_length:
+					possible_contours.append(melodic_idea)
+		except KeyError:
+			print(f"Interval of {leap_distance} not possible")
 
 		return possible_contours
 
@@ -1175,22 +1253,29 @@ class Phrase(Engraver):
 						break
 
 		if self.has_rest_ending and note_index == 5:
-			temp_melody = collapse_sequence(self.full_melody[:note_index])
-			temp_melody.append(self.starting_note)
-			temp_midi_nums = [new_note.midi_num for new_note in temp_melody]
-			if self.full_melody[note_index][-1] == self.starting_note:
-				return False
-			if self.has_dissonant_interval(temp_midi_nums, temp_melody):
-				return False
-
+			return self.has_proper_notes(note_index)
 		if not self.has_rest_ending and note_index == 6:
-			temp_melody = collapse_sequence(self.full_melody[:note_index])
-			temp_melody.append(self.starting_note)
-			temp_midi_nums = [new_note.midi_num for new_note in temp_melody]
-			if self.full_melody[note_index][-1] == self.starting_note:
-				return False
-			if self.has_dissonant_interval(temp_midi_nums, temp_melody):
-				return False
+			return self.has_proper_notes(note_index)
+
+		return True
+
+	def has_proper_notes(self, note_index) -> bool:
+
+		if self.full_melody[note_index][-1] == self.starting_note:
+			return False
+
+		temp_melody = collapse_sequence(self.full_melody[:note_index])
+		temp_melody.append(self.starting_note)
+		temp_midi_nums = [new_note.midi_num for new_note in temp_melody]
+		if self.has_dissonant_interval(temp_midi_nums, temp_melody):
+			return False
+
+		all_degrees_set = {
+			self.scale_obj.get_absolute_degree(current_note)
+			for current_note in temp_melody
+		}
+		if self.scale_obj.special_degree not in all_degrees_set:
+			return False 
 
 		return True
 
@@ -1224,21 +1309,38 @@ class Phrase(Engraver):
 				self.measures[-1].imprint_temporal_obj(Note(starting_note_str, duration))
 
 
+class ChordType(NamedTuple):
+	function: str
+	duration: int
+
+
 class MiniTheme(Phrase): 
 
 	def __init__(
 	  self, relative_offset: Union[int, Fraction],
 	  parent_absolute_offset: Union[int, Fraction], 
 	  num_measures: int = 4) -> None:
-		super().__init__(relative_offset, parent_absolute_offset, num_measures)
-		self.progressions = (
-			Progression( # e.g., I II6 V I
+		super().__init__(relative_offset, parent_absolute_offset, num_measures) 
+		self.progressions = [
+			Progression(
 				ChordType("TONIC", self.beats_per_measure), 
 				ChordType("PREDOMINANT", self.beats_per_measure),
 				ChordType("DOMINANT", self.beats_per_measure), 
 				ChordType("TONIC", self.beats_per_measure),
 			),
-		)
+		]
+		half_measure_duration = self.beats_per_measure // 2
+		if self.time_sig_obj.symbol != "3/4":
+			other_progressions = (
+				Progression(
+					ChordType("TONIC", self.beats_per_measure),
+					ChordType("DOMINANT", self.beats_per_measure),
+					ChordType("TONIC", half_measure_duration),
+					ChordType("DOMINANT", half_measure_duration),
+					ChordType("TONIC", self.beats_per_measure)
+				), 
+			)
+			self.progressions.extend(other_progressions)
 
 
 class Score(Engraver):
@@ -1256,7 +1358,7 @@ class Score(Engraver):
 		tonic_pitch = self.choose_random_tonic()
 		mode_choice = random.choice(("major", "minor"))
 		Engraver.scale_obj = Scale(tonic_pitch, mode_choice)
-		new_phrase = MiniPeriod(0, 0)
+		new_phrase = MiniTheme(0, 0)
 		new_phrase.add_melody()
 		self.phrases.append(new_phrase)
 
