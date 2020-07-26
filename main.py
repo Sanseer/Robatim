@@ -159,24 +159,18 @@ class Pitch(Engraver):
 
 	def shift(self, letter_increment: int, pitch_increment: int) -> Pitch:
 
-		# object parameter in both functions for consistency
-		# outward-facing methods pass pitch objects implicitly
-		# inward-facing methods pass pitch objects explicitly
-		interim_obj = self.change_pitch_letter(self, letter_increment)
-		final_obj = self.change_pitch_accidental(
-			interim_obj, pitch_increment
-		)
-		return final_obj
+		interim_obj = self.change_pitch_letter(letter_increment)
+		return interim_obj.change_pitch_accidental(pitch_increment)
 
-	def change_pitch_letter(self, old_pitch_obj: Pitch, letter_increment: int) -> Pitch:
+	def change_pitch_letter(self, letter_increment: int) -> Pitch:
 
 		if letter_increment == 0:
-			return old_pitch_obj
+			return self
 
 		letter_direction = collapse_magnitude(letter_increment)
 		half_step_letters = {"B", "C", "E", "F"}
-		new_accidental_amount = old_pitch_obj.accidental_amount
-		old_pitch_letter = old_pitch_obj.pitch_letter
+		new_accidental_amount = self.accidental_amount
+		old_pitch_letter = self.pitch_letter
 		old_letter_index = self.note_letters.index(old_pitch_letter)
 
 		for _ in range(abs(letter_increment)):
@@ -193,11 +187,11 @@ class Pitch(Engraver):
 		new_accidental_symbol = Pitch.accidental_amount_to_symbol(new_accidental_amount)
 		return Pitch(new_pitch_letter + new_accidental_symbol)
 
-	def change_pitch_accidental(self, old_pitch_obj: Pitch, pitch_increment: int) -> Pitch:
+	def change_pitch_accidental(self, pitch_increment: int) -> Pitch:
 
-		new_accidental_amount = old_pitch_obj.accidental_amount + pitch_increment
+		new_accidental_amount = self.accidental_amount + pitch_increment
 		new_accidental_symbol = Pitch.accidental_amount_to_symbol(new_accidental_amount)
-		return Pitch(old_pitch_obj.pitch_letter + new_accidental_symbol)
+		return Pitch(self.pitch_letter + new_accidental_symbol)
 
 	def get_lily_format(self) -> str:
 		letter_mark = self.pitch_letter.lower()
@@ -441,9 +435,7 @@ class Chord(Engraver):
 		reference_scale = Scale(str(tonic_pitch))
 		root_pitch = reference_scale.scale_pitches_seq[scale_degree]
 		accidental_amount = Pitch.accidental_symbol_to_amount(accidental_symbol)
-		root_pitch = root_pitch.change_pitch_accidental(
-			root_pitch, accidental_amount
-		)
+		root_pitch = root_pitch.change_pitch_accidental(accidental_amount)
 
 		if bass_figure in self.triads_figured_bass:
 			self.inversion_position = self.triads_figured_bass[bass_figure]
@@ -562,13 +554,13 @@ class Note(Pitch, Duration):
 		generic_interval = 0
 		while current_note.octave_number != self.octave_number:
 			current_note = current_note.change_pitch_letter(
-				current_note, letter_direction
+				letter_direction
 			)
 			generic_interval += letter_direction
 
 		while current_note.pitch_letter != self.pitch_letter:
 			current_note = current_note.change_pitch_letter(
-				current_note, letter_direction
+				letter_direction
 			) 
 			generic_interval += letter_direction
 
@@ -611,7 +603,7 @@ class Note(Pitch, Duration):
 
 		while self.pitch_symbol != str(current_pitch):
 			current_pitch = current_pitch.change_pitch_accidental(
-				current_pitch, accidental_direction
+				accidental_direction
 			)
 			current_interval = current_interval.shift_interval_quality(
 				interval_direction
@@ -619,12 +611,12 @@ class Note(Pitch, Duration):
 
 		return current_interval
 
-	def change_pitch_letter(self, old_note_obj, letter_increment: int) -> Note:
+	def change_pitch_letter(self, letter_increment: int) -> Note:
 		if letter_increment == 0:
-			return old_note_obj
-		old_pitch_obj = Pitch(old_note_obj.pitch_symbol)
-		new_pitch_obj = super().change_pitch_letter(
-			old_pitch_obj, letter_increment
+			return self
+		old_pitch_obj = Pitch(self.pitch_symbol)
+		new_pitch_obj = old_pitch_obj.change_pitch_letter(
+			letter_increment
 		)
 
 		pitch_letter = old_pitch_obj.pitch_letter
@@ -636,7 +628,7 @@ class Note(Pitch, Duration):
 			change_letter = "C"
 			letter_direction = 1
 
-		new_octave_number = old_note_obj.octave_number
+		new_octave_number = self.octave_number
 		for _ in range(abs(letter_increment)):
 			letter_index = (letter_index + letter_direction) % 7 
 			pitch_letter = self.note_letters[letter_index]
@@ -645,12 +637,12 @@ class Note(Pitch, Duration):
 
 		return Note(f"{new_pitch_obj}{new_octave_number}")
 
-	def change_pitch_accidental(self, old_note_obj, pitch_increment: int) -> Note:
-		old_pitch_obj = Pitch(old_note_obj.pitch_symbol)
-		new_pitch_obj = super().change_pitch_accidental(
-			old_pitch_obj, pitch_increment
+	def change_pitch_accidental(self, pitch_increment: int) -> Note:
+		old_pitch_obj = Pitch(self.pitch_symbol)
+		new_pitch_obj = old_pitch_obj.change_pitch_accidental(
+			pitch_increment
 		)
-		return Note(f"{new_pitch_obj}{old_note_obj.octave_number}")
+		return Note(f"{new_pitch_obj}{self.octave_number}")
 
 	def scalar_shift(self, scale_increment: int) -> None:
 		for scale_index, pitch_obj in enumerate(self.scale_obj.scale_pitches_seq):
@@ -659,9 +651,9 @@ class Note(Pitch, Duration):
 		final_index = (scale_index + scale_increment) % 7
 
 		final_pitch_obj = self.scale_obj.scale_pitches_seq[final_index]
-		interim_obj = self.change_pitch_letter(self, scale_increment)
+		interim_obj = self.change_pitch_letter(scale_increment)
 		accidental_diff = final_pitch_obj.accidental_amount - interim_obj.accidental_amount
-		return self.change_pitch_accidental(interim_obj, accidental_diff)
+		return interim_obj.change_pitch_accidental(accidental_diff)
 
 	def get_lily_format(self) -> str:
 		if self.octave_number > 3:

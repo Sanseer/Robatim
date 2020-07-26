@@ -26,66 +26,66 @@ class TestScore(unittest.TestCase):
 	def test_pitch_letter_change(self):
 
 		new_pitch = robatim.Pitch("C")
-		self.assertEqual(str(new_pitch.change_pitch_letter(new_pitch, -1)), "B#")
+		self.assertEqual(str(new_pitch.change_pitch_letter(-1)), "B#")
 		new_pitch = robatim.Pitch("B##")
-		self.assertEqual(str(new_pitch.change_pitch_letter(new_pitch, 0)), "B##")
+		self.assertEqual(str(new_pitch.change_pitch_letter(0)), "B##")
 		new_pitch = robatim.Pitch("E#")
-		self.assertEqual(str(new_pitch.change_pitch_letter(new_pitch, 1)), "F")
+		self.assertEqual(str(new_pitch.change_pitch_letter(1)), "F")
 
 		new_pitch = robatim.Pitch("Fbb")
-		self.assertEqual(str(new_pitch.change_pitch_letter(new_pitch, -1)), "Eb")
+		self.assertEqual(str(new_pitch.change_pitch_letter(-1)), "Eb")
 		new_pitch = robatim.Pitch("G#")
-		self.assertEqual(str(new_pitch.change_pitch_letter(new_pitch, 1)), "Ab")
+		self.assertEqual(str(new_pitch.change_pitch_letter(1)), "Ab")
 		new_pitch = robatim.Pitch("Db")
-		self.assertEqual(str(new_pitch.change_pitch_letter(new_pitch, -1)), "C#")
+		self.assertEqual(str(new_pitch.change_pitch_letter(-1)), "C#")
 
 		new_pitch = robatim.Pitch("A#")
-		self.assertEqual(str(new_pitch.change_pitch_letter(new_pitch, 2)), "Cbb")
+		self.assertEqual(str(new_pitch.change_pitch_letter(2)), "Cbb")
 		new_pitch = robatim.Pitch("Fb")
-		self.assertEqual(str(new_pitch.change_pitch_letter(new_pitch, -3)), "C####")
+		self.assertEqual(str(new_pitch.change_pitch_letter(-3)), "C####")
 
 	def test_note_letter_change(self):
 
 		new_note = robatim.Note("C4")
-		self.assertEqual(str(new_note.change_pitch_letter(new_note, -1)), "B#3")
+		self.assertEqual(str(new_note.change_pitch_letter(-1)), "B#3")
 		new_note = robatim.Note("B##2")
-		self.assertEqual(str(new_note.change_pitch_letter(new_note, 0)), "B##2")
+		self.assertEqual(str(new_note.change_pitch_letter(0)), "B##2")
 		new_note = robatim.Note("E#5")
-		self.assertEqual(str(new_note.change_pitch_letter(new_note, 1)), "F5")
+		self.assertEqual(str(new_note.change_pitch_letter(1)), "F5")
 
 		new_note = robatim.Note("Fbb3")
-		self.assertEqual(str(new_note.change_pitch_letter(new_note, -1)), "Eb3")
+		self.assertEqual(str(new_note.change_pitch_letter(-1)), "Eb3")
 		new_note = robatim.Note("G#0")
-		self.assertEqual(str(new_note.change_pitch_letter(new_note, 1)), "Ab0")
+		self.assertEqual(str(new_note.change_pitch_letter(1)), "Ab0")
 		new_note = robatim.Note("Db4")
-		self.assertEqual(str(new_note.change_pitch_letter(new_note, -1)), "C#4")
+		self.assertEqual(str(new_note.change_pitch_letter(-1)), "C#4")
 
 		new_note = robatim.Note("A#6")
-		self.assertEqual(str(new_note.change_pitch_letter(new_note, 2)), "Cbb7")
+		self.assertEqual(str(new_note.change_pitch_letter(2)), "Cbb7")
 		new_note = robatim.Note("Fb5")
-		self.assertEqual(str(new_note.change_pitch_letter(new_note, -3)), "C####5")
+		self.assertEqual(str(new_note.change_pitch_letter(-3)), "C####5")
 
 	def test_pitch_accidental_change(self):
 
 		new_pitch = robatim.Pitch("D#")
-		self.assertEqual(str(new_pitch.change_pitch_accidental(new_pitch, -2)), "Db")
+		self.assertEqual(str(new_pitch.change_pitch_accidental(-2)), "Db")
 		new_pitch = robatim.Pitch("A")
-		self.assertEqual(str(new_pitch.change_pitch_accidental(new_pitch, 0)), "A")
+		self.assertEqual(str(new_pitch.change_pitch_accidental(0)), "A")
 		new_pitch = robatim.Pitch("Fb")
-		self.assertEqual(str(new_pitch.change_pitch_accidental(new_pitch, 3)), "F##")
+		self.assertEqual(str(new_pitch.change_pitch_accidental(3)), "F##")
 		new_pitch = robatim.Pitch("B#")
-		self.assertEqual(str(new_pitch.change_pitch_accidental(new_pitch, -1)), "B")
+		self.assertEqual(str(new_pitch.change_pitch_accidental(-1)), "B")
 
 	def test_note_accidental_change(self):
 
 		new_note = robatim.Note("D#4")
-		self.assertEqual(str(new_note.change_pitch_accidental(new_note, -2)), "Db4")
+		self.assertEqual(str(new_note.change_pitch_accidental(-2)), "Db4")
 		new_note = robatim.Note("A0")
-		self.assertEqual(str(new_note.change_pitch_accidental(new_note, 0)), "A0")
+		self.assertEqual(str(new_note.change_pitch_accidental(0)), "A0")
 		new_note = robatim.Note("Fb5")
-		self.assertEqual(str(new_note.change_pitch_accidental(new_note, 3)), "F##5")
+		self.assertEqual(str(new_note.change_pitch_accidental(3)), "F##5")
 		new_note = robatim.Note("B#3")
-		self.assertEqual(str(new_note.change_pitch_accidental(new_note, -1)), "B3")	
+		self.assertEqual(str(new_note.change_pitch_accidental(-1)), "B3")	
 
 	def test_pitch_shift(self):
 
@@ -200,13 +200,13 @@ class TestScore(unittest.TestCase):
 		altered_interval = new_interval.shift_interval_quality(-1)
 		self.assertEqual(str(altered_interval), "M7")
 
-		new_interval = robatim.Interval("A", 4)
+		new_interval = robatim.Interval.create_from_symbol("A5")
 		altered_interval = new_interval.shift_interval_quality(-2)
 		self.assertEqual(str(altered_interval), "d5")
-		new_interval = robatim.Interval("dd", 3)
+		new_interval = robatim.Interval.create_from_symbol("dd4")
 		altered_interval = new_interval.shift_interval_quality(-1)
 		self.assertEqual(str(altered_interval), "ddd4")
-		new_interval = robatim.Interval("M", 2)
+		new_interval = robatim.Interval.create_from_symbol("M3")
 		altered_interval = new_interval.shift_interval_quality(2)
 		self.assertEqual(str(altered_interval), "AA3")
 
