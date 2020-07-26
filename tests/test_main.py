@@ -220,6 +220,56 @@ class TestScore(unittest.TestCase):
 		self.assertRaises(ValueError, robatim.Interval, "m", -11)
 		self.assertRaises(ValueError, robatim.Interval, "PP", 0)
 
+		self.assertRaises(
+			ValueError, robatim.Interval.create_from_symbol, "dd1"
+		)
+		self.assertRaises(
+			ValueError, robatim.Interval.create_from_symbol, "M4",
+			False
+		)
+		self.assertRaises(
+			ValueError, robatim.Interval.create_from_symbol, "P6"
+		)
+		self.assertRaises(
+			ValueError, robatim.Interval.create_from_symbol, "m8"
+		)
+
+		self.assertRaises(
+			ValueError, robatim.Interval.create_from_symbol, "PP10",
+			True 
+		)
+		self.assertRaises(
+			ValueError, robatim.Interval.create_from_symbol, "APA12" 
+		)
+		self.assertRaises(
+			ValueError, robatim.Interval.create_from_symbol,"dddd3"
+		)
+		self.assertRaises(
+			ValueError, robatim.Interval.create_from_symbol, "dd2",
+			False
+		)
+
+	def test_interval_amount(self):
+		
+		new_interval = robatim.Interval.create_from_symbol("M2", False)
+		self.assertEqual(new_interval.midi_distance, -2)
+		new_interval = robatim.Interval.create_from_symbol("dd3")
+		self.assertEqual(new_interval.midi_distance, 1)
+		new_interval = robatim.Interval.create_from_symbol("P5")
+		self.assertEqual(new_interval.midi_distance, 7)
+		new_interval =robatim.Interval.create_from_symbol("A1")
+		self.assertEqual(new_interval.midi_distance, 1)
+
+		new_interval = robatim.Interval.create_from_symbol("P1")
+		self.assertEqual(new_interval.midi_distance, 0)
+		new_interval = robatim.Interval.create_from_symbol("d9", True)
+		self.assertEqual(new_interval.midi_distance, 12)
+		new_interval = robatim.Interval.create_from_symbol("A11", False)
+		self.assertEqual(new_interval.midi_distance, -18)
+		new_interval = robatim.Interval.create_from_symbol("M6")
+		self.assertEqual(new_interval.midi_distance, 9)
+
+
 	def test_note_subtraction(self):
 
 		self.assertEqual(str(robatim.Note("A2") - robatim.Note("A3")), "P8")
