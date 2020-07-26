@@ -89,7 +89,7 @@ def collapse_magnitude(amount: int) -> int:
 		return 0
 
 
-def collapse_sequence(nested_sequence: List[List[int]]):
+def collapse_sequence(nested_sequence: List[List[int]]) -> List[int]:
 	unnested_sequence = []
 	for group in nested_sequence:
 		for item in group:
@@ -270,6 +270,130 @@ class Scale(Engraver):
 		return attempted_degree + (octave_amount * 7)
 
 
+class Interval:
+
+	def __init__(
+	  self, interval_quality: str, generic_interval: int) -> None:
+		self.interval_quality = interval_quality
+		self.generic_interval = generic_interval
+
+		# unison should be zero for symmetry with negative intervals
+		if self.generic_interval == 0:
+			self.possible_qualities = ["P", "A"]
+		elif self.generic_interval % 7 in {0, 3, 4,}:
+			self.possible_qualities = ["d", "P", "A"]
+		elif self.generic_interval % 7 in {1, 2, 5, 6}:
+			self.possible_qualities = ["d", "m", "M", "A"]
+		if not self.validate_interval_quality():
+			raise ValueError
+
+		self.midi_distance = self.get_midi_distance()
+
+	def validate_interval_quality(self) -> None:
+		if self.interval_quality[0] not in self.possible_qualities:
+			return False
+		if len(self.interval_quality) > 1:
+			if "d" in self.interval_quality:
+				chosen_character = "d"
+			elif "A" in self.interval_quality:
+				chosen_character = "A"
+			else:
+				return False
+
+			if chosen_character * len(self.interval_quality) != self.interval_quality:
+				return False
+		return True
+
+	def get_midi_distance(self) -> int:
+
+		if self.generic_interval >= 0:
+			interval_direction = 1
+		elif self.generic_interval < 0:
+			interval_direction = -1
+
+		simple_generic_interval = self.generic_interval
+		while not -6 <= simple_generic_interval <= 6:
+			simple_generic_interval += (7 * interval_direction * -1)
+		if simple_generic_interval in {0, 3, 4, -3, -4}:
+			current_interval_quality = "P"
+		else:
+			if self.generic_interval > 0:
+				current_interval_quality = "M"
+			elif self.generic_interval < 0:
+				current_interval_quality = "m"
+
+		reference_scale = Scale()
+		final_scale_pitch = reference_scale.scale_pitches_seq[simple_generic_interval]
+		reference_midi_num = reference_scale.scale_pitches_dict[final_scale_pitch]
+		midi_distance = reference_midi_num * interval_direction % 12
+		midi_distance *= interval_direction
+
+		current_generic_interval = simple_generic_interval
+		while current_generic_interval != self.generic_interval:
+			midi_distance += (interval_direction * 12)
+			current_generic_interval += (interval_direction * 7)
+
+		starting_quality_num = self.get_quality_num(current_interval_quality)
+		ending_quality_num = self.get_quality_num(self.interval_quality)
+		if starting_quality_num == ending_quality_num:
+			return midi_distance
+
+		interval_increment = ending_quality_num - starting_quality_num
+		midi_distance += (interval_increment * interval_direction)
+		if midi_distance < 0 and self.generic_interval > 0:
+			raise ValueError
+		if midi_distance > 0 and self.generic_interval < 0:
+			raise ValueError
+		return midi_distance
+
+	def __repr__(self):
+		return f"{self.interval_quality}{abs(self.generic_interval) + 1}"
+
+	def shift_interval_quality(self, increment: int) -> Interval:
+
+		quality_num = self.get_quality_num(self.interval_quality)
+		quality_num += increment
+		quality_span = len(self.possible_qualities)
+
+		if 0 <= quality_num < quality_span:
+			new_interval_quality = self.possible_qualities[quality_num] 
+		elif quality_num < 0:
+			new_interval_quality = "d" * abs(quality_num - 1) 
+		elif quality_num >= quality_span:
+			new_interval_quality = "A" * (quality_num - quality_span + 2)
+
+		return Interval(new_interval_quality, self.generic_interval)
+
+	def get_quality_num(self, interval_quality: str) -> int: 
+		quality_span = len(self.possible_qualities)
+
+		if interval_quality in self.possible_qualities:
+			quality_num = self.possible_qualities.index(interval_quality)
+		elif "d" in interval_quality:
+			quality_num = (interval_quality.count("d") * -1) + 1
+		elif "A" in interval_quality:
+			quality_num = quality_span + interval_quality.count("A") - 2
+
+		return quality_num
+
+	@staticmethod
+	def create_from_symbol(
+	  interval_symbol: str, is_rising: bool = True) -> Interval:
+		# use positive/negative sign on str instead of bool
+
+		for symbol_index, character in enumerate(interval_symbol):
+			if character.isdigit():
+				break
+		else:
+			raise ValueError
+
+		interval_quality = interval_symbol[:symbol_index]
+		generic_interval = int(interval_symbol[symbol_index:]) - 1
+		if not is_rising:
+			generic_interval *= -1
+		return Interval(interval_quality, generic_interval) 
+
+
 class Chord(Engraver):
 
 	triads_figured_bass = {"": 0, "5/3": 0, "6": 1, "6/3": 1, "6/4": 2}
@@ -314,10 +438,12 @@ class Chord(Engraver):
 
 		scale_degree = self.roman_numerals.index(roman_numeral)
 		tonic_pitch = self.scale_obj.scale_pitches_seq[0]
-		reference_scale = Scale(str(tonic_pitch), "ionian")
+		reference_scale = Scale(str(tonic_pitch))
 		root_pitch = reference_scale.scale_pitches_seq[scale_degree]
 		accidental_amount = Pitch.accidental_symbol_to_amount(accidental_symbol)
-		root_pitch = root_pitch.change_pitch_accidental(accidental_amount)
+		root_pitch = root_pitch.change_pitch_accidental(
+			root_pitch, accidental_amount
+		)
 
 		if bass_figure in self.triads_figured_bass:
 			self.inversion_position = self.triads_figured_bass[bass_figure]
@@ -331,7 +457,7 @@ class Chord(Engraver):
 		self.pitches = [root_pitch]
 		for interval_symbol in chosen_intervals:
 			new_interval = Interval.create_from_symbol(interval_symbol)
-			new_pitch = chordal_members[0] + new_interval
+			new_pitch = self.pitches[0] + new_interval
 			self.pitches.append(new_pitch)
 
 
@@ -351,65 +477,6 @@ class Duration(Engraver):
 			return f"{absolute_duration.denominator}"
 		elif absolute_duration.numerator == 3:
 			return f"{absolute_duration.denominator // 2}." 
-
-
-class Interval:
-
-	def __init__(
-	  self, interval_quality: str, generic_interval: int) -> None:
-		self.interval_quality = interval_quality
-		self.generic_interval = generic_interval
-
-		# unison should be zero for symmetry with negative intervals
-		if self.generic_interval == 0:
-			self.possible_qualities = ["P", "A"]
-		elif self.generic_interval % 7 in {0, 3, 4,}:
-			self.possible_qualities = ["d", "P", "A"]
-		elif self.generic_interval % 7 in {1, 2, 5, 6}:
-			self.possible_qualities = ["d", "m", "M", "A"]
-		if not self.validate_interval_quality():
-			raise ValueError
-
-	def validate_interval_quality(self) -> None:
-		if self.interval_quality[0] not in self.possible_qualities:
-			return False
-		if len(self.interval_quality) == 1:
-			if self.interval_quality not in {"d", "m", "M", "P", "A"}:
-				return False
-		else:
-			if "d" in self.interval_quality:
-				chosen_character = "d"
-			elif "A" in self.interval_quality:
-				chosen_character = "A"
-			else:
-				return False
-
-			if chosen_character * len(self.interval_quality) != self.interval_quality:
-				return False
-		return True
-
-	def __repr__(self):
-		return f"{self.interval_quality}{abs(self.generic_interval) + 1}"
-
-	def shift_interval_quality(self, increment) -> Interval:
-		quality_span = len(self.possible_qualities)
-
-		if self.interval_quality in self.possible_qualities:
-			quality_num = self.possible_qualities.index(self.interval_quality)
-		elif "d" in self.interval_quality:
-			quality_num = (self.interval_quality.count("d") * -1) + 1
-		elif "A" in self.interval_quality:
-			quality_num = quality_span + self.interval_quality.count("A") - 2
-
-		quality_num += increment
-		if 0 <= quality_num < quality_span:
-			new_interval_quality = self.possible_qualities[quality_num] 
-		elif quality_num < 0:
-			new_interval_quality = "d" * abs(quality_num - 1) 
-		elif quality_num >= quality_span:
-			new_interval_quality = "A" * (quality_num - quality_span + 2)
-
-		return Interval(new_interval_quality, self.generic_interval)
 
 
 class Note(Pitch, Duration):
@@ -505,17 +572,18 @@ class Note(Pitch, Duration):
 			) 
 			generic_interval += letter_direction
 
+
 		""" In a major scale, intervals from the tonic up to another
 		scale degree are major or perfect and intervals from the tonic
 		down to another scale degree are minor or perfect"""
-		guide_scale = Scale(starting_note.pitch_symbol, "ionian")
+		guide_scale = Scale(starting_note.pitch_symbol)
 		guide_scale_pitches = guide_scale.scale_pitches_seq
 
 		current_pitch = guide_scale_pitches[0]
 		scale_index = 0
 
 		while current_pitch.pitch_letter != self.pitch_letter:
-			scale_index = (scale_index + letter_direction) %  7
+			scale_index = (scale_index + letter_direction) % 7
 			current_pitch = guide_scale_pitches[scale_index]
 
 		if scale_index in {0, 3, 4}:
