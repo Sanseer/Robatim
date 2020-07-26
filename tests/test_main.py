@@ -161,16 +161,22 @@ class TestScore(unittest.TestCase):
 			self.assertEqual(chord_pitch_names, pitch_str_sequence)
 
 		robatim.Engraver.scale_obj = robatim.Scale("Bb", "ionian")
-		check_chord("I", ["Bb", "D", "F"])
-		check_chord("V7", ["F", "A", "C", "Eb"])
-		check_chord("II6", ["C", "Eb", "G"])
-		check_chord("VI", ["G", "Bb", "D"])
+		check_chord("I_MAJ", ["Bb", "D", "F"])
+		check_chord("V7_MAJ-MIN", ["F", "A", "C", "Eb"])
+		check_chord("II6_DIM", ["C", "Eb", "Gb"])
+		check_chord("VI_MIN", ["G", "Bb", "D"])
 
 		robatim.Engraver.scale_obj = robatim.Scale("F#", "aeolian")
-		check_chord("I", ["F#", "A", "C#"])
-		check_chord("IV6/5", ["B", "D", "F#", "A"])
-		check_chord("VII", ["E", "G#", "B"])
-		check_chord("I6/4", ["F#", "A", "C#"])
+		check_chord("I_MIN", ["F#", "A", "C#"])
+		check_chord("IV6/5_MIN", ["B", "D", "F#", "A"])
+		check_chord("bVII_MAJ", ["E", "G#", "B"])
+		check_chord("I6/4_MIN", ["F#", "A", "C#"])
+
+		robatim.Engraver.scale_obj = robatim.Scale()
+		check_chord("I7_MAJ", ["C", "E", "G", "B"])
+		check_chord("#IV6_DIM", ["F#", "A", "C"])
+		check_chord("bIII_AUG", ["Eb", "G", "B"])
+		check_chord("VII7_HALF-DIM", ["B", "D", "F", "A"])
 
 	def test_scalar_shift(self):
 
@@ -250,7 +256,7 @@ class TestScore(unittest.TestCase):
 		)
 
 	def test_interval_amount(self):
-		
+
 		new_interval = robatim.Interval.create_from_symbol("M2", False)
 		self.assertEqual(new_interval.midi_distance, -2)
 		new_interval = robatim.Interval.create_from_symbol("dd3")
@@ -269,7 +275,6 @@ class TestScore(unittest.TestCase):
 		new_interval = robatim.Interval.create_from_symbol("M6")
 		self.assertEqual(new_interval.midi_distance, 9)
 
-
 	def test_note_subtraction(self):
 
 		self.assertEqual(str(robatim.Note("A2") - robatim.Note("A3")), "P8")
@@ -285,6 +290,33 @@ class TestScore(unittest.TestCase):
 		self.assertEqual(str(robatim.Note("Fb5") - robatim.Note("C##4")), "ddd11")
 		self.assertEqual(str(robatim.Note("D1") - robatim.Note("E#2")), "A9")
 		self.assertEqual(str(robatim.Note("B3") - robatim.Note("F#6")), "P19")
+
+	def test_interval_addition(self):
+		
+		new_interval = robatim.Interval.create_from_symbol("P8", False)
+		self.assertEqual(str(robatim.Note("A3") +  new_interval), "A2")
+		new_interval = robatim.Interval.create_from_symbol("P1")
+		self.assertEqual(str(robatim.Note("Fbb1") + new_interval), "Fbb1")
+		new_interval = robatim.Interval.create_from_symbol("A1", False)
+		self.assertEqual(str(robatim.Note("B#5") + new_interval), "B5")
+		new_interval = robatim.Interval.create_from_symbol("AA1")
+		self.assertEqual(str(robatim.Note("Gb5") + new_interval), "G#5")
+
+		new_interval = robatim.Interval.create_from_symbol("M3")
+		self.assertEqual(str(robatim.Note("C4") + new_interval), "E4")
+		new_interval = robatim.Interval.create_from_symbol("d5")
+		self.assertEqual(str(robatim.Note("G3") + new_interval), "Db4")
+		new_interval = robatim.Interval.create_from_symbol("m7", False)
+		self.assertEqual(str(robatim.Note("F3") + new_interval), "G2")
+		new_interval = robatim.Interval.create_from_symbol("A4", False)
+		self.assertEqual(str(robatim.Note("D5") + new_interval), "Ab4")
+
+		new_interval = robatim.Interval.create_from_symbol("ddd11")
+		self.assertEqual(str(robatim.Note("C##4") + new_interval), "Fb5")
+		new_interval = robatim.Interval.create_from_symbol("A9", False)
+		self.assertEqual(str(robatim.Note("E#2") + new_interval), "D1")
+		new_interval = robatim.Interval.create_from_symbol("P19", False)
+		self.assertEqual(str(robatim.Note("F#6") + new_interval), "B3")
 
 	def test_slope_finder(self):
 		 self.assertEqual(

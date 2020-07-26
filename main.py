@@ -132,6 +132,10 @@ class Pitch(Engraver):
 	def __repr__(self) -> str:
 		return self.pitch_letter + self.accidental_symbol 
 
+	def __add__(self, interval_obj: Interval) -> Note:
+		interim_obj = self.change_pitch_letter(interval_obj.generic_interval)
+		return interim_obj.change_pitch_accidental(interval_obj.midi_distance)
+
 	@staticmethod
 	def accidental_symbol_to_amount(accidental_symbol: str) -> int:
 
@@ -267,9 +271,13 @@ class Scale(Engraver):
 class Interval:
 
 	def __init__(
-	  self, interval_quality: str, generic_interval: int) -> None:
+	  self, interval_quality: str, generic_interval: int, 
+	  interval_direction: int = 1) -> None:
 		self.interval_quality = interval_quality
-		self.generic_interval = generic_interval
+		self.generic_interval = abs(generic_interval) * interval_direction
+		if interval_direction not in {1, -1}:
+			raise ValueError
+		self.interval_direction = interval_direction
 
 		# unison should be zero for symmetry with negative intervals
 		if self.generic_interval == 0:
@@ -300,14 +308,9 @@ class Interval:
 
 	def get_midi_distance(self) -> int:
 
-		if self.generic_interval >= 0:
-			interval_direction = 1
-		elif self.generic_interval < 0:
-			interval_direction = -1
-
 		simple_generic_interval = self.generic_interval
 		while not -6 <= simple_generic_interval <= 6:
-			simple_generic_interval += (7 * interval_direction * -1)
+			simple_generic_interval += (7 * self.interval_direction * -1)
 		if simple_generic_interval in {0, 3, 4, -3, -4}:
 			current_interval_quality = "P"
 		else:
@@ -319,13 +322,13 @@ class Interval:
 		reference_scale = Scale()
 		final_scale_pitch = reference_scale.scale_pitches_seq[simple_generic_interval]
 		reference_midi_num = reference_scale.scale_pitches_dict[final_scale_pitch]
-		midi_distance = reference_midi_num * interval_direction % 12
-		midi_distance *= interval_direction
+		midi_distance = reference_midi_num * self.interval_direction % 12
+		midi_distance *= self.interval_direction
 
 		current_generic_interval = simple_generic_interval
 		while current_generic_interval != self.generic_interval:
-			midi_distance += (interval_direction * 12)
-			current_generic_interval += (interval_direction * 7)
+			midi_distance += (self.interval_direction * 12)
+			current_generic_interval += (self.interval_direction * 7)
 
 		starting_quality_num = self.get_quality_num(current_interval_quality)
 		ending_quality_num = self.get_quality_num(self.interval_quality)
@@ -333,7 +336,7 @@ class Interval:
 			return midi_distance
 
 		interval_increment = ending_quality_num - starting_quality_num
-		midi_distance += (interval_increment * interval_direction)
+		midi_distance += (interval_increment * self.interval_direction)
 		if midi_distance < 0 and self.generic_interval > 0:
 			raise ValueError
 		if midi_distance > 0 and self.generic_interval < 0:
@@ -383,9 +386,11 @@ class Interval:
 
 		interval_quality = interval_symbol[:symbol_index]
 		generic_interval = int(interval_symbol[symbol_index:]) - 1
-		if not is_rising:
-			generic_interval *= -1
-		return Interval(interval_quality, generic_interval) 
+		if is_rising:
+			interval_direction = 1
+		else:
+			interval_direction = -1
+		return Interval(interval_quality, generic_interval, interval_direction) 
 
 
 class Chord(Engraver):
@@ -650,10 +655,10 @@ class Note(Pitch, Duration):
 				break
 		final_index = (scale_index + scale_increment) % 7
 
-		final_pitch_obj = self.scale_obj.scale_pitches_seq[final_index]
-		interim_obj = self.change_pitch_letter(scale_increment)
-		accidental_diff = final_pitch_obj.accidental_amount - interim_obj.accidental_amount
-		return interim_obj.change_pitch_accidental(accidental_diff)
+		final_pitch = self.scale_obj.scale_pitches_seq[final_index]
+		interim_note = self.change_pitch_letter(scale_increment)
+		accidental_diff = final_pitch.accidental_amount - interim_note.accidental_amount
+		return interim_note.change_pitch_accidental(accidental_diff)
 
 	def get_lily_format(self) -> str:
 		if self.octave_number > 3:
@@ -729,6 +734,7 @@ class ChordRule(NamedTuple):
 		if chord_index == 0:
 			return True
 		return progression_obj.chord_symbols[chord_index - 1] in predecessors
+
 
 class Progression(Engraver):
 
