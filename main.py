@@ -21,6 +21,10 @@ class Engraver:
 	def beats_per_measure(self):
 		return self.time_sig_obj.beats_per_measure
 
+	@property
+	def tonic_pitch(self):
+		return self.scale_obj.scale_pitches_seq[0]
+
 
 class TimeSignature:
 
@@ -200,7 +204,7 @@ class Pitch(Engraver):
 	def get_lily_format(self) -> str:
 		letter_mark = self.pitch_letter.lower()
 		if self.accidental_amount > 0:
-			accidental_mark = "is" * abs(self.accidental_amount)
+			accidental_mark = "is" * self.accidental_amount
 		elif self.accidental_amount < 0:
 			accidental_mark = "es" * abs(self.accidental_amount)
 		else:
@@ -215,14 +219,22 @@ class Scale(Engraver):
 		"locrian",
 	)
 
-	def __init__(self, tonic: str = "C", mode: str = "ionian") -> None:
+	def __init__(self, tonic: str = "C", input_mode: str = "ionian") -> None:
 
-		self.mode = mode
-		special_degrees = {
-			"ionian": 0, "dorian": 5, "phrygian": 1, "lydian": 3, "mixolydian": 6,
-			"aeolian": 2, "locrian": 4,
-		}
-		self.special_degree = special_degrees[mode]
+		if input_mode == "major":
+			proxy_mode = "ionian"
+			self.mode = input_mode
+		elif input_mode == "minor":
+			proxy_mode = "aeolian"
+			self.mode = input_mode
+		else:
+			self.mode = proxy_mode = input_mode
+			special_degrees = {
+				"ionian": 0, "dorian": 5, "phrygian": 1, "lydian": 3, 
+				"mixolydian": 6, "aeolian": 2, "locrian": 4,
+			}
+			self.special_degree = special_degrees[input_mode]
+
 		tonic_pitch_obj = Pitch(tonic)
 		tonic_pitch_letter = tonic_pitch_obj.pitch_letter
 		current_midi_num = 0
@@ -237,7 +249,7 @@ class Scale(Engraver):
 		old_pitch_obj = tonic_pitch_obj
 		self.scale_pitches_seq = [old_pitch_obj]
 		self.scale_pitches_dict = {old_pitch_obj: current_midi_num}
-		scale_index = self.mode_wheel.index(self.mode.lower())
+		scale_index = self.mode_wheel.index(proxy_mode.lower())
 
 		for _ in range(6):
 			current_increment = self.scale_increments[scale_index]
@@ -248,10 +260,6 @@ class Scale(Engraver):
 			self.scale_pitches_dict[new_pitch_obj] = current_midi_num 
 			old_pitch_obj = new_pitch_obj
 			scale_index = (scale_index + 1) % 7
-
-	def is_note_diatonic(self, midi_num: int) -> bool:
-		base_midi_num = midi_num % 12
-		return base_midi_num in self.scale_pitches_dict.values()
 
 	def get_absolute_degree(self, chosen_note: Note) -> int:
 		chosen_pitch_name = chosen_note.pitch_symbol
@@ -376,7 +384,6 @@ class Interval:
 	@staticmethod
 	def create_from_symbol(
 	  interval_symbol: str, is_rising: bool = True) -> Interval:
-		# use positive/negative sign on str instead of bool
 
 		for symbol_index, character in enumerate(interval_symbol):
 			if character.isdigit():
@@ -417,6 +424,7 @@ class Chord(Engraver):
 		self.duration = duration
 		self.relative_offset = relative_offset
 		self.absolute_offset = relative_offset + parent_absolute_offset
+		self.chord_symbol = chord_symbol
 
 		roman_symbol, chord_quality = chord_symbol.split("_")
 		for accidental_index, character in enumerate(roman_symbol):
@@ -435,13 +443,6 @@ class Chord(Engraver):
 		else:
 			raise ValueError
 
-		scale_degree = self.roman_numerals.index(roman_numeral)
-		tonic_pitch = self.scale_obj.scale_pitches_seq[0]
-		reference_scale = Scale(str(tonic_pitch))
-		root_pitch = reference_scale.scale_pitches_seq[scale_degree]
-		accidental_amount = Pitch.accidental_symbol_to_amount(accidental_symbol)
-		root_pitch = root_pitch.change_pitch_accidental(accidental_amount)
-
 		if bass_figure in self.triads_figured_bass:
 			self.inversion_position = self.triads_figured_bass[bass_figure]
 			chosen_intervals = self.triad_intervals[chord_quality]
@@ -450,12 +451,21 @@ class Chord(Engraver):
 			chosen_intervals = self.seventh_chord_intervals[chord_quality]
 		else:
 			raise ValueError
+			
+		scale_degree = self.roman_numerals.index(roman_numeral)
+		reference_scale = Scale(str(self.tonic_pitch))
+		root_pitch = reference_scale.scale_pitches_seq[scale_degree]
+		accidental_amount = Pitch.accidental_symbol_to_amount(accidental_symbol)
+		root_pitch = root_pitch.change_pitch_accidental(accidental_amount)
 
 		self.pitches = [root_pitch]
 		for interval_symbol in chosen_intervals:
 			new_interval = Interval.create_from_symbol(interval_symbol)
-			new_pitch = self.pitches[0] + new_interval
+			new_pitch = root_pitch + new_interval
 			self.pitches.append(new_pitch)
+
+	def __repr__(self):
+		return self.chord_symbol
 
 
 class Duration(Engraver):
@@ -468,8 +478,7 @@ class Duration(Engraver):
 		self.absolute_offset = relative_offset + parent_absolute_offset
 
 	def get_lily_duration(self) -> str:
-		beat_value = self.time_sig_obj.beat_value
-		absolute_duration = beat_value * self.duration
+		absolute_duration = self.time_sig_obj.beat_value * self.duration
 		if absolute_duration.numerator == 1:
 			return f"{absolute_duration.denominator}"
 		elif absolute_duration.numerator == 3:
@@ -478,37 +487,14 @@ class Duration(Engraver):
 
 class Note(Pitch, Duration):
 
-	def __init__(self, note_designator: Union[int, str], 
+	def __init__(self, note_symbol: str, 
 	  duration: Union[int, Fraction] = 0, 
 	  relative_offset: Union[int, Fraction] = 0, 
 	  parent_absolute_offset: Union[int, Fraction] = 0) -> None:
-		if isinstance(note_designator, str):
-			self.create_note_from_note_symbol(note_designator)
-		elif isinstance(note_designator, int):
-			self.create_note_from_midi_num(note_designator)
 		self.duration = duration
 		self.relative_offset = relative_offset
 		self.absolute_offset = relative_offset + parent_absolute_offset
 
-	def create_note_from_midi_num(self, chosen_midi_num) -> None:
-		self.midi_num = chosen_midi_num
-		base_midi_num = chosen_midi_num % 12
-
-		for pitch_obj, current_midi_num in self.scale_obj.scale_pitches_dict.items():
-			if base_midi_num == current_midi_num:
-				break
-		else:
-			raise ValueError
-		self.pitch_symbol = str(pitch_obj)
-		super().__init__(self.pitch_symbol)
-		
-		self.octave_number = (self.midi_num // 12) - 1
-		if self.pitch_letter == "B" and self.accidental_amount > 0:
-			self.octave_number -= 1
-		elif self.pitch_letter == "C" and self.accidental_amount < 0:
-			self.octave_number += 1
-
-	def create_note_from_note_symbol(self, note_symbol: str) -> None:
 		self.octave_number = int(note_symbol[-1])
 		self.pitch_symbol = note_symbol[:-1]
 		super().__init__(self.pitch_symbol)
@@ -711,6 +697,13 @@ class Measure(Engraver):
 			self.notes.append(
 				Rest(chosen_obj.duration, current_offset, self.absolute_offset)
 			)
+
+	def get_chord(self, chosen_offset) -> Chord:
+		for current_chord in self.chords:
+			if current_chord.relative_offset == chosen_offset:
+				return current_chord
+		else:
+			raise ValueError
 
 
 class ChordRule(NamedTuple):
@@ -937,12 +930,19 @@ class Phrase(Engraver):
 
 		return base_melody_note_options
 
-	def get_modal_notes(self, start: int, stop: int) -> List[Note]:
+	def get_modal_notes(self, start_midi_num: int, stop_midi_num: int) -> List[Note]:
 		possible_notes = []
-		for midi_num in range(start, stop):
-			if self.scale_obj.is_note_diatonic(midi_num):
-				possible_notes.append(Note(midi_num))
-		print(f"Possible melody notes: {possible_notes}")
+		current_octave = start_midi_num // 12
+		current_note = Note(f"{self.tonic_pitch}{current_octave}")
+
+		while current_note.midi_num >= start_midi_num:
+			current_note = current_note.scalar_shift(-1) 
+
+		current_note = current_note.scalar_shift(1)
+		while current_note.midi_num < stop_midi_num:
+			possible_notes.append(current_note)
+			current_note = current_note.scalar_shift(1)
+
 		return possible_notes
 
 	def find_base_melody(
@@ -952,7 +952,7 @@ class Phrase(Engraver):
 		self.base_melody = [None for _ in base_melody_note_options]
 		self.base_degrees = self.base_melody[:]
 
-		tonic_pitch_symbol = str(self.scale_obj.scale_pitches_seq[0])
+		tonic_pitch_symbol = str(self.tonic_pitch)
 		for current_note in reference_note_options[0]:
 			if tonic_pitch_symbol == current_note.pitch_symbol:
 				starting_note = current_note
@@ -1170,6 +1170,7 @@ class Phrase(Engraver):
 				["I1", "I1", "I1", "I1", "I1", "I1", "I1", "REST"],
 				["I1", "I1", "I1", "I1", "I1", "I1", "I2", "REST"],
 				["I1", "I2", "I1", "I2", "I2", "I2", "I2", "REST"],
+				["I1", "I2", "I1", "I2", "I1", "I2", "I2", "REST"],
 			]
 			no_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
 
@@ -1404,8 +1405,8 @@ class MiniTheme(Phrase):
 				ChordType("TONIC", self.beats_per_measure),
 			),
 		]
-		half_measure_duration = self.beats_per_measure // 2
 		if self.time_sig_obj.symbol != "3/4":
+			half_measure_duration = self.beats_per_measure // 2
 			other_progressions = (
 				Progression(
 					ChordType("TONIC", self.beats_per_measure),

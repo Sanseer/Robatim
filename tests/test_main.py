@@ -122,18 +122,11 @@ class TestScore(unittest.TestCase):
 	def test_scale_degrees(self):
 		
 		chosen_scale_obj = robatim.Engraver.scale_obj = robatim.Scale("Ab") 
-		scale_sequence = ("Ab", "Bb", "C", "Db", "Eb", "F", "G")
-
-		self.assertTrue(chosen_scale_obj.is_note_diatonic(48))
-		self.assertTrue(chosen_scale_obj.is_note_diatonic(68))
-		self.assertTrue(chosen_scale_obj.is_note_diatonic(7))
-		self.assertTrue(chosen_scale_obj.is_note_diatonic(25))
-
-		chosen_note = robatim.Note(10)
+		chosen_note = robatim.Note("Bb3")
 		self.assertEqual(chosen_scale_obj.get_absolute_degree(chosen_note), 1)
-		chosen_note = robatim.Note(41)
+		chosen_note = robatim.Note("F4")
 		self.assertEqual(chosen_scale_obj.get_absolute_degree(chosen_note), 5)
-		chosen_note = robatim.Note(87)
+		chosen_note = robatim.Note("Eb2")
 		self.assertEqual(chosen_scale_obj.get_absolute_degree(chosen_note), 4)
 
 	def test_scale_pitches(self):
