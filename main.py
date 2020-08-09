@@ -262,9 +262,9 @@ class Scale(Engraver):
 			scale_index = (scale_index + 1) % 7
 
 	def get_absolute_degree(self, chosen_note: Note) -> int:
-		chosen_pitch_name = chosen_note.pitch_symbol
+		chosen_pitch_letter = chosen_note.pitch_letter
 		for scale_degree, pitch_obj in enumerate(self.scale_pitches_seq):
-			if str(pitch_obj) == chosen_pitch_name:
+			if pitch_obj.pitch_letter == chosen_pitch_letter:
 				return scale_degree 
 
 	def get_relative_degree(self, starting_note: Note, attempted_note: Note) -> int:
@@ -398,74 +398,6 @@ class Interval:
 		else:
 			interval_direction = -1
 		return Interval(interval_quality, generic_interval, interval_direction) 
-
-
-class Chord(Engraver):
-
-	triads_figured_bass = {"": 0, "5/3": 0, "6": 1, "6/3": 1, "6/4": 2}
-	sevenths_figured_bass = {
-		"7": 0, "7/5/3": 0, "6/5": 1, "6/5/3": 1, "4/3": 2, "6/4/3": 2, 
-		"6/4/2": 3, "4/2": 3, "2": 3,
-	}
-	triad_intervals = {
-		"MAJ": ("M3", "P5"), "MIN": ("m3", "P5"), "AUG": ("M3", "A5"),
-		"DIM": ("m3", "d5"),
-	}
-	seventh_chord_intervals = {
-		"MAJ": ("M3", "P5", "M7"), "MAJ-MIN": ("M3", "P5", "m7"), 
-		"MIN": ("m3", "P5", "m7"), "HALF-DIM": ("m3", "d5", "m7"),
-		"DIM": ("m3", "d5", "d7"), 
-	}
-
-	def __init__(
-	  self, chord_symbol: str, duration: Union[int, Fraction], 
-	  relative_offset: Union[int, Fraction] = 0, 
-	  parent_absolute_offset: Union[int, Fraction] = 0) -> None:
-		self.duration = duration
-		self.relative_offset = relative_offset
-		self.absolute_offset = relative_offset + parent_absolute_offset
-		self.chord_symbol = chord_symbol
-
-		roman_symbol, chord_quality = chord_symbol.split("_")
-		for accidental_index, character in enumerate(roman_symbol):
-			if character not in {"#", "b"}:
-				break
-		else:
-			raise ValueError
-
-		accidental_symbol = roman_symbol[0:accidental_index]
-		roman_symbol = roman_symbol[accidental_index:]
-		for num in range(3, 0, -1):
-			roman_numeral = roman_symbol[:num]
-			if roman_numeral in self.roman_numerals:
-				bass_figure = roman_symbol[num:]
-				break
-		else:
-			raise ValueError
-
-		if bass_figure in self.triads_figured_bass:
-			self.inversion_position = self.triads_figured_bass[bass_figure]
-			chosen_intervals = self.triad_intervals[chord_quality]
-		elif bass_figure in self.sevenths_figured_bass:
-			self.inversion_position = self.sevenths_figured_bass[bass_figure]
-			chosen_intervals = self.seventh_chord_intervals[chord_quality]
-		else:
-			raise ValueError
-			
-		scale_degree = self.roman_numerals.index(roman_numeral)
-		reference_scale = Scale(str(self.tonic_pitch))
-		root_pitch = reference_scale.scale_pitches_seq[scale_degree]
-		accidental_amount = Pitch.accidental_symbol_to_amount(accidental_symbol)
-		root_pitch = root_pitch.change_pitch_accidental(accidental_amount)
-
-		self.pitches = [root_pitch]
-		for interval_symbol in chosen_intervals:
-			new_interval = Interval.create_from_symbol(interval_symbol)
-			new_pitch = root_pitch + new_interval
-			self.pitches.append(new_pitch)
-
-	def __repr__(self):
-		return self.chord_symbol
 
 
 class Duration(Engraver):
@@ -659,6 +591,119 @@ class Note(Pitch, Duration):
 		return f"{pitch_mark}{octave_mark}{lily_duration}"
 
 
+class ChordPitchIterator(Engraver):
+
+	def __init__(self, chord, current_octave, starting_direction):
+		self.chord_length = len(chord.pitches)
+		self.current_octave = current_octave - starting_direction
+		self.arranged_pitches = sorted(
+			chord.pitches, 
+			key=lambda pitch: self.note_letters.index(pitch.pitch_letter)
+		)
+		if starting_direction == 1:
+			self.current_index = -1
+		elif starting_direction == -1:
+			self.current_index = self.chord_length
+		else:
+			raise ValueError
+
+	def shift(self, direction, cuttoff_index):
+		self.current_index = (self.current_index + direction) % self.chord_length 
+		if self.current_index == cuttoff_index:
+			self.current_octave = self.current_octave + direction
+		new_pitch = self.arranged_pitches[self.current_index]
+		return Note(f"{new_pitch}{self.current_octave}")
+
+	def next(self):
+		return self.shift(1, 0)
+
+	def prev(self):
+		return self.shift(-1, self.chord_length - 1)
+
+
+class Chord(Engraver):
+
+	triads_figured_bass = {"": 0, "5/3": 0, "6": 1, "6/3": 1, "6/4": 2}
+	sevenths_figured_bass = {
+		"7": 0, "7/5/3": 0, "6/5": 1, "6/5/3": 1, "4/3": 2, "6/4/3": 2, 
+		"6/4/2": 3, "4/2": 3, "2": 3,
+	}
+	triad_intervals = {
+		"MAJ": ("M3", "P5"), "MIN": ("m3", "P5"), "AUG": ("M3", "A5"),
+		"DIM": ("m3", "d5"),
+	}
+	seventh_chord_intervals = {
+		"MAJ": ("M3", "P5", "M7"), "MAJ-MIN": ("M3", "P5", "m7"), 
+		"MIN": ("m3", "P5", "m7"), "HALF-DIM": ("m3", "d5", "m7"),
+		"DIM": ("m3", "d5", "d7"), 
+	}
+
+	def __init__(
+	  self, chord_symbol: str, duration: Union[int, Fraction], 
+	  relative_offset: Union[int, Fraction] = 0, 
+	  parent_absolute_offset: Union[int, Fraction] = 0) -> None:
+		self.duration = duration
+		self.relative_offset = relative_offset
+		self.absolute_offset = relative_offset + parent_absolute_offset
+		self.chord_symbol = chord_symbol
+
+		roman_symbol, chord_quality = chord_symbol.split("_")
+		for accidental_index, character in enumerate(roman_symbol):
+			if character not in {"#", "b"}:
+				break
+		else:
+			raise ValueError
+
+		accidental_symbol = roman_symbol[0:accidental_index]
+		roman_symbol = roman_symbol[accidental_index:]
+		for num in range(3, 0, -1):
+			roman_numeral = roman_symbol[:num]
+			if roman_numeral in self.roman_numerals:
+				bass_figure = roman_symbol[num:]
+				break
+		else:
+			raise ValueError
+
+		if bass_figure in self.triads_figured_bass:
+			self.inversion_position = self.triads_figured_bass[bass_figure]
+			chosen_intervals = self.triad_intervals[chord_quality]
+		elif bass_figure in self.sevenths_figured_bass:
+			self.inversion_position = self.sevenths_figured_bass[bass_figure]
+			chosen_intervals = self.seventh_chord_intervals[chord_quality]
+		else:
+			raise ValueError
+			
+		scale_degree = self.roman_numerals.index(roman_numeral)
+		reference_scale = Scale(str(self.tonic_pitch))
+		root_pitch = reference_scale.scale_pitches_seq[scale_degree]
+		accidental_amount = Pitch.accidental_symbol_to_amount(accidental_symbol)
+		root_pitch = root_pitch.change_pitch_accidental(accidental_amount)
+
+		self.pitches = [root_pitch]
+		for interval_symbol in chosen_intervals:
+			new_interval = Interval.create_from_symbol(interval_symbol)
+			new_pitch = root_pitch + new_interval
+			self.pitches.append(new_pitch)
+
+	def __repr__(self):
+		return self.chord_symbol
+
+	def get_chord_notes(self, start_midi_num, stop_midi_num) -> List[Note]:
+		starting_octave = (start_midi_num // 12) + 1
+		chord_pitch_iter = ChordPitchIterator(self, starting_octave, -1)
+		current_note = chord_pitch_iter.prev()
+		while current_note.midi_num >= start_midi_num:
+			current_note = chord_pitch_iter.prev()
+
+		chord_notes = []
+		current_note = chord_pitch_iter.next() 
+		while current_note.midi_num < stop_midi_num:
+			chord_notes.append(current_note)
+			current_note = chord_pitch_iter.next()
+
+		return chord_notes
+
+
 class Rest(Duration):
 
 	def get_lily_format(self):
@@ -699,6 +744,8 @@ class Measure(Engraver):
 			)
 
 	def get_chord(self, chosen_offset) -> Chord:
+		if len(self.chords) == 1:
+			return self.chords[0]
 		for current_chord in self.chords:
 			if current_chord.relative_offset == chosen_offset:
 				return current_chord
@@ -735,7 +782,7 @@ class Progression(Engraver):
 		"I_MAJ": (
 			ChordRule(ChordRule.is_start_chord, (True,)),
 			ChordRule(ChordRule.is_end_chord, (True,)),
-			ChordRule(ChordRule.can_succeed, ({"V6_MAJ", "VII6_DIM"},))
+			ChordRule(ChordRule.can_succeed, ({"V_MAJ", "V6_MAJ", "VII6_DIM"},))
 		), "I6_MAJ": (
 			ChordRule(ChordRule.is_start_chord, (False,)),
 			ChordRule(ChordRule.is_end_chord, (False,)),
@@ -762,7 +809,7 @@ class Progression(Engraver):
 		), "I_MIN": (
 			ChordRule(ChordRule.is_start_chord, (True,)),
 			ChordRule(ChordRule.is_end_chord, (True,)),
-			ChordRule(ChordRule.can_succeed, ({"V6_MAJ", "VII6_DIM"},))
+			ChordRule(ChordRule.can_succeed, ({"V_MAJ", "V6_MAJ", "VII6_DIM"},))
 		), "I6_MIN": (
 			ChordRule(ChordRule.is_start_chord, (False,)),
 			ChordRule(ChordRule.is_end_chord, (False,)),
@@ -778,6 +825,9 @@ class Progression(Engraver):
 		self.chord_types = args
 		self.length = len(self.chord_types)
 		self.chord_symbols = []
+
+	def __repr__(self):
+		return " | ".join(chord_type.function for chord_type in self.chord_types)
 
 	def realize(self) -> List[Chord, ...]:
 
@@ -867,7 +917,9 @@ class Phrase(Engraver):
 
 	def imprint_progression(self) -> None:
 		progression = random.choice(self.progressions)
+		print(progression)
 		chosen_progression = progression.realize()
+		print(f"Chosen progression: {chosen_progression}")
 		relative_offset = 0
 		for current_chord in chosen_progression:
 			measure_index = relative_offset // self.beats_per_measure
@@ -997,8 +1049,7 @@ class Phrase(Engraver):
 					reference_note_options[note_index][:]
 				)
 				if note_index == 0:
-					print("Failed base melody.")
-					yield False
+					raise IndexError
 					
 				note_index -= 1
 				current_note_options = base_melody_note_options[note_index]
@@ -1043,12 +1094,10 @@ class Phrase(Engraver):
 				elif new_motif != (0, 0): 
 					used_motifs.add(new_motif)
 
-		if (1 <= note_index <= 2 and self.theme_type == "early_sentence" and 
-		  abs(attempted_degree - self.base_degrees[0]) > 2):
-			return False
-
 		if self.theme_type == "early_sentence":
 			if note_index == 0 and attempted_degree == 7:
+				return False
+			if 1 <= note_index <= 2 and abs(attempted_degree - self.base_degrees[0]) > 2:
 				return False
 			if note_index == 3:
 				motif_diff = self.base_degrees[1] - self.base_degrees[0]
@@ -1141,13 +1190,24 @@ class Phrase(Engraver):
 
 	def imprint_base_melody(self):
 
-		base_melody_iter = iter(self.base_melody)
+		if self.has_rest_ending:
+			base_melody = self.base_melody[:-2]
+			rest_ending_count = 2
+		else:
+			base_melody = self.base_melody[:-1]
+			rest_ending_count = 1
+		base_melody_iter = iter(base_melody)
 		for current_measure in self.measures:
 			for measure_fraction in self.time_sig_obj.melodic_divisions:
-				current_note_symbol = str(next(base_melody_iter))
+				try:
+					current_note_symbol = str(next(base_melody_iter))
+				except StopIteration:
+					break
 				current_measure.imprint_temporal_obj(
 					Note(current_note_symbol, self.beats_per_measure * measure_fraction)
 				)
+
+		self.finalize_theme(rest_ending_count)
 
 	def choose_embellish_rhythms(self) -> None:
 
