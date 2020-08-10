@@ -1016,10 +1016,14 @@ class Phrase(Engraver):
 
 		note_index = 0
 		current_note_options = base_melody_note_options[note_index]
-		self.theme_type = random.choice(
-			("early_sentence", "late_sentence", "bounce")
-		)  
-		print(f"Theme type: {self.theme_type}")
+		if self.style == "modal":
+			self.theme_type = random.choice(
+				("early_sentence", "late_sentence", "bounce")
+			)  
+			print(f"Theme type: {self.theme_type}")
+			test_base_melody_note = self.test_base_modal_note
+		elif self.style == "tonal":
+			test_base_melody_note = self.test_base_tonal_note
 
 		while True:
 			if current_note_options: 
@@ -1029,7 +1033,7 @@ class Phrase(Engraver):
 					starting_note, attempted_note
 				)
 
-				if self.test_melody_note(note_index, attempted_scale_degree):
+				if test_base_melody_note(note_index, attempted_scale_degree):
 					self.base_melody[note_index] = attempted_note
 					self.base_degrees[note_index] = attempted_scale_degree
 					note_index += 1
@@ -1056,7 +1060,7 @@ class Phrase(Engraver):
 				self.base_melody[note_index] = None
 				self.base_degrees[note_index] = None
 
-	def test_melody_note(self, note_index: int, attempted_degree: int) -> bool:
+	def test_melody_basics(self, note_index: int, attempted_degree: int) -> bool:
 
 		if not -2 <= attempted_degree <= 7:
 			return False
@@ -1093,53 +1097,6 @@ class Phrase(Engraver):
 					return False
 				elif new_motif != (0, 0): 
 					used_motifs.add(new_motif)
-
-		if self.theme_type == "early_sentence":
-			if note_index == 0 and attempted_degree == 7:
-				return False
-			if 1 <= note_index <= 2 and abs(attempted_degree - self.base_degrees[0]) > 2:
-				return False
-			if note_index == 3:
-				motif_diff = self.base_degrees[1] - self.base_degrees[0]
-				if current_leap != motif_diff:
-					return False
-			if (note_index == 4 and 
-			  attempted_degree in {self.base_degrees[0], self.base_degrees[2]}):
-				return False
-			if note_index == 5:
-				new_motif_direction = collapse_magnitude(current_leap)
-				old_motif_direction = collapse_magnitude(
-					self.base_degrees[1] - self.base_degrees[0]
-				)
-				if new_motif_direction != old_motif_direction:
-					return False
-				if attempted_degree in {self.base_degrees[1], self.base_degrees[3]}:
-					return False
-
-		if self.theme_type == "late_sentence":
-			if note_index == 1 and attempted_degree != self.base_degrees[0]:
-				return False
-			if note_index == 2 and abs(current_leap) > 2:
-				return False 
-			if note_index == 5:
-				motif_diff = self.base_degrees[3] - self.base_degrees[2]
-				if current_leap != motif_diff:
-					return False
-			if (3 <= note_index <= 4 and 
-			  not -2 <= attempted_degree - self.base_degrees[2] <= 0):
-				return False
-
-		if self.theme_type == "bounce":
-			if attempted_degree != 0 and note_index == 3:
-				return False
-			if note_index == 7:
-				temp_base_degrees = self.base_degrees
-				temp_base_degrees[-1] = 0
-
-				if max(temp_base_degrees[:4]) <= max(temp_base_degrees[4:]):
-					return False
-				if max(temp_base_degrees) != temp_base_degrees[1]:
-					return False
 
 		if note_index == 6:
 			if self.base_degrees[1:6].count(0) > 1:
@@ -1187,6 +1144,133 @@ class Phrase(Engraver):
 			return True
 
 		return False
+
+	def test_base_modal_note(self, note_index: int, attempted_degree: int) -> bool:
+
+		if not self.test_melody_basics(note_index, attempted_degree):
+			return False
+
+		if note_index >= 1:
+			current_leap = attempted_degree - self.base_degrees[note_index - 1]
+		if self.theme_type == "early_sentence":
+			if note_index == 0 and attempted_degree == 7:
+				return False
+			if 1 <= note_index <= 2 and abs(attempted_degree - self.base_degrees[0]) > 2:
+				return False
+			if note_index == 3:
+				motif_diff = self.base_degrees[1] - self.base_degrees[0]
+				if current_leap != motif_diff:
+					return False
+			if (note_index == 4 and 
+			  attempted_degree in {self.base_degrees[0], self.base_degrees[2]}):
+				return False
+			if note_index == 5:
+				new_motif_direction = collapse_magnitude(current_leap)
+				old_motif_direction = collapse_magnitude(
+					self.base_degrees[1] - self.base_degrees[0]
+				)
+				if new_motif_direction != old_motif_direction:
+					return False
+				if attempted_degree in {self.base_degrees[1], self.base_degrees[3]}:
+					return False
+
+		if self.theme_type == "late_sentence":
+			if note_index == 1 and attempted_degree != self.base_degrees[0]:
+				return False
+			if note_index == 2 and abs(current_leap) > 2:
+				return False 
+			if note_index == 5:
+				motif_diff = self.base_degrees[3] - self.base_degrees[2]
+				if current_leap != motif_diff:
+					return False
+			if (3 <= note_index <= 4 and 
+			  not -2 <= attempted_degree - self.base_degrees[2] <= 0):
+				return False
+
+		if self.theme_type == "bounce":
+			if note_index == 3 and attempted_degree != 0:
+				return False
+			if note_index == 7:
+				if max(self.base_degrees[:4]) <= max(self.base_degrees[4:-1]):
+					return False
+				if max(self.base_degrees[:-1]) != self.base_degrees[1]:
+					return False
+
+		return True
+
+	def test_base_tonal_note(self, note_index: int, attempted_degree: int) -> bool:
+
+		if not self.test_melody_basics(note_index, attempted_degree):
+			return False
+
+		if note_index == 7:
+			if self.test_tonal_early_sentence():
+				self.theme_type = "early_sentence"
+				print(f"Theme type: {self.theme_type}")
+				return True
+			if self.test_tonal_late_sentence():
+				self.theme_type = "late_sentence"
+				print(f"Theme type: {self.theme_type}")
+				return True
+			if self.test_tonal_bounce():
+				self.theme_type = "bounce"
+				print(f"Theme type: {self.theme_type}")
+				return True
+			return False
+
+		return True
+
+	def test_tonal_early_sentence(self) -> bool:
+		if self.base_degrees[0] == 7:
+			return False
+		if abs(self.base_degrees[1] - self.base_degrees[0]) > 2:
+			return False
+		if abs(self.base_degrees[2] - self.base_degrees[0]) > 2:
+			return False
+
+		motif_diff1 = self.base_degrees[1] - self.base_degrees[0]
+		motif_diff2 = self.base_degrees[3] - self.base_degrees[2]
+		if motif_diff1 != motif_diff2:
+			return False
+		if self.base_degrees[4] in {self.base_degrees[0], self.base_degrees[2]}:
+			return False
+		if self.base_degrees[5] in {self.base_degrees[1], self.base_degrees[3]}:
+			return False
+
+		new_motif_direction = collapse_magnitude(
+			self.base_degrees[5] - self.base_degrees[4]
+		)
+		old_motif_direction = collapse_magnitude(
+			self.base_degrees[1] - self.base_degrees[0]
+		)
+		if new_motif_direction != old_motif_direction:
+			return False
+		return True
+
+	def test_tonal_late_sentence(self):
+		if self.base_degrees[1] != self.base_degrees[0]:
+			return False
+		if abs(self.base_degrees[2] - self.base_degrees[1]) > 2:
+			return False
+		motif_diff1 = self.base_degrees[3] - self.base_degrees[2]
+		motif_diff2 = self.base_degrees[5] - self.base_degrees[4]
+		if motif_diff1 != motif_diff2:
+			return False
+
+		if not -2 <= self.base_degrees[3] - self.base_degrees[2] <= 0:
+			return False
+		if not -2 <= self.base_degrees[4] - self.base_degrees[2] <= 0:
+			return False
+		return True
+
+	def test_tonal_bounce(self):
+		if self.base_degrees[3] != 0:
+			return False
+		if max(self.base_degrees[:4]) <= max(self.base_degrees[4:-1]):
+			return False
+		if max(self.base_degrees[:-1]) != self.base_degrees[1]:
+			return False
+		return True
 
 	def imprint_base_melody(self):
 
