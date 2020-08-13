@@ -261,7 +261,7 @@ class Scale(Engraver):
 			old_pitch_obj = new_pitch_obj
 			scale_index = (scale_index + 1) % 7
 
-	def get_absolute_degree(self, chosen_note: Note) -> int:
+	def get_absolute_degree(self, chosen_note: Union[Pitch, Note]) -> int:
 		chosen_pitch_letter = chosen_note.pitch_letter
 		for scale_degree, pitch_obj in enumerate(self.scale_pitches_seq):
 			if pitch_obj.pitch_letter == chosen_pitch_letter:
@@ -703,6 +703,13 @@ class Chord(Engraver):
 
 		return chord_notes
 
+	def get_pitch_from_degree(self, chosen_degree):
+		for current_pitch in self.pitches:
+			if self.scale_obj.get_absolute_degree(current_pitch) == chosen_degree:
+				return current_pitch
+		else:
+			raise ValueError
+
 
 class Rest(Duration):
 
@@ -834,13 +841,13 @@ class Progression(Engraver):
 		if self.scale_obj.mode == "major":
 			all_chords = {
 				"TONIC": ("I_MAJ", "I6_MAJ"), 
-				"PREDOMINANT": ("IV6_MIN", "II6_MIN"),
+				"PREDOMINANT": ("IV6_MAJ", "II6_MIN"),
 				"DOMINANT": ("V6_MAJ", "VII6_DIM", "V_MAJ"),
 			}
 		elif self.scale_obj.mode == "minor":
 			all_chords = {
 				"TONIC": ("I_MIN", "I6_MIN"),
-				"PREDOMINANT": ("IV6_MAJ", "II6_DIM"),
+				"PREDOMINANT": ("IV6_MIN", "II6_DIM"),
 				"DOMINANT": ("V6_MAJ", "VII6_DIM", "V_MAJ"),
 			}
 
@@ -897,17 +904,24 @@ class Phrase(Engraver):
 		self.measures = []
 		self.relative_offset = relative_offset
 		self.absolute_offset = relative_offset + parent_absolute_offset
+		self.base_note_offsets = []
 
+		current_offset = 0
 		for index in range(num_measures):
 			self.measures.append(
 				Measure(index * self.beats_per_measure, self.absolute_offset)
 			)
+			for measure_fraction in self.time_sig_obj.melodic_divisions:
+				self.base_note_offsets.append(current_offset)
+				current_offset += (measure_fraction * self.beats_per_measure) 
+
 		self.base_melody = []
 		self.full_melody = []
 
 		self.starting_note = None
 		self.embellish_rhythms = []
 		self.theme_type = None
+		self.note_index = 0
 
 		if self.time_sig_obj.symbol in {"6/8", "3/4"}:
 			self.has_rest_ending = True
@@ -930,6 +944,9 @@ class Phrase(Engraver):
 
 		if self.style == "tonal":
 			self.imprint_progression()
+			embellish_melody = self.embellish_tonal_melody
+		elif self.style == "modal":
+			embellish_melody = self.embellish_modal_melody
 
 		base_melody_note_options = self.get_base_melody_options()
 		base_melody_finder = self.find_base_melody(base_melody_note_options)
@@ -943,7 +960,7 @@ class Phrase(Engraver):
 		self.embellish_rhythms = next(rhythm_finder)
 		print(f"Embellish rhythms: {self.embellish_rhythms}")
 		while True:
-			if self.embellish_melody():
+			if embellish_melody():
 				break
 			if not next(base_melody_finder):
 				raise ValueError
@@ -1355,7 +1372,7 @@ class Phrase(Engraver):
 				embellish_rhythms.append(rhythm_mapping[embellish_symbol])
 			return embellish_rhythms
 
-	def embellish_melody(self):
+	def embellish_modal_melody(self):
 		embellish_contour_options = []
 		self.full_melody = []
 		chosen_contours = []
@@ -1372,46 +1389,98 @@ class Phrase(Engraver):
 					return False
 				embellish_contour_options.append(possible_contours)
 
-		note_index = 0
+		self.note_index = 0
 		reference_contour_options = copy.deepcopy(embellish_contour_options)
-		current_contour_options = embellish_contour_options[note_index]
+		current_contour_options = embellish_contour_options[self.note_index]
 
 		while True:
 			if current_contour_options:
-				chosen_contour = random.choice(current_contour_options)
-				current_contour_options.remove(chosen_contour)
-				chosen_contours[note_index] = chosen_contour
-
-				starting_note = self.base_melody[note_index]
-				self.full_melody[note_index] = self.realize_melody_contour(
-					starting_note, chosen_contour
+				self.full_melody[self.note_index] = self.try_new_contour(
+					current_contour_options, chosen_contours
 				)
-
-				if (self.test_contour(note_index, chosen_contours) and 
-				  self.test_embellishment(note_index)):
-					note_index += 1
+				if (self.test_melody_contour(chosen_contours) and 
+				  self.test_embellishment()):
+					self.note_index += 1
 					if None not in self.full_melody:
 						self.add_embellish_durations()
 						return True
-					current_contour_options = embellish_contour_options[note_index]
+					current_contour_options = embellish_contour_options[self.note_index]
 				else:
-					self.full_melody[note_index] = None
-					chosen_contours[note_index] = None
+					self.full_melody[self.note_index] = None
+					chosen_contours[self.note_index] = None
 			else:
-				embellish_contour_options[note_index] = (
-					reference_contour_options[note_index][:]
+				embellish_contour_options[self.note_index] = (
+					reference_contour_options[self.note_index][:]
+				)
+				if self.note_index == 0:
+					print("Embellishment failed.")
+					return False
+				self.note_index -= 1
+				current_contour_options = embellish_contour_options[self.note_index]
+				self.full_melody[self.note_index] = None
+				chosen_contours[self.note_index] = None
+
+	def embellish_tonal_melody(self):
+		embellish_contour_options = []
+		self.full_melody = []
+		chosen_contours = []
+		remaining_note_realizations = []
+
+		for note_index, embellish_rhythm in enumerate(self.embellish_rhythms):
+			if embellish_rhythm == "REST":
+				self.full_melody.append("REST")
+			else:
+				self.full_melody.append(None)
+				chosen_contours.append(None)
+				remaining_note_realizations.append([])
+				possible_contours = self.create_contour_options(note_index, embellish_rhythm)
+				if not possible_contours:
+					print("Embellishment not possible.")
+					return False
+				embellish_contour_options.append(possible_contours)
+
+		self.note_index = 0
+		reference_contour_options = copy.deepcopy(embellish_contour_options)
+		current_contour_options = embellish_contour_options[self.note_index]
+
+		while True:
+			current_note_realizations = remaining_note_realizations[self.note_index]
+			if current_contour_options or current_note_realizations:
+				if not current_note_realizations:
+					current_note_realizations = self.try_new_contour(
+						current_contour_options, chosen_contours
+					)
+					remaining_note_realizations[self.note_index] = current_note_realizations
+
+				while current_note_realizations:
+					chosen_realization = random.choice(current_note_realizations)
+					self.full_melody[self.note_index] = chosen_realization
+					current_note_realizations.remove(chosen_realization)
+
+					if (self.test_melody_contour(chosen_contours) and 
+					  self.test_embellishment()):
+						self.note_index += 1
+						if None not in self.full_melody:
+							self.add_embellish_durations()
+							return True
+						current_contour_options = embellish_contour_options[self.note_index]
+						break
+					else:
+						self.full_melody[self.note_index] = None
+			else:
+				chosen_contours[self.note_index] = None
+				embellish_contour_options[self.note_index] = (
+					reference_contour_options[self.note_index][:]
 				)
 				if note_index == 0:
 					print("Embellishment failed.")
 					return False
 				note_index -= 1
-				current_contour_options = embellish_contour_options[note_index]
-				self.full_melody[note_index] = None
-				chosen_contours[note_index] = None
+				current_contour_options = embellish_contour_options[self.note_index]
+				self.full_melody[self.note_index] = None
 
 	def create_contour_options(
 	  self, note_index: int, embellish_rhythm: Tuple[int, ...]) -> List[Tuple[int, ...]]:
-		embellish_length = len(embellish_rhythm)
 		all_contour_options = {
 			0: ((0,), (0, 1), (0, -1), (0, -1, -2), (0, -2, -1), (0, 2, 1), (0, 1, 0)),
 			-1: ((0,), (0, 0), (0, 1), (0, -1), (0, -2), (0, -1, -2), (0, 1, 0), (0, 2, 1)),
@@ -1429,38 +1498,81 @@ class Phrase(Engraver):
 		leap_distance = next_scale_degree - current_scale_degree
 		try: 
 			for melodic_idea in all_contour_options[leap_distance]:
-				if len(melodic_idea) == embellish_length:
+				if len(melodic_idea) == len(embellish_rhythm):
 					possible_contours.append(melodic_idea)
 		except KeyError:
 			print(f"Interval of {leap_distance} not possible")
 
 		return possible_contours
 
-	def realize_melody_contour(
-	  self, starting_note: Note, chosen_contour: Tuple[int, ...]) -> List[Note]:
+	def try_new_contour(
+	  self, current_contour_options: List[Tuple[int, ...]], 
+	  chosen_contours: List[Union[Tuple[int, ...], None]]) -> Union[List[Note], List[List[Note]]]:
+		chosen_contour = random.choice(current_contour_options)
+		current_contour_options.remove(chosen_contour)
+		chosen_contours[self.note_index] = chosen_contour
 
+		if self.style == "modal":
+			realize_melody_contour = self.realize_modal_melody_contour
+		elif self.style == "tonal":
+			realize_melody_contour = self.realize_tonal_melody_contour
+		return realize_melody_contour(chosen_contour)
+
+
+	def realize_modal_melody_contour(
+	  self, chosen_contour: Tuple[int, ...]) -> List[Note]:
+		starting_note = self.base_melody[self.note_index]
 		realized_melody_fragment = []
 		for melody_shift in chosen_contour:
 			new_note = starting_note.scalar_shift(melody_shift)
 			realized_melody_fragment.append(new_note)
 		return realized_melody_fragment
 
-	def test_contour(
-	  self, note_index: int, chosen_contours: List[Union[Tuple[int, ...], None]]) -> bool:
+	def realize_tonal_melody_contour(
+	  self, chosen_contour: Tuple[int, ...]) -> List[List[Note]]:
+		starting_note = self.base_melody[self.note_index]
+		possible_melody_fragments = []
+		main_melody_fragment = []
+		current_offset = 0
+		starting_degree = self.scale_obj.get_absolute_degree(starting_note)
+
+		current_offset = self.base_note_offsets[self.note_index]
+		measure_index = current_offset // self.beats_per_measure
+		current_measure = self.measures[measure_index]
+		relative_offset = current_offset - (measure_index * self.beats_per_measure)
+		current_chord = current_measure.get_chord(relative_offset)
+
+		for melody_shift in chosen_contour:
+			current_degree = (starting_degree + melody_shift) % 7
+			scale_note = starting_note.scalar_shift(melody_shift)
+
+			try:
+				chordal_pitch = current_chord.get_pitch_from_degree(current_degree)
+				accidental_diff = chordal_pitch.accidental_amount - scale_note.accidental_amount
+				chordal_note = scale_note.change_pitch_accidental(accidental_diff)
+				main_melody_fragment.append(chordal_note)
+			except ValueError:
+				main_melody_fragment.append(scale_note)
+		possible_melody_fragments.append(main_melody_fragment)
+
+		return possible_melody_fragments
+
+	def test_melody_contour(
+	  self, chosen_contours: List[Union[Tuple[int, ...], None]]) -> bool:
 		if self.theme_type == "early_sentence":
-			if (note_index in {2, 3} and chosen_contours[note_index] != 
-			  chosen_contours[note_index - 2]):
+			if (self.note_index in {2, 3} and chosen_contours[self.note_index] != 
+			  chosen_contours[self.note_index - 2]):
 				return False
 		return True
 
-	def test_embellishment(self, note_index: int) -> bool:
-		if note_index >= 2 and note_index % 2 == 0:
-			last_previous_note = self.full_melody[note_index - 1][-1]
-			current_first_note = self.full_melody[note_index][0]
+	def test_embellishment(self) -> bool:
+		if self.note_index >= 2 and self.note_index % 2 == 0:
+			last_previous_note = self.full_melody[self.note_index - 1][-1]
+			current_first_note = self.full_melody[self.note_index][0]
 			bar_leap = current_first_note.midi_num - last_previous_note.midi_num
 			if abs(bar_leap >= 3): 
 				leap_direction = collapse_magnitude(bar_leap)
-				for current_note in self.full_melody[note_index]:
+				for current_note in self.full_melody[self.note_index]:
 					resolve_leap = current_note.midi_num - current_first_note.midi_num  
 					if resolve_leap != 0:
 						resolve_direction = collapse_magnitude(resolve_leap)
@@ -1472,30 +1584,31 @@ class Phrase(Engraver):
 							return False 
 						break
 
-		if self.has_rest_ending and note_index == 5:
-			return self.has_proper_notes(note_index)
-		if not self.has_rest_ending and note_index == 6:
-			return self.has_proper_notes(note_index)
+		if self.has_rest_ending and self.note_index == 5:
+			return self.has_proper_notes()
+		if not self.has_rest_ending and self.note_index == 6:
+			return self.has_proper_notes()
 
 		return True
 
-	def has_proper_notes(self, note_index) -> bool:
+	def has_proper_notes(self) -> bool:
 
-		if self.full_melody[note_index][-1] == self.starting_note:
+		if self.full_melody[self.note_index][-1] == self.starting_note:
 			return False
 
-		temp_melody = collapse_sequence(self.full_melody[:note_index])
+		temp_melody = collapse_sequence(self.full_melody[:self.note_index])
 		temp_melody.append(self.starting_note)
 		temp_midi_nums = [new_note.midi_num for new_note in temp_melody]
 		if self.has_dissonant_interval(temp_midi_nums, temp_melody):
 			return False
 
-		all_degrees_set = {
-			self.scale_obj.get_absolute_degree(current_note)
-			for current_note in temp_melody
-		}
-		if self.scale_obj.special_degree not in all_degrees_set:
-			return False 
+		if self.style == "modal":
+			all_degrees_set = {
+				self.scale_obj.get_absolute_degree(current_note)
+				for current_note in temp_melody
+			}
+			if self.scale_obj.special_degree not in all_degrees_set:
+				return False 
 
 		return True
 
