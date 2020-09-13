@@ -39,7 +39,7 @@ class TimeSignature:
 		"6/8": (Fraction(1, 2), Fraction(1, 2)), 
 		"4/4": (Fraction(1, 2), Fraction(1, 2)),
 		"2/2": (Fraction(1, 2), Fraction(1, 2)),
-		"3/4": (Fraction(2, 3), Fraction(1, 3)),
+		"3/4": (Fraction(1, 1),),
 	}
 	all_tempo_ranges = {
 		"6/8": range(38, 59), "4/4": range(90, 125),
@@ -59,19 +59,24 @@ class TimeSignature:
 			"I2": ((4, 4), (4, 2, 2))
 		},
 		"3/4": {
-			"I1": ((1, 1), (1,)),
-			"I2": ((2, 2), (2,)),
-			"I3": ((1, 1), (1,)),
-			"I4": ((2, 2), (2,))
+			"I1": ((2, 1, 1, 2), (4, 1, 1), (3, 1, 2), (1, 1, 1), (2, 1)),
+			"I2": ((1, 1, 1), (2, 1, 1, 2), (2, 1))
 		},
 	}
 	all_rest_endings = {
-		"6/8": {2: (("NOTE", 1), ("REST", 1))},
-		"4/4": {1: (("NOTE", 1), ("REST", 1)), 2: (("NOTE", 2), ("REST", 2))},
-		"2/2": {
-			1: (("NOTE", Fraction(1, 2)), ("REST", Fraction(1, 2))), 
-			2: (("NOTE", 1), ("REST", 1))
-		}, "3/4": {2: (("NOTE", 2), ("REST", 1))}
+		"6/8": {
+			1: ((-1, "NOTE", 1),), 
+			2: ((-1, "NOTE", 1), (-1, "REST", 1))
+		}, "4/4": {
+			1: ((-1, "NOTE", 1), (-1, "REST", 1)), 
+			2: ((-1, "NOTE", 2), (-1, "REST", 2))
+		}, "2/2": {
+			1: ((-1, "NOTE", Fraction(1, 2)), (-1, "REST", Fraction(1, 2))), 
+			2: ((-1, "NOTE", 1), (-1, "REST", 1))
+		}, "3/4": {
+			1: ((-1, "NOTE", 2), (-1, "REST", 1)), 
+			2: ((-2, "NOTE", 3), (-1, "REST", 3))
+		}
 	}
 
 	def __init__(self, symbol: str) -> None:
@@ -221,19 +226,20 @@ class Scale(Engraver):
 
 	def __init__(self, tonic: str = "C", input_mode: str = "ionian") -> None:
 
-		if input_mode == "major":
+		self.mode = input_mode.lower()
+		if self.mode == "major":
 			proxy_mode = "ionian"
-			self.mode = input_mode
-		elif input_mode == "minor":
+		elif self.mode == "minor":
 			proxy_mode = "aeolian"
-			self.mode = input_mode
-		else:
-			self.mode = proxy_mode = input_mode
+		elif self.mode in self.mode_wheel:
+			proxy_mode = self.mode
 			special_degrees = {
 				"ionian": 0, "dorian": 5, "phrygian": 1, "lydian": 3, 
 				"mixolydian": 6, "aeolian": 2, "locrian": 4,
 			}
-			self.special_degree = special_degrees[input_mode]
+			self.special_degree = special_degrees[proxy_mode]
+		else:
+			raise ValueError
 
 		tonic_pitch_obj = Pitch(tonic)
 		tonic_pitch_letter = tonic_pitch_obj.pitch_letter
@@ -249,7 +255,7 @@ class Scale(Engraver):
 		old_pitch_obj = tonic_pitch_obj
 		self.scale_pitches_seq = [old_pitch_obj]
 		self.scale_pitches_dict = {old_pitch_obj: current_midi_num}
-		scale_index = self.mode_wheel.index(proxy_mode.lower())
+		scale_index = self.mode_wheel.index(proxy_mode)
 
 		for _ in range(6):
 			current_increment = self.scale_increments[scale_index]
@@ -854,35 +860,49 @@ class Progression(Engraver):
 		reference_chord_combos = []
 		remaining_chord_combos = []
 		for chord_type in self.chord_types:
-			possible_chords = list(all_chords[chord_type.function])
+			if chord_type.function[0:7] == "REPEAT_":
+				possible_chords = []
+			else:
+				possible_chords = list(all_chords[chord_type.function])
 			reference_chord_combos.append(possible_chords)
 			self.chord_symbols.append(None)
 			remaining_chord_combos.append(None)
 
 		chord_index = 0
 		remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
+		is_progressing = True
 		while None in self.chord_symbols:
 			if remaining_chord_combos[chord_index]:
 				chosen_chord = random.choice(remaining_chord_combos[chord_index])
 				remaining_chord_combos[chord_index].remove(chosen_chord)
 
-				is_chord_valid = True
 				for rule_obj in self.chord_rules[chosen_chord]:
 					is_chord_rule_valid = rule_obj.function(
 						self, chord_index, *rule_obj.parameters
 					)
 					if not is_chord_rule_valid:
-						is_chord_valid = False
+						is_progressing = False
 						break
 				else:
+					is_progressing = True
 					self.chord_symbols[chord_index] = chosen_chord
 					chord_index += 1
 					try:
 						remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
 					except IndexError:
-						continue
+						chord_index -= 1
+					continue
 
-			if not is_chord_valid and not remaining_chord_combos[chord_index]:
+			if is_progressing and self.chord_types[chord_index].function[0:7] == "REPEAT_":
+				repeat_index = int(self.chord_types[chord_index].function[7:])
+				self.chord_symbols[chord_index] = self.chord_symbols[repeat_index]
+				chord_index += 1
+				try:
+					remaining_chord_combos[chord_index] = reference_chord_combos[chord_index][:]
+				except IndexError:
+					chord_index -= 1
+				continue
+			if not is_progressing and not remaining_chord_combos[chord_index]:
 				remaining_chord_combos[chord_index] = None
 				if chord_index == 0:
 					raise IndexError
@@ -907,6 +927,8 @@ class Phrase(Engraver):
 		self.base_note_offsets = []
 
 		current_offset = 0
+		if self.time_sig_obj.symbol == "3/4":
+			num_measures *= 2
 		for index in range(num_measures):
 			self.measures.append(
 				Measure(index * self.beats_per_measure, self.absolute_offset)
@@ -917,22 +939,17 @@ class Phrase(Engraver):
 
 		self.base_melody = []
 		self.full_melody = []
-
 		self.starting_note = None
 		self.embellish_rhythms = []
+
 		self.theme_type = None
 		self.note_index = 0
-
-		if self.time_sig_obj.symbol in {"6/8", "3/4"}:
-			self.has_rest_ending = True
-		else:
-			self.has_rest_ending = random.choice((True, False))
+		self.has_rest_ending = random.choice((True, False))
 		print(f"Has rest ending? {self.has_rest_ending}")
 
 	def imprint_progression(self) -> None:
-		progression = random.choice(self.progressions)
-		print(progression)
-		chosen_progression = progression.realize()
+		print(self.progression)
+		chosen_progression = self.progression.realize()
 		print(f"Chosen progression: {chosen_progression}")
 		relative_offset = 0
 		for current_chord in chosen_progression:
@@ -1192,8 +1209,6 @@ class Phrase(Engraver):
 					return False
 
 		if self.theme_type == "late_sentence":
-			if note_index == 1 and attempted_degree != self.base_degrees[0]:
-				return False
 			if note_index == 2 and abs(current_leap) > 2:
 				return False 
 			if note_index == 5:
@@ -1312,28 +1327,20 @@ class Phrase(Engraver):
 
 	def choose_embellish_rhythms(self) -> None:
 
-		if self.time_sig_obj.symbol == "3/4":
-			possible_rhythms = [
-				["I1", "I2", "I1", "I2", "I1", "I2", "REST", "REST"],
-				["I1", "I2", "I3", "I4", "I3", "I4", "REST", "REST"]
-			]
-			has_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
-		else:
-			possible_rhythms = [
-				["I1", "I1", "I1", "I1", "I1", "I1", "REST", "REST"],
-				["I1", "I1", "I2", "I1", "I1", "I1", "REST", "REST"],
-				["I1", "I2", "I1", "I2", "I1", "I2", "REST", "REST"],
-				["I1", "I2", "I1", "I2", "I2", "I2", "REST", "REST"],
-				["I1", "I1", "I1", "I1", "I2", "I2", "REST", "REST"],
-			]
-			has_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
-			possible_rhythms = [
-				["I1", "I1", "I1", "I1", "I1", "I1", "I1", "REST"],
-				["I1", "I1", "I1", "I1", "I1", "I1", "I2", "REST"],
-				["I1", "I2", "I1", "I2", "I2", "I2", "I2", "REST"],
-				["I1", "I2", "I1", "I2", "I1", "I2", "I2", "REST"],
-			]
-			no_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
+		possible_rhythms = [
+			["I1", "I1", "I1", "I1", "I1", "I1", "REST", "REST"],
+			["I1", "I1", "I2", "I1", "I1", "I1", "REST", "REST"],
+			["I1", "I2", "I1", "I2", "I1", "I2", "REST", "REST"],
+			["I1", "I2", "I1", "I2", "I2", "I2", "REST", "REST"],
+			["I1", "I1", "I1", "I1", "I2", "I2", "REST", "REST"],
+		]
+		has_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
+		possible_rhythms = [
+			["I1", "I1", "I1", "I1", "I1", "I1", "I2", "REST"],
+			["I1", "I2", "I1", "I2", "I2", "I2", "I2", "REST"],
+			["I1", "I2", "I1", "I2", "I1", "I2", "I2", "REST"],
+		]
+		no_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
 
 		while True:
 			if self.has_rest_ending:
@@ -1482,14 +1489,22 @@ class Phrase(Engraver):
 	def create_contour_options(
 	  self, note_index: int, embellish_rhythm: Tuple[int, ...]) -> List[Tuple[int, ...]]:
 		all_contour_options = {
-			0: ((0,), (0, 1), (0, -1), (0, -1, -2), (0, -2, -1), (0, 2, 1), (0, 1, 0)),
-			-1: ((0,), (0, 0), (0, 1), (0, -1), (0, -2), (0, -1, -2), (0, 1, 0), (0, 2, 1)),
-			-2: ((0,), (0, -1), (0, -3), (0, 0, -1), (0, -1, -2), (0, -1, 0), (0, 1, -1)),
-			-3: ((0, 0),),
-			-4: ((0, -2), (0, -2, -3)),
-			1: ((0,), (0, 2), (0, 1, 2)),
-			2: ((0,), (0, 1), (0, 0, 1), (0, 1, 0), (0, 1, 2)),
-			3: ((0, 4), (0, -1, -2), (0, 1, 2)),
+			0: (
+				(0, 1), (0, -1), (0, 2), (0, -2), (0, -1, -2), (0, -2, -1), 
+				(0, 1, 0), (0, 2, 1)
+			), -1: (
+				(0, 0), (0, 1), (0, -1), (0, -2), (0, -1, -2), (0, 1, 0), 
+				(0, 0, 1), (0, -1, -2, 0), (0, 2, 1, 0)
+			), -2: (
+				(0, 0), (0, -1), (0, -2), (0, -3), (0, 0, -1), (0, -1, -2), (0, 0, 1)
+			), -3: ((0, -3), (0, -1), (0, -1, -2), (0, -2, -4)),
+			-4: ((0, -2), (0, -1, 0), (0, -2, -3), (0, 0, 1, 2),),
+			1: (
+				(0, 0), (0, 2), (0, -2), (0, 0, 0), (0, -1, 0), (0, 1, 2), 
+				(0, 0, -2, 0), (0, 0, 1, 2)
+			), 2: ((0, 0), (0, 1), (0, 1, 0), (0, 0, 1), (0, 0, -1, 0)),
+			3: ((0, 1, 2), (0, 2), (0, 0, 1, 2),),
+			4: ((0, 4), (0, 0, 1, 2), (0, 1, 2, 3)),
 		}
 
 		possible_contours = []
@@ -1593,7 +1608,8 @@ class Phrase(Engraver):
 
 	def has_proper_notes(self) -> bool:
 
-		if self.full_melody[self.note_index][-1] == self.starting_note:
+		penultimate_note = self.full_melody[self.note_index][-1]
+		if self.scale_obj.get_absolute_degree(penultimate_note) not in {1, 2, 6}:
 			return False
 
 		temp_melody = collapse_sequence(self.full_melody[:self.note_index])
@@ -1635,11 +1651,11 @@ class Phrase(Engraver):
 		rest_ending_symbols = self.time_sig_obj.rest_ending[rest_ending_count]
 		starting_note_str = str(self.starting_note)
 
-		for symbol, duration in rest_ending_symbols:
+		for measure_index, symbol, duration in rest_ending_symbols:
 			if symbol == "REST":
-				self.measures[-1].imprint_temporal_obj(Rest(duration))
+				self.measures[measure_index].imprint_temporal_obj(Rest(duration))
 			elif symbol == "NOTE":
-				self.measures[-1].imprint_temporal_obj(Note(starting_note_str, duration))
+				self.measures[measure_index].imprint_temporal_obj(Note(starting_note_str, duration))
 
 
 class ChordType(NamedTuple):
@@ -1654,26 +1670,39 @@ class MiniTheme(Phrase):
 	  parent_absolute_offset: Union[int, Fraction], 
 	  num_measures: int = 4) -> None:
 		super().__init__(relative_offset, parent_absolute_offset, num_measures) 
-		self.progressions = [
-			Progression(
-				ChordType("TONIC", self.beats_per_measure), 
-				ChordType("PREDOMINANT", self.beats_per_measure),
-				ChordType("DOMINANT", self.beats_per_measure), 
-				ChordType("TONIC", self.beats_per_measure),
-			),
-		]
-		if self.time_sig_obj.symbol != "3/4":
-			half_measure_duration = self.beats_per_measure // 2
-			other_progressions = (
-				Progression(
-					ChordType("TONIC", self.beats_per_measure),
-					ChordType("DOMINANT", self.beats_per_measure),
-					ChordType("TONIC", half_measure_duration),
-					ChordType("DOMINANT", half_measure_duration),
-					ChordType("TONIC", self.beats_per_measure)
-				), 
-			)
-			self.progressions.extend(other_progressions)
+		if self.style == "tonal":
+			if self.time_sig_obj.symbol == "3/4":
+				progressions = (
+					Progression(
+						ChordType("TONIC", self.beats_per_measure),
+						ChordType("REPEAT_0", self.beats_per_measure),
+						ChordType("DOMINANT", self.beats_per_measure),
+						ChordType("REPEAT_0", self.beats_per_measure),
+						ChordType("REPEAT_0", self.beats_per_measure),
+						ChordType("REPEAT_0", self.beats_per_measure),
+						ChordType("DOMINANT", self.beats_per_measure),
+						ChordType("TONIC", self.beats_per_measure),
+					),
+				)
+			else:
+				half_measure_duration = self.beats_per_measure // 2
+				progressions = (
+					Progression(
+						ChordType("TONIC", self.beats_per_measure),
+						ChordType("DOMINANT", self.beats_per_measure),
+						ChordType("TONIC", half_measure_duration),
+						ChordType("DOMINANT", half_measure_duration),
+						ChordType("TONIC", self.beats_per_measure)
+					), Progression(
+						ChordType("TONIC", self.beats_per_measure), 
+						ChordType("PREDOMINANT", self.beats_per_measure),
+						ChordType("DOMINANT", self.beats_per_measure), 
+						ChordType("TONIC", self.beats_per_measure),
+					),
+				)
+			self.progression = random.choice(progressions)
+		else:
+			self.progression = None
 
 
 class Score(Engraver):
