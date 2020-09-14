@@ -2,7 +2,7 @@ from __future__ import annotations
 # allows use of an annotation before function definition (Python 3.7+)
 import copy
 import random
-from typing import List, Tuple, Union, NamedTuple, Callable
+from typing import List, Tuple, Set, Union, NamedTuple, Callable
 from fractions import Fraction
 import itertools
 
@@ -42,7 +42,7 @@ class TimeSignature:
 		"3/4": (Fraction(1, 1),),
 	}
 	all_tempo_ranges = {
-		"6/8": range(38, 59), "4/4": range(90, 125),
+		"6/8": range(38, 67), "4/4": range(66, 125),
 		"2/2": range(53, 101), "3/4": range(80, 141),
 	}
 	all_rhythms = {
@@ -88,6 +88,9 @@ class TimeSignature:
 		self.rest_ending = self.all_rest_endings[symbol] 
 		self.beat_value = self.all_beat_values[self.symbol]
 
+	def __repr__(self):
+		return self.symbol
+
 
 def collapse_magnitude(amount: int) -> int:
 	if amount > 0:
@@ -98,7 +101,7 @@ def collapse_magnitude(amount: int) -> int:
 		return 0
 
 
-def collapse_sequence(nested_sequence: List[List[int]]) -> List[int]:
+def collapse_sequence(nested_sequence: List[List]) -> List:
 	unnested_sequence = []
 	for group in nested_sequence:
 		for item in group:
@@ -267,8 +270,8 @@ class Scale(Engraver):
 			old_pitch_obj = new_pitch_obj
 			scale_index = (scale_index + 1) % 7
 
-	def get_absolute_degree(self, chosen_note: Union[Pitch, Note]) -> int:
-		chosen_pitch_letter = chosen_note.pitch_letter
+	def get_absolute_degree(self, chosen_obj: Union[Pitch, Note]) -> int:
+		chosen_pitch_letter = chosen_obj.pitch_letter
 		for scale_degree, pitch_obj in enumerate(self.scale_pitches_seq):
 			if pitch_obj.pitch_letter == chosen_pitch_letter:
 				return scale_degree 
@@ -756,7 +759,7 @@ class Measure(Engraver):
 				Rest(chosen_obj.duration, current_offset, self.absolute_offset)
 			)
 
-	def get_chord(self, chosen_offset) -> Chord:
+	def get_chord(self, chosen_offset: int) -> Chord:
 		if len(self.chords) == 1:
 			return self.chords[0]
 		for current_chord in self.chords:
@@ -771,19 +774,22 @@ class ChordRule(NamedTuple):
 	parameters: Tuple
 
 	@staticmethod
-	def is_start_chord(progression_obj, chord_index, verdict):
+	def is_start_chord(
+	  progression_obj: Progression, chord_index: int, verdict: bool) -> bool:
 		if chord_index != 0:
 			return True
 		return verdict
 
 	@staticmethod
-	def is_end_chord(progression_obj, chord_index, verdict):
+	def is_end_chord(
+	  progression_obj: Progression, chord_index: int, verdict: bool) -> bool:
 		if chord_index != progression_obj.length - 1:
 			return True
 		return verdict
 
 	@staticmethod
-	def can_succeed(progression_obj, chord_index, predecessors):
+	def can_succeed(
+	  progression_obj: Progression, chord_index: int, predecessors: Set[str]) -> bool:
 		if chord_index == 0:
 			return True
 		return progression_obj.chord_symbols[chord_index - 1] in predecessors
@@ -927,7 +933,7 @@ class Phrase(Engraver):
 		self.base_note_offsets = []
 
 		current_offset = 0
-		if self.time_sig_obj.symbol == "3/4":
+		if str(self.time_sig_obj) == "3/4":
 			num_measures *= 2
 		for index in range(num_measures):
 			self.measures.append(
@@ -1461,8 +1467,8 @@ class Phrase(Engraver):
 
 				while current_note_realizations:
 					chosen_realization = random.choice(current_note_realizations)
-					self.full_melody[self.note_index] = chosen_realization
 					current_note_realizations.remove(chosen_realization)
+					self.full_melody[self.note_index] = chosen_realization
 
 					if (self.test_melody_contour(chosen_contours) and 
 					  self.test_embellishment()):
@@ -1545,11 +1551,11 @@ class Phrase(Engraver):
 
 	def realize_tonal_melody_contour(
 	  self, chosen_contour: Tuple[int, ...]) -> List[List[Note]]:
-		starting_note = self.base_melody[self.note_index]
+		unit_starting_note = self.base_melody[self.note_index]
 		possible_melody_fragments = []
 		main_melody_fragment = []
 		current_offset = 0
-		starting_degree = self.scale_obj.get_absolute_degree(starting_note)
+		unit_starting_degree = self.scale_obj.get_absolute_degree(unit_starting_note)
 
 		current_offset = self.base_note_offsets[self.note_index]
 		measure_index = current_offset // self.beats_per_measure
@@ -1558,8 +1564,8 @@ class Phrase(Engraver):
 		current_chord = current_measure.get_chord(relative_offset)
 
 		for melody_shift in chosen_contour:
-			current_degree = (starting_degree + melody_shift) % 7
-			scale_note = starting_note.scalar_shift(melody_shift)
+			current_degree = (unit_starting_degree + melody_shift) % 7
+			scale_note = unit_starting_note.scalar_shift(melody_shift)
 
 			try:
 				chordal_pitch = current_chord.get_pitch_from_degree(current_degree)
@@ -1581,7 +1587,14 @@ class Phrase(Engraver):
 		return True
 
 	def test_embellishment(self) -> bool:
-		if self.note_index >= 2 and self.note_index % 2 == 0:
+		if str(self.time_sig_obj) == "3/4" and self.note_index >= 1:
+			measure_marker = True
+		elif (str(self.time_sig_obj) != "3/4" and self.note_index >= 2 and 
+		  self.note_index % 2 == 0):
+			measure_marker = True
+		else:
+			measure_marker = False
+		if measure_marker:
 			last_previous_note = self.full_melody[self.note_index - 1][-1]
 			current_first_note = self.full_melody[self.note_index][0]
 			bar_leap = current_first_note.midi_num - last_previous_note.midi_num
@@ -1599,9 +1612,8 @@ class Phrase(Engraver):
 							return False 
 						break
 
-		if self.has_rest_ending and self.note_index == 5:
-			return self.has_proper_notes()
-		if not self.has_rest_ending and self.note_index == 6:
+		if (self.has_rest_ending and self.note_index == 5 or 
+		  not self.has_rest_ending and self.note_index == 6):
 			return self.has_proper_notes()
 
 		return True
@@ -1612,7 +1624,7 @@ class Phrase(Engraver):
 		if self.scale_obj.get_absolute_degree(penultimate_note) not in {1, 2, 6}:
 			return False
 
-		temp_melody = collapse_sequence(self.full_melody[:self.note_index])
+		temp_melody = collapse_sequence(self.full_melody[:self.note_index + 1])
 		temp_melody.append(self.starting_note)
 		temp_midi_nums = [new_note.midi_num for new_note in temp_melody]
 		if self.has_dissonant_interval(temp_midi_nums, temp_melody):
@@ -1671,7 +1683,7 @@ class MiniTheme(Phrase):
 	  num_measures: int = 4) -> None:
 		super().__init__(relative_offset, parent_absolute_offset, num_measures) 
 		if self.style == "tonal":
-			if self.time_sig_obj.symbol == "3/4":
+			if str(self.time_sig_obj) == "3/4":
 				progressions = (
 					Progression(
 						ChordType("TONIC", self.beats_per_measure),
@@ -1758,7 +1770,7 @@ class Score(Engraver):
 		beat_obj = Duration(1)
 		variable_text_seq = [
 			part_name, "= { \\key", f"{lily_tonic_pitch}", f"\\{self.scale_obj.mode}", 
-			"\\time", f"{self.time_sig_obj.symbol}", "\\tempo", 
+			"\\time", f"{self.time_sig_obj}", "\\tempo", 
 			f"{beat_obj.get_lily_duration()}", f"= {self.tempo}", 
 			f"{lily_note_string}", "}"
 		]
@@ -1826,6 +1838,6 @@ class Score(Engraver):
 
 if __name__ == "__main__":
 	my_score = Score()
-	my_score.create_modal_theme()
+	my_score.create_tonal_theme()
 	my_score.export_score()
 		
