@@ -1339,6 +1339,7 @@ class Phrase(Engraver):
 			["I1", "I2", "I1", "I2", "I1", "I2", "REST", "REST"],
 			["I1", "I2", "I1", "I2", "I2", "I2", "REST", "REST"],
 			["I1", "I1", "I1", "I1", "I2", "I2", "REST", "REST"],
+			["I1", "I1", "I1", "I2", "I1", "I2", "REST", "REST"]
 		]
 		has_rest_ending_rhythm = self.realize_embellish_rhythm(possible_rhythms)
 		possible_rhythms = [
@@ -1509,7 +1510,7 @@ class Phrase(Engraver):
 				(0, 0), (0, 2), (0, -2), (0, 0, 0), (0, -1, 0), (0, 1, 2), 
 				(0, 0, -2, 0), (0, 0, 1, 2)
 			), 2: ((0, 0), (0, 1), (0, 1, 0), (0, 0, 1), (0, 0, -1, 0)),
-			3: ((0, 1, 2), (0, 2), (0, 0, 1, 2),),
+			3: ((0, 2), (0, 1, 2), (0, 2, 4), (0, 0, 1, 2),),
 			4: ((0, 4), (0, 0, 1, 2), (0, 1, 2, 3)),
 		}
 
@@ -1597,11 +1598,22 @@ class Phrase(Engraver):
 		if measure_marker:
 			last_previous_note = self.full_melody[self.note_index - 1][-1]
 			current_first_note = self.full_melody[self.note_index][0]
-			bar_leap = current_first_note.midi_num - last_previous_note.midi_num
-			if abs(bar_leap >= 3): 
+			if last_previous_note == current_first_note:
+				return False
+			last_previous_degree = self.scale_obj.get_relative_degree(
+				self.starting_note, last_previous_note
+			) 
+			current_first_degree = self.scale_obj.get_relative_degree(
+				self.starting_note, current_first_note
+			)
+			bar_leap = current_first_degree - last_previous_degree
+			if abs(bar_leap) >= 3: 
 				leap_direction = collapse_magnitude(bar_leap)
 				for current_note in self.full_melody[self.note_index]:
-					resolve_leap = current_note.midi_num - current_first_note.midi_num  
+					current_degree = self.scale_obj.get_relative_degree(
+						self.starting_note, current_note
+					)
+					resolve_leap = current_degree - current_first_degree  
 					if resolve_leap != 0:
 						resolve_direction = collapse_magnitude(resolve_leap)
 						if leap_direction == resolve_direction:
