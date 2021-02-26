@@ -1391,13 +1391,13 @@ class Phrase(Engraver):
 		self.full_melody = []
 		chosen_contours = []
 
-		for note_index, embellish_rhythm in enumerate(self.embellish_rhythms):
+		for rhythm_index, embellish_rhythm in enumerate(self.embellish_rhythms):
 			if embellish_rhythm == "REST":
 				self.full_melody.append("REST")
 			else:
 				self.full_melody.append(None)
 				chosen_contours.append(None)
-				possible_contours = self.create_contour_options(note_index, embellish_rhythm)
+				possible_contours = self.create_contour_options(rhythm_index, embellish_rhythm)
 				if not possible_contours:
 					print("Embellishment not possible.")
 					return False
@@ -1440,14 +1440,14 @@ class Phrase(Engraver):
 		chosen_contours = []
 		remaining_note_realizations = []
 
-		for note_index, embellish_rhythm in enumerate(self.embellish_rhythms):
+		for rhythm_index, embellish_rhythm in enumerate(self.embellish_rhythms):
 			if embellish_rhythm == "REST":
 				self.full_melody.append("REST")
 			else:
 				self.full_melody.append(None)
 				chosen_contours.append(None)
 				remaining_note_realizations.append([])
-				possible_contours = self.create_contour_options(note_index, embellish_rhythm)
+				possible_contours = self.create_contour_options(rhythm_index, embellish_rhythm)
 				if not possible_contours:
 					print("Embellishment not possible.")
 					return False
@@ -1486,15 +1486,15 @@ class Phrase(Engraver):
 				embellish_contour_options[self.note_index] = (
 					reference_contour_options[self.note_index][:]
 				)
-				if note_index == 0:
+				if self.note_index == 0:
 					print("Embellishment failed.")
 					return False
-				note_index -= 1
+				self.note_index -= 1
 				current_contour_options = embellish_contour_options[self.note_index]
 				self.full_melody[self.note_index] = None
 
 	def create_contour_options(
-	  self, note_index: int, embellish_rhythm: Tuple[int, ...]) -> List[Tuple[int, ...]]:
+	  self, rhythm_index: int, embellish_rhythm: Tuple[int, ...]) -> List[Tuple[int, ...]]:
 		all_contour_options = {
 			0: (
 				(0, 1), (0, -1), (0, 2), (0, -2), (0, -1, -2), (0, -2, -1), 
@@ -1515,8 +1515,8 @@ class Phrase(Engraver):
 		}
 
 		possible_contours = []
-		current_scale_degree = self.base_degrees[note_index]
-		next_scale_degree = self.base_degrees[note_index + 1]
+		current_scale_degree = self.base_degrees[rhythm_index]
+		next_scale_degree = self.base_degrees[rhythm_index + 1]
 		leap_distance = next_scale_degree - current_scale_degree
 		try: 
 			for melodic_idea in all_contour_options[leap_distance]:
