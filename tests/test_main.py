@@ -1,4 +1,6 @@
 import unittest
+from fractions import Fraction
+
 import main as robatim
 
 class TestScore(unittest.TestCase):
@@ -10,18 +12,44 @@ class TestScore(unittest.TestCase):
 		self.assertEqual(new_pitch.accidental_symbol, "")
 		self.assertEqual(new_pitch.accidental_amount, 0)
 		self.assertEqual(str(new_pitch), "C")
+		self.assertEqual(new_pitch.get_lily_format(), "c")
 
 		new_pitch = robatim.Pitch("G#")
 		self.assertEqual(new_pitch.pitch_letter, "G")
 		self.assertEqual(new_pitch.accidental_symbol, "#")
 		self.assertEqual(new_pitch.accidental_amount, 1)
 		self.assertEqual(str(new_pitch), "G#")
+		self.assertEqual(new_pitch.get_lily_format(), "gis")
 
 		new_pitch = robatim.Pitch("Dbb")
 		self.assertEqual(new_pitch.pitch_letter, "D")
 		self.assertEqual(new_pitch.accidental_symbol, "bb")
 		self.assertEqual(new_pitch.accidental_amount, -2)
 		self.assertEqual(str(new_pitch), "Dbb")
+		self.assertEqual(new_pitch.get_lily_format(), "deses")
+
+	def test_note_creation(self):
+		robatim.Engraver.time_sig_obj = robatim.TimeSignature("4/4")
+		new_note = robatim.Note("C5", 1)
+		self.assertEqual(new_note.pitch_letter, "C")
+		self.assertEqual(new_note.accidental_symbol, "")
+		self.assertEqual(new_note.accidental_amount, 0)
+		self.assertEqual(str(new_note), "C5")
+		self.assertEqual(new_note.get_lily_format(), "c''4")
+
+		new_note = robatim.Note("G#3", Fraction(3, 4))
+		self.assertEqual(new_note.pitch_letter, "G")
+		self.assertEqual(new_note.accidental_symbol, "#")
+		self.assertEqual(new_note.accidental_amount, 1)
+		self.assertEqual(str(new_note), "G#3")
+		self.assertEqual(new_note.get_lily_format(), "gis8.")
+
+		new_note = robatim.Note("Dbb2", Fraction(1, 4))
+		self.assertEqual(new_note.pitch_letter, "D")
+		self.assertEqual(new_note.accidental_symbol, "bb")
+		self.assertEqual(new_note.accidental_amount, -2)
+		self.assertEqual(str(new_note), "Dbb2")
+		self.assertEqual(new_note.get_lily_format(), "deses,16")
 
 	def test_pitch_letter_change(self):
 
