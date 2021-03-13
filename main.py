@@ -277,13 +277,15 @@ class Scale(Engraver):
 				return scale_degree 
 
 	def get_relative_degree(self, starting_note: Note, attempted_note: Note) -> int:
-		if starting_note == attempted_note:
-			return 0
-		attempted_degree = self.get_absolute_degree(attempted_note)
-		midi_pitch_diff = attempted_note.midi_num - starting_note.midi_num
-		octave_amount = midi_pitch_diff // 12
-		return attempted_degree + (octave_amount * 7)
+		starting_octave = starting_note.octave_number
+		attempted_octave = attempted_note.octave_number
+		starting_pitch_index = self.note_letters.index(starting_note.pitch_letter)
+		attempted_pitch_index = self.note_letters.index(attempted_note.pitch_letter)
 
+		relative_degree = attempted_pitch_index - starting_pitch_index
+		relative_degree += (7 * (attempted_octave - starting_octave))
+
+		return relative_degree
 
 class Interval:
 
@@ -411,7 +413,8 @@ class Interval:
 
 class Duration(Engraver):
 
-	def __init__(self, duration: Union[int, Fraction] = 0, 
+	def __init__(
+	  self, duration: Union[int, Fraction] = 0, 
 	  relative_offset: Union[int, Fraction] = 0, 
 	  parent_absolute_offset: Union[int, Fraction] = 0) -> None:
 		self.duration = duration
@@ -428,8 +431,8 @@ class Duration(Engraver):
 
 class Note(Pitch, Duration):
 
-	def __init__(self, note_symbol: str, 
-	  duration: Union[int, Fraction] = 0, 
+	def __init__(
+	  self, note_symbol: str, duration: Union[int, Fraction] = 0, 
 	  relative_offset: Union[int, Fraction] = 0, 
 	  parent_absolute_offset: Union[int, Fraction] = 0) -> None:
 		self.duration = duration
