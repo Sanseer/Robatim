@@ -157,6 +157,26 @@ class TestScore(unittest.TestCase):
 		chosen_note = robatim.Note("Eb2")
 		self.assertEqual(chosen_scale_obj.get_absolute_degree(chosen_note), 4)
 
+	def test_relative_degree(self):
+		chosen_scale_obj = robatim.Engraver.scale_obj = robatim.Scale("Ab")
+		starting_note = robatim.Note("Ab4")
+
+		chosen_note = robatim.Note("Ab4")
+		self.assertEqual(chosen_scale_obj.get_relative_degree(starting_note, chosen_note), 0)
+		chosen_note = robatim.Note("B3")
+		self.assertEqual(chosen_scale_obj.get_relative_degree(starting_note, chosen_note), -6)
+		chosen_note = robatim.Note("F####4")
+		self.assertEqual(chosen_scale_obj.get_relative_degree(starting_note, chosen_note), -2)
+		chosen_note = robatim.Note("Eb2")
+		self.assertEqual(chosen_scale_obj.get_relative_degree(starting_note, chosen_note), -17)
+
+		chosen_note = robatim.Note("C5")
+		self.assertEqual(chosen_scale_obj.get_relative_degree(starting_note, chosen_note), 2)
+		chosen_note = robatim.Note("G#6")
+		self.assertEqual(chosen_scale_obj.get_relative_degree(starting_note, chosen_note), 13)
+		chosen_note = robatim.Note("Db5")
+		self.assertEqual(chosen_scale_obj.get_relative_degree(starting_note, chosen_note), 3)
+
 	def test_scale_pitches(self):
 
 		def analyze_scale_members(chosen_scale_obj, scale_sequence):
