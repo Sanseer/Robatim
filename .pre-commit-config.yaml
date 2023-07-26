@@ -3,3 +3,4 @@ repos:
     rev: 23.7.0
     hooks:
     -   id: black
+exclude: 'generate/midiutil.py'

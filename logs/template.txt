@@ -1,0 +1,28 @@
+\header {
+  title = "Untitled"
+  composer = "Robatim"
+}
+
+chordVoices = { \key KEY_SIG \minor CHORD_NOTES }
+
+bassVoice = { \key KEY_SIG \minor \time TIME_SIG \ottava #-1 BASS_NOTES }
+
+drumsUpper = \drummode { DRUMS_UPPER_NOTES }
+
+drumsLower = \drummode { DRUMS_LOWER_NOTES }
+
+\score {
+    \new PianoStaff <<
+      \new Staff <<
+        \new Voice \clef "alto" { \chordVoices }
+      >>
+      \new Staff <<
+        \new Voice \clef "bass" { \bassVoice }
+      >>
+      \new DrumStaff  <<
+        \new DrumVoice { \voiceOne \drumsUpper }
+        \new DrumVoice { \voiceTwo \drumsLower }
+      >>
+    >>
+  \layout {}
+}

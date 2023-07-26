@@ -1,5 +1,6 @@
-__pycache__
-logs/lily_output.txt
+__pycache__/
+.mypy_cache/
+logs/output.txt
 *.mid
 *.log
 *.json
