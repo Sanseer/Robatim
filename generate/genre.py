@@ -176,30 +176,40 @@ class FolkBuilder:
             root_iter = lowest_chord_root.create_iterator(["P8"])
             bass_root_prospects.append(deque(bass_tessitura.filter_pitches(root_iter)))
 
-        rooted_bassline = next(
-            iter(theory.WaveFunction(bass_root_prospects, self.has_bass_rooted))
+        possible_bassline_scaffolds = theory.WaveFunction(
+            bass_root_prospects, self.has_bass_rooted
         )
-        print(rooted_bassline)
 
-        bass_walker_prospects = []
-        for sequence_index, bass_root_note in enumerate(rooted_bassline):
-            groove_units = self.time_keeper.symbol_parents[sequence_index].groove_units
-            current_chord = self.chords[sequence_index]
-            bass_paths = self.get_bass_paths(
-                bass_root_note, current_chord, groove_units
-            )
-            index_prospects = []
-            for bass_path in bass_paths:
-                for bass_note in bass_path:
-                    if bass_note not in bass_tessitura:
-                        break
-                else:
-                    index_prospects.append(bass_path)
-            bass_walker_prospects.append(index_prospects)
+        for bassline_scaffold in possible_bassline_scaffolds:
+            print(f"Attempting {bassline_scaffold}")
+            bass_walker_prospects = []
+            for bass_root_note, current_chord, symbol_parent in zip(
+                bassline_scaffold, self.chords, self.time_keeper.symbol_parents
+            ):
+                bass_paths = self.get_bass_paths(
+                    bass_root_note, current_chord, symbol_parent.groove_units
+                )
+                index_prospects = []
+                for bass_path in bass_paths:
+                    for bass_note in bass_path:
+                        if bass_note not in bass_tessitura:
+                            break
+                    else:
+                        index_prospects.append(bass_path)
+                bass_walker_prospects.append(index_prospects)
 
-        bass_walker = next(
-            iter(theory.WaveFunction(bass_walker_prospects, self.has_bass_walked))
-        )
+            try:
+                bass_walker = next(
+                    iter(
+                        theory.WaveFunction(bass_walker_prospects, self.has_bass_walked)
+                    )
+                )
+                break
+            except StopIteration:
+                continue
+        else:
+            raise ValueError
+
         groove_iter = itertools.cycle(
             [
                 Fraction(groove_value)
@@ -213,7 +223,7 @@ class FolkBuilder:
                     theory.SpecificNote(bass_pitch, strum_duration)
                 )
 
-        final_bass_note = rooted_bassline[-1]
+        final_bass_note = bassline_scaffold[-1]
         self._score.tonal_parts[(chosen_instrument, 1)][-2:] = [
             theory.SpecificNote(final_bass_note, next(groove_iter)),
             theory.RestNote(next(groove_iter)),
