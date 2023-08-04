@@ -727,7 +727,7 @@ class WaveFunction:
         sequence_prospects: list[list] | list[deque],
         has_propagated: Callable[[list, int, list, Any], bool],
     ) -> None:
-        self.sequence_prospects = sequence_prospects
+        self.sequence_prospects = copy.deepcopy(sequence_prospects)
         self.has_propagated = has_propagated
         """A sequence is not necessarily validated from left to right 
         but is instead validated based on entropy. 

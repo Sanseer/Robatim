@@ -2,6 +2,7 @@ import random
 from collections import deque
 import itertools
 from fractions import Fraction
+from typing import Callable
 
 from generate import theory, implement
 
@@ -32,6 +33,10 @@ class FolkBuilder:
 
         self.index_repeats: dict[int, set[int]]
         self.subsequences: dict[int, tuple[tuple[int, ...], str]]
+        self.get_bass_range: Callable[
+            [deque[theory.SpecificPitch]],
+            tuple[theory.SpecificPitch, theory.SpecificPitch],
+        ]
 
     @staticmethod
     def find_subsequences(
@@ -176,37 +181,46 @@ class FolkBuilder:
             root_iter = lowest_chord_root.create_iterator(["P8"])
             bass_root_prospects.append(deque(bass_tessitura.filter_pitches(root_iter)))
 
-        possible_bassline_scaffolds = theory.WaveFunction(
-            bass_root_prospects, self.has_bass_rooted
-        )
+        bass_range_options = [self.surround_single_tonic, self.within_double_tonic]
+        random.shuffle(bass_range_options)
+        for bass_range_option in bass_range_options:
+            self.get_bass_range = bass_range_option
+            possible_bassline_scaffolds = theory.WaveFunction(
+                bass_root_prospects, self.has_bass_rooted
+            )
 
-        for bassline_scaffold in possible_bassline_scaffolds:
-            print(f"Attempting {bassline_scaffold}")
-            bass_walker_prospects = []
-            for bass_root_note, current_chord, symbol_parent in zip(
-                bassline_scaffold, self.chords, self.time_keeper.symbol_parents
-            ):
-                bass_paths = self.get_bass_paths(
-                    bass_root_note, current_chord, symbol_parent.groove_units
-                )
-                index_prospects = []
-                for bass_path in bass_paths:
-                    for bass_note in bass_path:
-                        if bass_note not in bass_tessitura:
-                            break
-                    else:
-                        index_prospects.append(bass_path)
-                bass_walker_prospects.append(index_prospects)
-
-            try:
-                bass_walker = next(
-                    iter(
-                        theory.WaveFunction(bass_walker_prospects, self.has_bass_walked)
+            for bassline_scaffold in possible_bassline_scaffolds:
+                print(f"Attempting {bassline_scaffold}")
+                bass_walker_prospects = []
+                for bass_root_note, current_chord, symbol_parent in zip(
+                    bassline_scaffold, self.chords, self.time_keeper.symbol_parents
+                ):
+                    bass_paths = self.get_bass_paths(
+                        bass_root_note, current_chord, symbol_parent.groove_units
                     )
-                )
-                break
-            except StopIteration:
+                    index_prospects = []
+                    for bass_path in bass_paths:
+                        for bass_note in bass_path:
+                            if bass_note not in bass_tessitura:
+                                break
+                        else:
+                            index_prospects.append(bass_path)
+                    bass_walker_prospects.append(index_prospects)
+
+                try:
+                    bass_walker = next(
+                        iter(
+                            theory.WaveFunction(
+                                bass_walker_prospects, self.has_bass_walked
+                            )
+                        )
+                    )
+                    break
+                except StopIteration:
+                    continue
+            else:
                 continue
+            break
         else:
             raise ValueError
 
@@ -249,8 +263,12 @@ class FolkBuilder:
         for sequence_index in range(sequence_size):
             index_prospects = bass_sequence_prospects[sequence_index]
             if index_prospects[0].generic_pitch == chosen_bass_note.generic_pitch:
-                index_prospects.clear()
-                index_prospects.append(chosen_bass_note)
+                if (
+                    self.get_bass_range == self.surround_single_tonic
+                    or chosen_bass_note.generic_pitch != self._score.scale
+                ):
+                    index_prospects.clear()
+                    index_prospects.append(chosen_bass_note)
 
         def has_global_reset(sequence_index: int) -> bool:
             min_pitch = index_prospects[0]
@@ -287,7 +305,7 @@ class FolkBuilder:
 
         return True
 
-    def get_bass_range(
+    def surround_single_tonic(
         self, specific_pitches: deque[theory.SpecificPitch]
     ) -> tuple[theory.SpecificPitch, theory.SpecificPitch]:
         if specific_pitches[0].generic_pitch == self._score.scale:
@@ -296,6 +314,15 @@ class FolkBuilder:
         else:
             up_shift = down_shift = theory.Interval.get("P8")
 
+        pitch_min = specific_pitches[0] - down_shift
+        pitch_max = specific_pitches[-1] + up_shift
+
+        return pitch_min, pitch_max
+
+    def within_double_tonic(
+        self, specific_pitches: deque[theory.SpecificPitch]
+    ) -> tuple[theory.SpecificPitch, theory.SpecificPitch]:
+        up_shift = down_shift = theory.Interval.get("P8")
         pitch_min = specific_pitches[0] - down_shift
         pitch_max = specific_pitches[-1] + up_shift
 
@@ -407,6 +434,16 @@ class FolkBuilder:
                             bass_root_note,
                             bass_root_note - (~fifth_interval),
                             bass_root_note,
+                        ],
+                        [
+                            bass_root_note,
+                            bass_root_note,
+                            bass_root_note + fifth_interval,
+                        ],
+                        [
+                            bass_root_note,
+                            bass_root_note,
+                            bass_root_note - (~fifth_interval),
                         ],
                     ]
                 )
