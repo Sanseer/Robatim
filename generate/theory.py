@@ -5,11 +5,11 @@ import random
 from fractions import Fraction
 from dataclasses import dataclass
 from collections import defaultdict, deque
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterator, TypeVar
 import copy
 
 
-def create_reversible_map(old_mapping: dict) -> dict:
+def create_reversible_map(old_mapping: dict[str, str]) -> dict[str, str]:
     new_mapping = {}
     for key, value in old_mapping.items():
         new_mapping[key] = value
@@ -18,17 +18,21 @@ def create_reversible_map(old_mapping: dict) -> dict:
     return new_mapping
 
 
+# PEP 673
+TStringDefinedEntity = TypeVar("TStringDefinedEntity", bound="StringDefinedEntity")
+
+
 class StringDefinedEntity:
-    def __init__(self):
+    def __init__(self, symbol: str) -> None:
         raise NotImplementedError
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"'{self}'"
 
     def __eq__(self, other) -> bool:
         return str(self) == str(other)
 
-    def clone(self):
+    def clone(self: TStringDefinedEntity) -> TStringDefinedEntity:
         return self.__class__(str(self))
 
 
@@ -37,16 +41,16 @@ class ValueComparator:
         self.value: int
         raise NotImplementedError
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: ValueComparator) -> bool:
         return self.value < other.value
 
-    def __le__(self, other) -> bool:
+    def __le__(self, other: ValueComparator) -> bool:
         return self.value <= other.value
 
-    def __gt__(self, other) -> bool:
+    def __gt__(self, other: ValueComparator) -> bool:
         return self.value > other.value
 
-    def __ge__(self, other) -> bool:
+    def __ge__(self, other: ValueComparator) -> bool:
         return self.value >= other.value
 
 
@@ -78,6 +82,9 @@ class Accidental(StringDefinedEntity, ValueComparator):
 
     def increment(self, amount: int) -> None:
         self.value += amount
+
+
+TGenericPitch = TypeVar("TGenericPitch", bound="GenericPitch")
 
 
 class GenericPitch(StringDefinedEntity):
@@ -122,13 +129,13 @@ class GenericPitch(StringDefinedEntity):
                 self.accidental.increment(-2 * direction)
         self.letter = current_letter
 
-    def __add__(self, chosen_interval: Interval) -> GenericPitch:
+    def __add__(self: TGenericPitch, chosen_interval: Interval) -> TGenericPitch:
         new_obj = self.clone()
         new_obj.increment_letter(chosen_interval.size)
         new_obj.increment_value(chosen_interval.value)
         return new_obj
 
-    def __sub__(self, chosen_interval: Interval) -> GenericPitch:
+    def __sub__(self: TGenericPitch, chosen_interval: Interval) -> TGenericPitch:
         new_obj = self.clone()
         new_obj.increment_letter(chosen_interval.size * -1)
         new_obj.increment_value(chosen_interval.value * -1)
@@ -197,18 +204,6 @@ class SpecificPitch(GenericPitch, ValueComparator):
             if current_letter == octave_step:
                 self._octave += direction
         self.letter = current_letter
-
-    def __add__(self, chosen_interval: Interval) -> SpecificPitch:
-        new_obj = self.clone()
-        new_obj.increment_letter(chosen_interval.size)
-        new_obj.increment_value(chosen_interval.value)
-        return new_obj
-
-    def __sub__(self, chosen_interval: Interval) -> SpecificPitch:
-        new_obj = self.clone()
-        new_obj.increment_letter(chosen_interval.size * -1)
-        new_obj.increment_value(chosen_interval.value * -1)
-        return new_obj
 
     @property
     def generic_pitch(self) -> str:
