@@ -35,6 +35,21 @@ class StringDefinedEntity:
     def clone(self: TStringDefinedEntity) -> TStringDefinedEntity:
         return self.__class__(str(self))
 
+    @staticmethod
+    def split_by_characters(
+        input_string: str, segment1_identifiers: set[str]
+    ) -> tuple[str, str]:
+        for index, character in enumerate(input_string):
+            if character not in segment1_identifiers:
+                string_segment1 = input_string[:index]
+                string_segment2 = input_string[index:]
+                break
+        else:
+            string_segment1 = input_string
+            string_segment2 = ""
+
+        return string_segment1, string_segment2
+
 
 class ValueComparator:
     def __init__(self) -> None:
@@ -332,6 +347,11 @@ class IntervalQuality:
         return self.inversion_map[old_symbol[0]] * len(old_symbol)
 
 
+class EngravingError(Exception):
+    def __str__(self) -> str:
+        return f"Double accidentals detected: {self.args[0]}"
+
+
 class Scale(GenericPitch):
     roman_numerals = {"I": 0, "II": 1, "III": 2, "IV": 3, "V": 4, "VI": 5, "VII": 6}
 
@@ -339,12 +359,21 @@ class Scale(GenericPitch):
         super().__init__(symbol)
         self.chord_cache: dict[str, GenericChord] = {}
         tonic_pitch = GenericPitch(str(self))
+        print(f"Chosen scale: {tonic_pitch}")
 
         major_scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "M7"]
         self._members = [
             tonic_pitch + Interval.get(interval_symbol)
             for interval_symbol in major_scale_intervals
         ]
+
+        """Lilypond can't render triple accidentals. 
+        Preventing double accidentals on the major scale ensures that 
+        altered notes don't have triple accidentals."""
+        for scale_pitch in self._members:
+            number_of_accidentals = abs(scale_pitch.accidental.value)
+            if number_of_accidentals >= 2:
+                raise EngravingError(scale_pitch)
 
     def __getitem__(self, index: int) -> GenericPitch:
         return self._members[index]
@@ -354,7 +383,7 @@ class Scale(GenericPitch):
             return self.chord_cache[input_symbol]
 
         pitch_identifiers = {"#", "b", "V", "I"}
-        roman_numeral, chord_modifier = split_by_characters(
+        roman_numeral, chord_modifier = self.split_by_characters(
             input_symbol, pitch_identifiers
         )
 
@@ -392,7 +421,6 @@ class GenericChord(StringDefinedEntity):
         "": ["P1", "M3", "P5"],
         "m": ["P1", "m3", "P5"],
         "dim": ["P1", "m3", "d5"],
-        "7": ["P1", "M3", "P5", "m7"],
     }
 
     def __init__(self, symbol: str | None = None) -> None:
@@ -401,7 +429,7 @@ class GenericChord(StringDefinedEntity):
             self.chord_id = random.choice(list(self.chord_types.keys()))
         else:
             pitch_identifiers = {"#", "b", "A", "B", "C", "D", "E", "F", "G"}
-            pitch_symbol, chord_id = split_by_characters(symbol, pitch_identifiers)
+            pitch_symbol, chord_id = self.split_by_characters(symbol, pitch_identifiers)
             if chord_id not in self.chord_types:
                 raise ValueError
             self.chord_id = chord_id
@@ -426,27 +454,11 @@ class GenericChord(StringDefinedEntity):
         return Interval.get(self.chord_types[self.chord_id][pitch_index])
 
 
-def split_by_characters(
-    input_string: str, segment1_identifiers: set[str]
-) -> tuple[str, str]:
-    for index, character in enumerate(input_string):
-        if character not in segment1_identifiers:
-            string_segment1 = input_string[:index]
-            string_segment2 = input_string[index:]
-            break
-    else:
-        string_segment1 = input_string
-        string_segment2 = ""
-
-    return string_segment1, string_segment2
-
-
 class Tessitura:
     chord_interval_map = {
         "": ["M3", "m3", "P4"],
         "m": ["m3", "M3", "P4"],
         "dim": ["m3", "m3", "A4"],
-        "7": ["M3", "m3", "m3", "M2"],
     }
 
     def __init__(
@@ -561,8 +573,14 @@ class NoteCluster:
 
 class AbstractScore:
     def __init__(self) -> None:
-        self.scale = Scale()
-        print(f"Chosen scale: {self.scale}")
+        while True:
+            try:
+                self.scale = Scale()
+            except EngravingError as err:
+                print(err)
+                print("Reattempting...")
+            else:
+                break
         print(f"Scale members: {self.scale._members}")
         self.time_sig: TimeSignature
         self.tempo: int
