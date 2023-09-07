@@ -46,14 +46,13 @@ class LilypondFactory:
 
         generic_pitch_repr = cls.convert_generic_pitch(input_pitch)
 
+        abs_octave_shift = abs(input_pitch.octave - 3)
         if input_pitch.octave > 3:
-            symbol_quantity = input_pitch.octave - 3
             octave_mark = "'"
         else:
-            symbol_quantity = 3 - input_pitch.octave
             octave_mark = ","
 
-        octave_repr = symbol_quantity * octave_mark
+        octave_repr = octave_mark * abs_octave_shift
         output_repr = f"{generic_pitch_repr}{octave_repr}"
         cls.specific_pitch_cache[input_repr] = output_repr
 
@@ -104,13 +103,13 @@ class LilypondFactory:
             pitch_repr = cls.drum_mapping[input_obj.pitch]
             return f"{pitch_repr}{duration_repr}"
         elif isinstance(input_obj, theory.DrumCluster):
-            drum_cluster = [cls.drum_mapping[drum_pitch] for drum_pitch in input_obj]
-            drum_cluster_repr = " ".join(drum_cluster)
+            drum_notes = [cls.drum_mapping[drum_pitch] for drum_pitch in input_obj]
+            drum_notes_repr = " ".join(drum_notes)
             # a DrumCluster may have one DrumNote if you merged a DrumNote with a RestNote
-            if len(drum_cluster) == 1:
-                return f"{drum_cluster_repr}{duration_repr}"
+            if len(drum_notes) == 1:
+                return f"{drum_notes_repr}{duration_repr}"
             else:
-                return f"<{drum_cluster_repr}>{duration_repr}"
+                return f"<{drum_notes_repr}>{duration_repr}"
         elif isinstance(input_obj, theory.RestNote):
             return f"r{duration_repr}"
 
@@ -145,18 +144,19 @@ class LilypondFactory:
             )
 
         time_sig_repr = str(input_score.time_sig)
-        drum_note_sequences: list[list[str]] = [[], []]
-        if time_sig_repr == "7/8":
-            drum_note_sequences[0].append(
-                r"\set Timing.beamExceptions = #'() \set Timing.beatStructure = 3,4"
+        drum_note_sequences = []
+        for drum_part in input_score.drum_parts:
+            drum_note_sequences.append(
+                [cls.convert_drum_obj(drum_obj) for drum_obj in drum_part]
             )
-        for index, drum_part in enumerate(input_score.drum_parts):
-            for drum_obj in drum_part:
-                drum_note_sequences[index].append(cls.convert_drum_obj(drum_obj))
+        if time_sig_repr == "7/8":
+            drum_note_sequences[0].insert(
+                0, r"\set Timing.beamExceptions = #'() \set Timing.beatStructure = 3,4"
+            )
 
         with open("logs/template.txt", "r") as sheet_file:
             output_string = sheet_file.read()
-        tonic_designator = cls.convert_generic_pitch(input_score.scale)
+        tonic_designator = cls.convert_generic_pitch(input_score.scale[0])
         output_string = output_string.replace("KEY_SIG", tonic_designator)
 
         output_string = output_string.replace(
@@ -193,21 +193,32 @@ def export_midi(input_score: theory.AbstractScore) -> None:
     channel = 0
     time = 0
 
+    time_sig_beats = {"4/4": "1", "7/8": "1", "12/8": "2/3"}
+    beats_per_quarter_note = Fraction(time_sig_beats[str(input_score.time_sig)])
+
+    def get_tick_duration(metric_duration: Fraction) -> int:
+        return int(metric_duration * 4 * beats_per_quarter_note * TICKS_PER_QUARTERNOTE)
+
     for (instrument, _), score_part in input_score.tonal_parts.items():
         new_midi.addProgramChange(track, channel, 0, instrument.number)
         for sound_obj in score_part:
-            duration = int(sound_obj.duration * 4 * TICKS_PER_QUARTERNOTE)
+            tick_duration = get_tick_duration(sound_obj.duration)
 
             if isinstance(sound_obj, theory.SpecificNote):
                 new_midi.addNote(
-                    track, channel, sound_obj.specific_pitch.value, time, duration, 115
+                    track,
+                    channel,
+                    sound_obj.specific_pitch.value,
+                    time,
+                    tick_duration,
+                    115,
                 )
             elif isinstance(sound_obj, theory.SpecificChord):
                 for specific_pitch in sound_obj.note_cluster:
                     new_midi.addNote(
-                        track, channel, specific_pitch.value, time, duration, 80
+                        track, channel, specific_pitch.value, time, tick_duration, 80
                     )
-            time += duration
+            time += tick_duration
 
         track += 1
         channel += 1
@@ -215,15 +226,19 @@ def export_midi(input_score: theory.AbstractScore) -> None:
 
     channel = 9
     for drum_part in input_score.drum_parts:
-        time = 0
         for drum_obj in drum_part:
-            duration = int(drum_obj.duration * 4 * TICKS_PER_QUARTERNOTE)
+            tick_duration = get_tick_duration(drum_obj.duration)
             if isinstance(drum_obj, theory.DrumNote):
-                new_midi.addNote(track, channel, drum_obj.pitch, time, duration, 100)
+                new_midi.addNote(
+                    track, channel, drum_obj.pitch, time, tick_duration, 100
+                )
             elif isinstance(drum_obj, theory.DrumCluster):
                 for drum_pitch in drum_obj:
-                    new_midi.addNote(track, channel, drum_pitch, time, duration, 100)
-            time += duration
+                    new_midi.addNote(
+                        track, channel, drum_pitch, time, tick_duration, 100
+                    )
+            time += tick_duration
+        time = 0
 
     try:
         with open("logs/output.mid", "wb") as output_file:
