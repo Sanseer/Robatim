@@ -255,6 +255,26 @@ class SpecificPitch(GenericPitch, ValueComparator):
                 current_pitch += current_interval
                 yield current_pitch
 
+    @staticmethod
+    def get_interval_distance(
+        first_pitch: SpecificPitch, second_pitch: SpecificPitch
+    ) -> int:
+        if first_pitch < second_pitch:
+            increment = 1
+        else:
+            increment = -1
+
+        search_pitch = first_pitch.clone()
+        interval_count = 0
+        while (
+            search_pitch.letter != second_pitch.letter
+            or search_pitch.octave != second_pitch.octave
+        ):
+            search_pitch.increment_letter(increment)
+            interval_count += 1
+
+        return interval_count
+
 
 class Interval(StringDefinedEntity, ValueComparator):
     major_scale_semitones = (0, 2, 4, 5, 7, 9, 11)
@@ -777,6 +797,8 @@ class WaveFunction:
             chosen_item = random.choice(slot_options)
             self.final_sequence[chosen_index] = chosen_item
             modified_prospects = copy.deepcopy(sequence_prospects)
+            modified_prospects[chosen_index].clear()
+            modified_prospects[chosen_index].append(chosen_item)
 
             propagate_verdict = self.has_propagated(
                 modified_prospects, chosen_index, self.final_sequence, chosen_item

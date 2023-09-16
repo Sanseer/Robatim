@@ -188,6 +188,7 @@ class TimeKeeper:
             for primary_index in duplicate_group:
                 for secondary_index in duplicate_group:
                     result[primary_index].add(secondary_index)
+                result[primary_index].remove(primary_index)
 
         return result
 

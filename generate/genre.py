@@ -3,6 +3,7 @@ from collections import deque
 import itertools
 from fractions import Fraction
 from typing import Callable
+from functools import partial
 
 from generate import theory, implement
 
@@ -17,6 +18,62 @@ instruments_accompaniment = [
     theory.MidiInstrument(*instrument)
     for instrument in implement.idioms["instruments_accompaniment"]
 ]
+
+
+def filter_prospects(
+    original_prospects: deque | list, has_prospect_succeeded: partial[bool]
+) -> bool:
+    filtered_prospects = [
+        original_prospect
+        for original_prospect in original_prospects
+        if has_prospect_succeeded(original_prospect)
+    ]
+
+    if not filtered_prospects:
+        return False
+    original_prospects.clear()
+    original_prospects.extend(filtered_prospects)
+
+    return True
+
+
+def checked_leap(
+    first_pitch: theory.SpecificPitch, second_pitch: theory.SpecificPitch
+) -> bool:
+    interval_distance = theory.SpecificPitch.get_interval_distance(
+        first_pitch, second_pitch
+    )
+    return interval_distance <= 4
+
+
+def checked_dissonance(
+    first_pitch: theory.SpecificPitch, second_pitch: theory.SpecificPitch
+) -> bool:
+    undesirable_pitches = {
+        (first_pitch + theory.Interval.get("d4")).generic_pitch,
+        (first_pitch + theory.Interval.get("A5")).generic_pitch,
+    }
+    return second_pitch.generic_pitch not in undesirable_pitches
+
+
+def checked_bass_transition(
+    previous_bass_move: list[theory.SpecificPitch],
+    current_bass_move: list[theory.SpecificPitch],
+) -> bool:
+    current_boundary_pitch = current_bass_move[0]
+    previous_boundary_pitch = previous_bass_move[-1]
+    if not checked_leap(previous_boundary_pitch, current_boundary_pitch):
+        return False
+    if not checked_dissonance(previous_boundary_pitch, current_boundary_pitch):
+        return False
+
+    return True
+
+
+def checked_octave(
+    first_pitch: theory.SpecificPitch, second_pitch: theory.SpecificPitch
+) -> bool:
+    return first_pitch.octave == second_pitch.octave
 
 
 class FolkBuilder:
@@ -37,6 +94,7 @@ class FolkBuilder:
             [deque[theory.SpecificPitch]],
             tuple[theory.SpecificPitch, theory.SpecificPitch],
         ]
+        self.adjacent_chord_regions: set[tuple[int, int]] = set()
 
     @staticmethod
     def find_subsequences(
@@ -83,6 +141,12 @@ class FolkBuilder:
         self.time_keeper = implement.TimeKeeper(progression_preset)
         self.time_keeper.print_formatted()
         self.index_repeats = self.time_keeper.symbol_parent_repeats
+
+        for chord_index, (first_symbol_parent, _) in enumerate(
+            itertools.pairwise(self.time_keeper.symbol_parents)
+        ):
+            if first_symbol_parent.groove_units == 1:
+                self.adjacent_chord_regions.add((chord_index, chord_index + 1))
 
         symbol_sequence = self.time_keeper.symbol_sequence
         self.subsequences = self.find_subsequences(
@@ -184,6 +248,7 @@ class FolkBuilder:
         bass_range_options = [self.surround_single_tonic, self.within_double_tonic]
         random.shuffle(bass_range_options)
         for bass_range_option in bass_range_options:
+            print(bass_range_option.__name__)
             self.get_bass_range = bass_range_option
             possible_bassline_scaffolds = theory.WaveFunction(
                 bass_root_prospects, self.has_bass_rooted
@@ -248,27 +313,58 @@ class FolkBuilder:
         bass_sequence_prospects: list[deque[theory.SpecificPitch]],
         propagate_index: int,
         bass_sequence: list[theory.SpecificPitch | None],
-        chosen_bass_note: theory.SpecificPitch,
+        chosen_bass_pitch: theory.SpecificPitch,
     ) -> bool:
+        if propagate_index != len(bass_sequence) - 1:
+            next_index = propagate_index + 1
+            next_prospects = bass_sequence_prospects[next_index]
+            attempted_indices = (propagate_index, next_index)
+            if attempted_indices in self.adjacent_chord_regions:
+                has_prospect_succeeded = partial(
+                    checked_leap, second_pitch=chosen_bass_pitch
+                )
+                if not filter_prospects(next_prospects, has_prospect_succeeded):
+                    return False
+
+        if propagate_index != 0:
+            previous_index = propagate_index - 1
+            previous_prospects = bass_sequence_prospects[previous_index]
+            attempted_indices = (previous_index, propagate_index)
+            if attempted_indices in self.adjacent_chord_regions:
+                has_prospect_succeeded = partial(
+                    checked_leap, second_pitch=chosen_bass_pitch
+                )
+                if not filter_prospects(previous_prospects, has_prospect_succeeded):
+                    return False
+
+        for duplicate_index in self.index_repeats[propagate_index]:
+            bass_sequence_prospects[duplicate_index].clear()
+            bass_sequence_prospects[duplicate_index].append(chosen_bass_pitch)
+
+        has_single_tone = (
+            self.get_bass_range == self.surround_single_tonic
+            or chosen_bass_pitch.generic_pitch != self._score.scale
+        )
+
+        sequence_size = len(bass_sequence)
+        if has_single_tone:
+            for sequence_index in range(sequence_size):
+                index_prospects = bass_sequence_prospects[sequence_index]
+                if index_prospects[0].letter == chosen_bass_pitch.letter:
+                    has_prospect_succeeded = partial(
+                        checked_octave, second_pitch=chosen_bass_pitch
+                    )
+                    if not filter_prospects(index_prospects, has_prospect_succeeded):
+                        return False
+
         global_tessitura = theory.Tessitura(
-            *self.get_bass_range(deque([chosen_bass_note]))
+            *self.get_bass_range(deque([chosen_bass_pitch]))
         )
         local_tessituras = []
         for index_prospects in bass_sequence_prospects:
             local_tessitura = theory.Tessitura(index_prospects[0], index_prospects[-1])
             local_tessituras.append(local_tessitura)
             global_tessitura.has_contracted(*self.get_bass_range(index_prospects))
-
-        sequence_size = len(bass_sequence)
-        for sequence_index in range(sequence_size):
-            index_prospects = bass_sequence_prospects[sequence_index]
-            if index_prospects[0].generic_pitch == chosen_bass_note.generic_pitch:
-                if (
-                    self.get_bass_range == self.surround_single_tonic
-                    or chosen_bass_note.generic_pitch != self._score.scale
-                ):
-                    index_prospects.clear()
-                    index_prospects.append(chosen_bass_note)
 
         def has_global_reset(sequence_index: int) -> bool:
             min_pitch = index_prospects[0]
@@ -458,22 +554,39 @@ class FolkBuilder:
         bass_walker: list[list[theory.SpecificPitch] | None],
         chosen_bass_move: list[theory.SpecificPitch],
     ) -> bool:
-        if propagate_index != len(bass_walker) - 1:
-            last_bass_note = chosen_bass_move[-1]
+        final_index = len(bass_walker) - 1
+        last_bass_note = chosen_bass_move[-1]
+        if propagate_index != final_index:
             next_bass_note = bass_walker_prospects[propagate_index + 1][0][0]
-            transition_leap = abs(chosen_bass_move[-1].value - next_bass_note.value)
-            if transition_leap > 7:
+            if not checked_leap(last_bass_note, next_bass_note):
+                return False
+            if not checked_dissonance(last_bass_note, next_bass_note):
                 return False
 
-            undesirable_pitches = [
-                (last_bass_note + theory.Interval.get("d4")).generic_pitch,
-                (last_bass_note + theory.Interval.get("A5")).generic_pitch,
-            ]
-            if repr(next_bass_note.generic_pitch) in repr(undesirable_pitches):
+        if propagate_index != 0:
+            previous_prospects = bass_walker_prospects[propagate_index - 1]
+            has_prospect_succeeded = partial(
+                checked_bass_transition, current_bass_move=chosen_bass_move
+            )
+            if not filter_prospects(previous_prospects, has_prospect_succeeded):
                 return False
 
         for duplicate_index in self.index_repeats[propagate_index]:
             if len(bass_walker_prospects[duplicate_index][0]) == len(chosen_bass_move):
+                if duplicate_index != final_index:
+                    next_bass_note = bass_walker_prospects[duplicate_index + 1][0][0]
+                    if not checked_leap(last_bass_note, next_bass_note):
+                        return False
+                    if not checked_dissonance(last_bass_note, next_bass_note):
+                        return False
+
+                if duplicate_index != 0:
+                    previous_prospects = bass_walker_prospects[duplicate_index - 1]
+                    has_prospect_succeeded = partial(
+                        checked_bass_transition, current_bass_move=chosen_bass_move
+                    )
+                    if not filter_prospects(previous_prospects, has_prospect_succeeded):
+                        return False
                 bass_walker_prospects[duplicate_index] = [chosen_bass_move]
 
         return True
