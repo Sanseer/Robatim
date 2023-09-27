@@ -43,7 +43,7 @@ def checked_leap(
     interval_distance = theory.SpecificPitch.get_interval_distance(
         first_pitch, second_pitch
     )
-    return interval_distance <= 4
+    return interval_distance <= 7
 
 
 def checked_dissonance(
@@ -66,7 +66,6 @@ def checked_bass_transition(
         return False
     if not checked_dissonance(previous_boundary_pitch, current_boundary_pitch):
         return False
-
     return True
 
 
@@ -245,8 +244,13 @@ class FolkBuilder:
             root_iter = lowest_chord_root.create_iterator(["P8"])
             bass_root_prospects.append(deque(bass_tessitura.filter_pitches(root_iter)))
 
-        bass_range_options = [self.surround_single_tonic, self.within_double_tonic]
+        bass_range_options = [
+            self.surround_single_tonic,
+            self.descend_from_tonic,
+            self.ascend_from_tonic,
+        ]
         random.shuffle(bass_range_options)
+
         for bass_range_option in bass_range_options:
             print(bass_range_option.__name__)
             self.get_bass_range = bass_range_option
@@ -341,21 +345,15 @@ class FolkBuilder:
             bass_sequence_prospects[duplicate_index].clear()
             bass_sequence_prospects[duplicate_index].append(chosen_bass_pitch)
 
-        has_single_tone = (
-            self.get_bass_range == self.surround_single_tonic
-            or chosen_bass_pitch.generic_pitch != self._score.scale
-        )
-
         sequence_size = len(bass_sequence)
-        if has_single_tone:
-            for sequence_index in range(sequence_size):
-                index_prospects = bass_sequence_prospects[sequence_index]
-                if index_prospects[0].letter == chosen_bass_pitch.letter:
-                    has_prospect_succeeded = partial(
-                        checked_octave, second_pitch=chosen_bass_pitch
-                    )
-                    if not filter_prospects(index_prospects, has_prospect_succeeded):
-                        return False
+        for sequence_index in range(sequence_size):
+            index_prospects = bass_sequence_prospects[sequence_index]
+            if index_prospects[0].letter == chosen_bass_pitch.letter:
+                has_prospect_succeeded = partial(
+                    checked_octave, second_pitch=chosen_bass_pitch
+                )
+                if not filter_prospects(index_prospects, has_prospect_succeeded):
+                    return False
 
         global_tessitura = theory.Tessitura(
             *self.get_bass_range(deque([chosen_bass_pitch]))
@@ -415,10 +413,29 @@ class FolkBuilder:
 
         return pitch_min, pitch_max
 
-    def within_double_tonic(
+    def descend_from_tonic(
         self, specific_pitches: deque[theory.SpecificPitch]
     ) -> tuple[theory.SpecificPitch, theory.SpecificPitch]:
-        up_shift = down_shift = theory.Interval.get("P8")
+        if specific_pitches[0].generic_pitch == self._score.scale:
+            up_shift = theory.Interval.get("P1")
+            down_shift = theory.Interval.get("P8")
+        else:
+            up_shift = down_shift = theory.Interval.get("P8")
+
+        pitch_min = specific_pitches[0] - down_shift
+        pitch_max = specific_pitches[-1] + up_shift
+
+        return pitch_min, pitch_max
+
+    def ascend_from_tonic(
+        self, specific_pitches: deque[theory.SpecificPitch]
+    ) -> tuple[theory.SpecificPitch, theory.SpecificPitch]:
+        if specific_pitches[0].generic_pitch == self._score.scale:
+            up_shift = theory.Interval.get("M6")
+            down_shift = theory.Interval.get("M2")
+        else:
+            up_shift = down_shift = theory.Interval.get("P8")
+
         pitch_min = specific_pitches[0] - down_shift
         pitch_max = specific_pitches[-1] + up_shift
 
@@ -436,23 +453,18 @@ class FolkBuilder:
             return [[bass_root_note]]
         elif groove_units % 2 == 0:
             multiplier = groove_units // 2
-            # duplicated prospects reduce the probability of non-duplicated prospects
             prospects = [
                 [bass_root_note, bass_root_note] * multiplier,
                 [bass_root_note, bass_root_note + third_interval] * multiplier,
-                [bass_root_note, bass_root_note + third_interval] * multiplier,
                 [bass_root_note, bass_root_note - theory.Interval.get("m3")]
                 * multiplier,
-                [bass_root_note, bass_root_note - theory.Interval.get("m3")]
+                [bass_root_note, bass_root_note - theory.Interval.get("M3")]
                 * multiplier,
             ]
             if fifth_interval != "d5":
                 prospects.extend(
                     [
                         [bass_root_note, bass_root_note + fifth_interval] * multiplier,
-                        [bass_root_note, bass_root_note + fifth_interval] * multiplier,
-                        [bass_root_note, bass_root_note - (~fifth_interval)]
-                        * multiplier,
                         [bass_root_note, bass_root_note - (~fifth_interval)]
                         * multiplier,
                     ]
@@ -496,7 +508,6 @@ class FolkBuilder:
             prospects = [
                 [bass_root_note, bass_root_note, bass_root_note],
                 [bass_root_note, bass_root_note + third_interval, bass_root_note],
-                [bass_root_note, bass_root_note + third_interval, bass_root_note],
                 [
                     bass_root_note,
                     bass_root_note - theory.Interval.get("m3"),
@@ -504,7 +515,7 @@ class FolkBuilder:
                 ],
                 [
                     bass_root_note,
-                    bass_root_note - theory.Interval.get("m3"),
+                    bass_root_note - theory.Interval.get("M3"),
                     bass_root_note,
                 ],
             ]
@@ -518,16 +529,6 @@ class FolkBuilder:
                         ],
                         [
                             bass_root_note,
-                            bass_root_note + fifth_interval,
-                            bass_root_note,
-                        ],
-                        [
-                            bass_root_note,
-                            bass_root_note - (~fifth_interval),
-                            bass_root_note,
-                        ],
-                        [
-                            bass_root_note,
                             bass_root_note - (~fifth_interval),
                             bass_root_note,
                         ],
@@ -538,6 +539,26 @@ class FolkBuilder:
                         ],
                         [
                             bass_root_note,
+                            bass_root_note,
+                            bass_root_note - (~fifth_interval),
+                        ],
+                        [
+                            bass_root_note + fifth_interval,
+                            bass_root_note,
+                            bass_root_note,
+                        ],
+                        [
+                            bass_root_note - (~fifth_interval),
+                            bass_root_note,
+                            bass_root_note,
+                        ],
+                        [
+                            bass_root_note + fifth_interval,
+                            bass_root_note,
+                            bass_root_note + fifth_interval,
+                        ],
+                        [
+                            bass_root_note - (~fifth_interval),
                             bass_root_note,
                             bass_root_note - (~fifth_interval),
                         ],
