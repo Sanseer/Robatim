@@ -299,12 +299,14 @@ class Interval(StringDefinedEntity, ValueComparator):
         # Programmers count from zero. Unison (P1) should be P0.
         self.size = int(size) - 1
         simplified_size = self.size % 7
+        reference_quality: IntervalQuality
+        self.quality: IntervalQuality
         if simplified_size in self.perfect_degrees:
-            reference_quality = IntervalQuality("P", "perfect")
-            self.quality = IntervalQuality(quality, "perfect")
+            reference_quality = PerfectibleQuality("P")
+            self.quality = PerfectibleQuality(quality)
         else:
-            reference_quality = IntervalQuality("M", "imperfect")
-            self.quality = IntervalQuality(quality, "imperfect")
+            reference_quality = ImperfectibleQuality("M")
+            self.quality = ImperfectibleQuality(quality)
 
         self.value = self.major_scale_semitones[simplified_size]
         current_size = self.size
@@ -335,36 +337,39 @@ class Interval(StringDefinedEntity, ValueComparator):
         return Interval.get(f"{~self.quality}{new_size + 1}")
 
 
-class IntervalQuality:
-    interval_choices = {"perfect": ("d", "P", "A"), "imperfect": ("d", "m", "M", "A")}
+class IntervalQuality(StringDefinedEntity):
     inversion_map = create_reversible_map({"P": "P", "A": "d", "M": "m"})
+    possible_intervals: tuple[str, ...]
 
-    def __init__(self, symbol: str, designation: str) -> None:
-        self.possible_intervals = self.interval_choices[designation]
-
+    def __init__(self, symbol: str) -> None:
         if len(set(symbol)) != 1:
             raise ValueError
-        if symbol in self.possible_intervals:
-            self.index = self.possible_intervals.index(symbol)
-        elif "AA" in symbol:
-            self.index = symbol.count("A") + len(self.possible_intervals) - 2
-        elif "dd" in symbol:
-            self.index = symbol.count("d") * -1 + 1
+        self.symbol = symbol
+
+    def __str__(self) -> str:
+        return self.symbol
+
+    def __invert__(self) -> str:
+        return self.inversion_map[self.symbol[0]] * len(self.symbol)
+
+    @property
+    def index(self) -> int:
+        if self.symbol in self.possible_intervals:
+            return self.possible_intervals.index(self.symbol)
+        elif "AA" in self.symbol:
+            return self.symbol.count("A") + len(self.possible_intervals) - 2
+        elif "dd" in self.symbol:
+            return self.symbol.count("d") * -1 + 1
         else:
             raise ValueError
 
-    def __str__(self) -> str:
-        n = len(self.possible_intervals)
-        if 0 <= self.index < n:
-            return self.possible_intervals[self.index]
-        elif self.index < 0:
-            return "d" * (1 - self.index)
-        else:
-            return "A" * (self.index - n + 2)
 
-    def __invert__(self) -> str:
-        old_symbol = str(self)
-        return self.inversion_map[old_symbol[0]] * len(old_symbol)
+class PerfectibleQuality(IntervalQuality):
+    possible_intervals = ("d", "P", "A")
+
+
+class ImperfectibleQuality(IntervalQuality):
+    possible_intervals = ("d", "m", "M", "A")
 
 
 class EngravingError(Exception):
