@@ -23,7 +23,7 @@ TStringDefinedEntity = TypeVar("TStringDefinedEntity", bound="StringDefinedEntit
 
 
 class StringDefinedEntity:
-    def __init__(self, symbol: str) -> None:
+    def __init__(self, symbol: str, /) -> None:
         raise NotImplementedError
 
     def __repr__(self) -> str:
@@ -70,7 +70,7 @@ class ValueComparator:
 
 
 class Accidental(StringDefinedEntity, ValueComparator):
-    def __init__(self, symbol: str | None = None) -> None:
+    def __init__(self, symbol: str | None = None, /) -> None:
         if symbol is None:
             self.value = random.choice([-1, 0, 1])
         else:
@@ -95,7 +95,7 @@ class Accidental(StringDefinedEntity, ValueComparator):
 
         return chosen_symbol * abs(self.value)
 
-    def increment(self, amount: int) -> None:
+    def increment(self, amount: int, /) -> None:
         self.value += amount
 
 
@@ -105,7 +105,7 @@ TGenericPitch = TypeVar("TGenericPitch", bound="GenericPitch")
 class GenericPitch(StringDefinedEntity):
     letters = ("C", "D", "E", "F", "G", "A", "B")
 
-    def __init__(self, symbol: str | None = None) -> None:
+    def __init__(self, symbol: str | None = None, /) -> None:
         if symbol is None:
             self.letter = random.choice(self.letters)
             self.accidental = Accidental()
@@ -118,10 +118,10 @@ class GenericPitch(StringDefinedEntity):
     def __str__(self) -> str:
         return f"{self.letter}{self.accidental}"
 
-    def increment_value(self, amount: int) -> None:
+    def increment_value(self, amount: int, /) -> None:
         self.accidental.increment(amount)
 
-    def increment_letter(self, amount: int) -> None:
+    def increment_letter(self, amount: int, /) -> None:
         if amount > 0:
             direction = 1
             half_steps = {"F", "C"}
@@ -161,7 +161,7 @@ class SpecificPitch(GenericPitch, ValueComparator):
     letter_map = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
     value_map = {0: "C", 2: "D", 4: "E", 5: "F", 7: "G", 9: "A", 11: "B"}
 
-    def __init__(self, symbol: str | None = None) -> None:
+    def __init__(self, symbol: str | None = None, /) -> None:
         if symbol is None:
             super().__init__()
             self._octave = random.randint(1, 7)
@@ -188,11 +188,11 @@ class SpecificPitch(GenericPitch, ValueComparator):
     def __str__(self) -> str:
         return f"{self.generic_pitch}{self._octave}"
 
-    def increment_value(self, increment: int) -> None:
+    def increment_value(self, increment: int, /) -> None:
         super().increment_value(increment)
         self.value += increment
 
-    def increment_letter(self, amount: int) -> None:
+    def increment_letter(self, amount: int, /) -> None:
         if amount > 0:
             direction = 1
             half_steps = {"F", "C"}
@@ -229,7 +229,7 @@ class SpecificPitch(GenericPitch, ValueComparator):
         return self._octave
 
     @classmethod
-    def get_pitch_from_value(cls, input_value: int) -> SpecificPitch:
+    def get_pitch_from_value(cls, input_value: int, /) -> SpecificPitch:
         simplified_value = input_value % 12
         if simplified_value in cls.value_map:
             shift = 0
@@ -281,7 +281,7 @@ class Interval(StringDefinedEntity, ValueComparator):
     perfect_degrees = {0, 3, 4}
     cache: dict[str, Interval] = {}
 
-    def __init__(self, symbol: str) -> None:
+    def __init__(self, symbol: str, /) -> None:
         for index, character in enumerate(symbol):
             if character.isdigit():
                 if character == "0":
@@ -322,7 +322,7 @@ class Interval(StringDefinedEntity, ValueComparator):
         return f"{self.quality}{self.size + 1}"
 
     @classmethod
-    def get(cls, symbol: str) -> Interval:
+    def get(cls, symbol: str, /) -> Interval:
         # Interval construction is time-consuming
         if symbol in cls.cache:
             return cls.cache[symbol]
@@ -341,7 +341,7 @@ class IntervalQuality(StringDefinedEntity):
     inversion_map = create_reversible_map({"P": "P", "A": "d", "M": "m"})
     possible_intervals: tuple[str, ...]
 
-    def __init__(self, symbol: str) -> None:
+    def __init__(self, symbol: str, /) -> None:
         if len(set(symbol)) != 1:
             raise ValueError
         self.symbol = symbol
@@ -380,7 +380,7 @@ class EngravingError(Exception):
 class Scale(GenericPitch):
     roman_numerals = {"I": 0, "II": 1, "III": 2, "IV": 3, "V": 4, "VI": 5, "VII": 6}
 
-    def __init__(self, symbol: str | None = None) -> None:
+    def __init__(self, symbol: str | None = None, /) -> None:
         super().__init__(symbol)
         self.chord_cache: dict[str, GenericChord] = {}
         tonic_pitch = GenericPitch(str(self))
@@ -403,7 +403,7 @@ class Scale(GenericPitch):
     def __getitem__(self, index: int) -> GenericPitch:
         return self._members[index]
 
-    def get_chord(self, input_symbol: str) -> GenericChord:
+    def get_chord(self, input_symbol: str, /) -> GenericChord:
         if input_symbol in self.chord_cache:
             return self.chord_cache[input_symbol]
 
@@ -448,7 +448,7 @@ class GenericChord(StringDefinedEntity):
         "dim": ["P1", "m3", "d5"],
     }
 
-    def __init__(self, symbol: str | None = None) -> None:
+    def __init__(self, symbol: str | None = None, /) -> None:
         if symbol is None:
             pitch_symbol = str(GenericPitch())
             self.chord_id = random.choice(list(self.chord_types.keys()))
@@ -637,8 +637,10 @@ class TimeSignature:
 
     @property
     def groove_duration(self) -> Fraction:
-        result = sum(Fraction(str_duration) for str_duration in self.groove_pattern)
-        return Fraction(result)
+        return sum(
+            (Fraction(str_duration) for str_duration in self.groove_pattern),
+            Fraction("0"),
+        )
 
 
 @dataclass
@@ -765,6 +767,11 @@ class WaveFunction:
         sequence_prospects: list[list] | list[deque],
         has_propagated: Callable[[list, int, list, Any], bool],
     ) -> None:
+        for propagate_index, index_prospects in enumerate(sequence_prospects):
+            if not index_prospects:
+                print(f"No prospects at index {propagate_index}")
+                raise ValueError
+
         self.sequence_prospects = copy.deepcopy(sequence_prospects)
         self.has_propagated = has_propagated
         """A sequence is not necessarily validated from left to right 
