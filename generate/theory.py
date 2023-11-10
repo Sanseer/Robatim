@@ -378,7 +378,15 @@ class EngravingError(Exception):
 
 
 class Scale(GenericPitch):
-    roman_numerals = {"I": 0, "II": 1, "III": 2, "IV": 3, "V": 4, "VI": 5, "VII": 6}
+    roman_numeral_to_degree = {
+        "I": 0,
+        "II": 1,
+        "III": 2,
+        "IV": 3,
+        "V": 4,
+        "VI": 5,
+        "VII": 6,
+    }
 
     def __init__(self, symbol: str | None = None, /) -> None:
         super().__init__(symbol)
@@ -408,18 +416,17 @@ class Scale(GenericPitch):
             return self.chord_cache[input_symbol]
 
         pitch_identifiers = {"#", "b", "V", "I"}
-        roman_numeral, chord_modifier = self.split_by_characters(
+        roman_symbol, chord_modifier = self.split_by_characters(
             input_symbol, pitch_identifiers
         )
 
-        chosen_pitch = self.get_pitch_from_roman_numeral(roman_numeral)
-        chord_symbol = "".join([str(chosen_pitch), chord_modifier])
-        new_chord = GenericChord(chord_symbol)
+        chosen_pitch = self.get_pitch_from_roman_symbol(roman_symbol)
+        new_chord = GenericChord(f"{chosen_pitch}{chord_modifier}")
         self.chord_cache[input_symbol] = new_chord
 
         return new_chord
 
-    def get_pitch_from_roman_numeral(self, symbol: str) -> GenericPitch:
+    def get_pitch_from_roman_symbol(self, symbol: str, /) -> GenericPitch:
         roman_numeral_hierarchy = ("VII", "VI", "IV", "V", "III", "II", "I")
 
         for current_roman_numeral in roman_numeral_hierarchy:
@@ -434,9 +441,22 @@ class Scale(GenericPitch):
         if current_roman_numeral != symbol[index:]:
             raise ValueError
 
-        scale_degree = self.roman_numerals[current_roman_numeral]
+        scale_degree = self.roman_numeral_to_degree[current_roman_numeral]
         chosen_pitch = self[scale_degree].clone()
         chosen_pitch.increment_value(new_accidental.value)
+
+        return chosen_pitch
+
+    def get_pitch_from_scale_degree(self, scale_degree: str, /) -> GenericPitch:
+        pitch_modifiers = {"b", "#"}
+        accidental_repr, degree_repr = self.split_by_characters(
+            scale_degree, pitch_modifiers
+        )
+        scale_index = int(degree_repr) - 1
+
+        chosen_pitch = self[scale_index].clone()
+        accidental_mod = Accidental(accidental_repr)
+        chosen_pitch.increment_value(accidental_mod.value)
 
         return chosen_pitch
 
@@ -549,6 +569,17 @@ class Tessitura:
 
         return delta
 
+    def shrink(self, constraint_tessitura: Tessitura) -> bool:
+        delta = False
+        if constraint_tessitura._lowest_pitch > self._lowest_pitch:
+            self.lowest_pitch = constraint_tessitura._lowest_pitch
+            delta = True
+        if constraint_tessitura._highest_pitch < self._highest_pitch:
+            self.highest_pitch = constraint_tessitura._highest_pitch
+            delta = True
+
+        return delta
+
     def filter_pitches(
         self, pitch_iterator: Iterator[SpecificPitch]
     ) -> list[SpecificPitch]:
@@ -577,6 +608,13 @@ class Tessitura:
             for index in range(len(available_pitches) - 2)
         ]
         return deque(result)
+
+    def find_equivalent_pitches(
+        self, generic_pitch: GenericPitch
+    ) -> list[SpecificPitch]:
+        starting_specific_pitch = SpecificPitch(f"{generic_pitch}0")
+        note_iter = starting_specific_pitch.create_iterator(["P8"])
+        return self.filter_pitches(note_iter)
 
 
 class NoteCluster:
@@ -607,7 +645,7 @@ class AbstractScore:
             else:
                 break
         print(f"Scale members: {self.scale._members}")
-        self.time_sig: TimeSignature
+        self._time_sig: TimeSignature
         self.tempo: int
         """The same instrument can be used for multiple parts
         the tuple with an integer distinguishes them from one another
@@ -618,9 +656,19 @@ class AbstractScore:
         self.tonal_parts = defaultdict(list)
         self.drum_parts: list[list[DrumNote | DrumCluster | RestNote]] = []
 
+    @property
+    def time_sig(self) -> TimeSignature:
+        return self._time_sig
+
+    @time_sig.setter
+    def time_sig(self, chosen_time_sig: TimeSignature) -> None:
+        self._time_sig = chosen_time_sig
+        self.set_tempo()
+        print(f"Using {self._time_sig} time. Tempo = {self.tempo}")
+
     def set_tempo(self) -> None:
-        lower_tempo_bound = round(self.time_sig.lower_tempo_bound * 0.975)
-        upper_tempo_bound = round(self.time_sig.upper_tempo_bound * 1.025)
+        lower_tempo_bound = round(self._time_sig.lower_tempo_bound * 0.975)
+        upper_tempo_bound = round(self._time_sig.upper_tempo_bound * 1.025)
         self.tempo = random.randint(lower_tempo_bound, upper_tempo_bound)
 
 

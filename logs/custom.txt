@@ -1,0 +1,6 @@
+\score {
+    \new PianoStaff <<
+VOICE_PARTS
+    >>
+  \layout {}
+}

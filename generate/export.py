@@ -178,6 +178,42 @@ class LilypondFactory:
         with open("logs/output.txt", "w") as sheet_file:
             sheet_file.write(output_string)
 
+    @classmethod
+    def export_score(cls, input_score: theory.AbstractScore) -> None:
+        with open("logs/custom.txt", "r") as sheet_file:
+            output_string = sheet_file.read()
+        tonic_designator = cls.convert_generic_pitch(input_score.scale[0])
+        space_chr = " "
+        voice_parts_markup = []
+
+        for _, score_part in input_score.tonal_parts.items():
+            part_sequence = [f"\\key {tonic_designator} \\minor"]
+            part_settings = [
+                f"\\time {input_score.time_sig}",
+                '\\clef "bass"',
+                "\\ottava #-1",
+            ]
+            part_sequence.extend(part_settings)
+            part_sequence.extend(
+                cls.convert_tonal_obj(sound_obj) for sound_obj in score_part
+            )
+
+            part_repr = " ".join(part_sequence)
+
+            voice_part_markup = [
+                f"{space_chr * 6}\\new Staff <<",
+                f"{space_chr * 8}\\new Voice {{ {part_repr} }}",
+                f"{space_chr * 6}>>",
+            ]
+            voice_parts_markup.append("\n".join(voice_part_markup))
+
+        output_string = output_string.replace(
+            "VOICE_PARTS", "\n".join(voice_parts_markup)
+        )
+
+        with open("logs/output.txt", "w") as sheet_file:
+            sheet_file.write(output_string)
+
 
 def export_midi(input_score: theory.AbstractScore) -> None:
     TICKS_PER_QUARTERNOTE = 960
@@ -193,7 +229,7 @@ def export_midi(input_score: theory.AbstractScore) -> None:
     channel = 0
     time = 0
 
-    time_sig_beats = {"4/4": "1", "7/8": "1", "12/8": "2/3"}
+    time_sig_beats = {"4/4": "1", "7/8": "1", "12/8": "2/3", "6/8": "2/3"}
     beats_per_quarter_note = Fraction(time_sig_beats[str(input_score.time_sig)])
 
     def get_tick_duration(metric_duration: Fraction) -> int:
