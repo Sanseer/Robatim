@@ -275,6 +275,26 @@ class SpecificPitch(GenericPitch, ValueComparator):
 
         return interval_count
 
+    def consonant_shift(
+        self, chosen_scale: Scale, chosen_chord: GenericChord, scale_shift: int
+    ) -> SpecificPitch:
+        if scale_shift == 0:
+            return self
+
+        result_pitch = self.clone()
+        result_pitch.increment_letter(scale_shift)
+        target_pitch_letter = result_pitch.letter
+
+        for chord_pitch in chosen_chord:
+            if chord_pitch.letter == target_pitch_letter:
+                return SpecificPitch(f"{chord_pitch}{result_pitch.octave}")
+
+        for scale_pitch in chosen_scale:
+            if scale_pitch.letter == target_pitch_letter:
+                return SpecificPitch(f"{scale_pitch}{result_pitch.octave}")
+        else:
+            raise ValueError
+
 
 class Interval(StringDefinedEntity, ValueComparator):
     major_scale_semitones = (0, 2, 4, 5, 7, 9, 11)
@@ -410,6 +430,9 @@ class Scale(GenericPitch):
 
     def __getitem__(self, index: int) -> GenericPitch:
         return self._members[index]
+
+    def __iter__(self) -> Iterator[GenericPitch]:
+        return iter(self._members)
 
     def get_chord(self, input_symbol: str, /) -> GenericChord:
         if input_symbol in self.chord_cache:

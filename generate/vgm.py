@@ -6,11 +6,15 @@ from fractions import Fraction
 
 from generate import theory
 
+# Importing settings allows stylistic updates independent of codebase.
 with open("idioms_vgm.json", "r") as f:
     idioms = json.load(f)
 
 instruments_bass = [
     theory.MidiInstrument(*instrument) for instrument in idioms["instruments_bass"]
+]
+instruments_melody = [
+    theory.MidiInstrument(*instrument) for instrument in idioms["instruments_melody"]
 ]
 time_sigs = [theory.TimeSignature(*time_sig) for time_sig in idioms["time_sigs"]]
 
@@ -53,6 +57,34 @@ def checked_consequent_repeat(
 nonadjacent_section_pairs = ((0, 2), (2, 0))
 
 
+def include_generic_pitch(
+    prospect_pitch: theory.GenericPitch, target_pitch: theory.GenericPitch
+) -> bool:
+    return prospect_pitch == target_pitch
+
+
+def checked_next_fragment_leap(
+    next_melody_fragment: list[theory.SpecificPitch],
+    before_leap_note: theory.SpecificPitch,
+) -> bool:
+    after_leap_note = next_melody_fragment[0]
+    interval_distance = theory.SpecificPitch.get_interval_distance(
+        before_leap_note, after_leap_note
+    )
+    return interval_distance <= 3
+
+
+def checked_previous_fragment_leap(
+    previous_melody_fragment: list[theory.SpecificPitch],
+    after_leap_note: theory.SpecificPitch,
+) -> bool:
+    before_leap_note = previous_melody_fragment[-1]
+    interval_distance = theory.SpecificPitch.get_interval_distance(
+        before_leap_note, after_leap_note
+    )
+    return interval_distance <= 3
+
+
 class Composer:
     def __init__(self) -> None:
         self.score = theory.AbstractScore()
@@ -65,10 +97,14 @@ class Composer:
         )
         nested_bass_degrees = next(iter(possible_bass_degrees))
         print(f"{nested_bass_degrees = }")
-        bass_generic_pitches = [
-            self.score.scale.get_pitch_from_scale_degree(bass_degree)
+        unnested_bass_degrees = [
+            bass_degree
             for bass_degree_section in nested_bass_degrees
             for bass_degree in bass_degree_section
+        ]
+        bass_generic_pitches = [
+            self.score.scale.get_pitch_from_scale_degree(bass_degree)
+            for bass_degree in unnested_bass_degrees
         ]
 
         lowest_bass_pitch = theory.SpecificPitch.get_pitch_from_value(
@@ -87,20 +123,115 @@ class Composer:
             bass_pitch_prospects, self.has_bassline_propagated
         )
         final_bass_pitches = next(iter(possible_basslines))
-        print(f"{final_bass_pitches = }")
 
         chosen_instrument = random.choice(instruments_bass)
-        strum_duration = sum(
-            (
-                Fraction(groove_repr)
-                for groove_repr in self.score.time_sig.groove_pattern
-            ),
-            Fraction("0"),
-        )
+        strum_duration = self.score.time_sig.groove_duration
         self.score.tonal_parts[(chosen_instrument, 0)] = [
             theory.SpecificNote(bass_pitch, strum_duration)
             for bass_pitch in final_bass_pitches
         ]
+
+        rhythm_options = idioms["rhythm_options"][str(self.score.time_sig)]
+        chosen_rhythms = {
+            rhythm_id: random.choice(rhythm_options[rhythm_id])
+            for rhythm_id in idioms["rhythm_identifiers"]
+        }
+        print(f"{chosen_rhythms = }")
+        sustain_rhythm_id = idioms["sustain_rhythm_id"]
+        chosen_rhythm_config = random.choice(idioms["possible_rhythm_configs"])
+        print(f"{chosen_rhythm_config = }")
+        nested_melody_rhythm = []
+
+        for rhythm_id in chosen_rhythm_config:
+            if rhythm_id == sustain_rhythm_id:
+                nested_melody_rhythm.append([strum_duration])
+            else:
+                nested_melody_rhythm.append(
+                    [Fraction(rhythm_repr) for rhythm_repr in chosen_rhythms[rhythm_id]]
+                )
+
+        degree_to_chord_symbol = idioms["degree_to_chord_symbol"]
+        chosen_chord_symbols = [
+            degree_to_chord_symbol[bass_degree] for bass_degree in unnested_bass_degrees
+        ]
+        print(f"{chosen_chord_symbols = }")
+        chosen_chords = [
+            self.score.scale.get_chord(chord_symbol)
+            for chord_symbol in chosen_chord_symbols
+        ]
+
+        scaffold_prospects = [
+            chosen_chord._members[:] for chosen_chord in chosen_chords
+        ]
+        has_prospect_succeeded = functools.partial(
+            include_generic_pitch, target_pitch=self.score.scale[0]
+        )
+        filter_prospects(scaffold_prospects[-1], has_prospect_succeeded)
+
+        # mapping objects in json must use strings as keys
+        melody_figure_options = {
+            int(k): v for k, v in idioms["melody_figure_options"].items()
+        }
+        lowest_melody_pitch = theory.SpecificPitch.get_pitch_from_value(
+            idioms["lowest_melody_pitch"]
+        )
+        highest_melody_pitch = theory.SpecificPitch.get_pitch_from_value(
+            idioms["highest_melody_pitch"]
+        )
+        melody_tessitura = theory.Tessitura(lowest_melody_pitch, highest_melody_pitch)
+
+        def get_figurations(
+            chord_pitch: theory.GenericPitch,
+            figure_length: int,
+            chosen_chord: theory.GenericChord,
+        ) -> list[list[theory.SpecificPitch]]:
+            possible_starting_pitches = melody_tessitura.find_equivalent_pitches(
+                chord_pitch
+            )
+            possible_figures = melody_figure_options[figure_length]
+            figurations = []
+
+            for possible_starting_pitch in possible_starting_pitches:
+                for possible_figure in possible_figures:
+                    current_figure = [possible_starting_pitch]
+                    for scale_shift in possible_figure:
+                        shifted_pitch = possible_starting_pitch.consonant_shift(
+                            self.score.scale, chosen_chord, scale_shift
+                        )
+                        if shifted_pitch not in melody_tessitura:
+                            break
+                        current_figure.append(shifted_pitch)
+                    else:
+                        figurations.append(current_figure)
+
+            return figurations
+
+        nested_melody_prospects = []
+        for rhythm_group, chord_pitches, chosen_chord in zip(
+            nested_melody_rhythm, scaffold_prospects, chosen_chords
+        ):
+            figure_length = len(rhythm_group)
+            possible_melody_fragments = []
+            for chord_pitch in chord_pitches:
+                possible_melody_fragments.extend(
+                    get_figurations(chord_pitch, figure_length, chosen_chord)
+                )
+            nested_melody_prospects.append(possible_melody_fragments)
+
+        possible_nested_melodies = theory.WaveFunction(
+            nested_melody_prospects, self.has_melody_propagated
+        )
+        chosen_nested_melody = next(iter(possible_nested_melodies))
+        chosen_instrument = random.choice(instruments_melody)
+
+        current_score_part = self.score.tonal_parts[chosen_instrument, 1]
+        for rhythm_group, melody_fragment in zip(
+            nested_melody_rhythm, chosen_nested_melody
+        ):
+            for note_duration, melody_pitch in zip(rhythm_group, melody_fragment):
+                current_score_part.append(
+                    theory.SpecificNote(melody_pitch, note_duration)
+                )
 
     @staticmethod
     def has_bass_degree_propagated(
@@ -206,3 +337,27 @@ class Composer:
         pitch_max = specific_pitches[-1] + up_shift
 
         return theory.Tessitura(pitch_min, pitch_max)
+
+    def has_melody_propagated(
+        self,
+        nested_melody_prospects: list[list[list[theory.SpecificPitch]]],
+        propagate_index: int,
+        nested_melody: list[list[theory.SpecificPitch] | None],
+        chosen_melody_fragment: list[theory.SpecificPitch],
+    ) -> bool:
+        if propagate_index != len(nested_melody) - 1:
+            next_prospects = nested_melody_prospects[propagate_index + 1]
+            has_prospect_succeeded = functools.partial(
+                checked_next_fragment_leap, before_leap_note=chosen_melody_fragment[-1]
+            )
+            if not filter_prospects(next_prospects, has_prospect_succeeded):
+                return False
+        if propagate_index != 0:
+            previous_prospects = nested_melody_prospects[propagate_index - 1]
+            has_prospect_succeeded = functools.partial(
+                checked_previous_fragment_leap,
+                after_leap_note=chosen_melody_fragment[0],
+            )
+            if not filter_prospects(previous_prospects, has_prospect_succeeded):
+                return False
+        return True

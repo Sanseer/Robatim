@@ -186,14 +186,17 @@ class LilypondFactory:
         space_chr = " "
         voice_parts_markup = []
 
-        for _, score_part in input_score.tonal_parts.items():
-            part_sequence = [f"\\key {tonic_designator} \\minor"]
-            part_settings = [
+        all_part_settings = {
+            0: [
                 f"\\time {input_score.time_sig}",
                 '\\clef "bass"',
                 "\\ottava #-1",
-            ]
-            part_sequence.extend(part_settings)
+            ],
+            1: ['\\clef "alto"'],
+        }
+        for part_index, (_, score_part) in enumerate(input_score.tonal_parts.items()):
+            part_sequence = [f"\\key {tonic_designator} \\minor"]
+            part_sequence.extend(all_part_settings[part_index])
             part_sequence.extend(
                 cls.convert_tonal_obj(sound_obj) for sound_obj in score_part
             )
@@ -208,7 +211,7 @@ class LilypondFactory:
             voice_parts_markup.append("\n".join(voice_part_markup))
 
         output_string = output_string.replace(
-            "VOICE_PARTS", "\n".join(voice_parts_markup)
+            "VOICE_PARTS", "\n".join(voice_parts_markup[::-1])
         )
 
         with open("logs/output.txt", "w") as sheet_file:
