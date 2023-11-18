@@ -103,7 +103,7 @@ class Composer:
             for bass_degree in bass_degree_section
         ]
         bass_generic_pitches = [
-            self.score.scale.get_pitch_from_scale_degree(bass_degree)
+            self.score.major_scale.get_pitch_from_scale_degree(bass_degree)
             for bass_degree in unnested_bass_degrees
         ]
 
@@ -156,7 +156,7 @@ class Composer:
         ]
         print(f"{chosen_chord_symbols = }")
         chosen_chords = [
-            self.score.scale.get_chord(chord_symbol)
+            self.score.major_scale.get_chord(chord_symbol)
             for chord_symbol in chosen_chord_symbols
         ]
 
@@ -164,7 +164,7 @@ class Composer:
             chosen_chord._members[:] for chosen_chord in chosen_chords
         ]
         has_prospect_succeeded = functools.partial(
-            include_generic_pitch, target_pitch=self.score.scale[0]
+            include_generic_pitch, target_pitch=self.score.minor_scale[0]
         )
         filter_prospects(scaffold_prospects[-1], has_prospect_succeeded)
 
@@ -196,7 +196,7 @@ class Composer:
                     current_figure = [possible_starting_pitch]
                     for scale_shift in possible_figure:
                         shifted_pitch = possible_starting_pitch.consonant_shift(
-                            self.score.scale, chosen_chord, scale_shift
+                            self.score.minor_scale, chosen_chord, scale_shift
                         )
                         if shifted_pitch not in melody_tessitura:
                             break
@@ -327,7 +327,7 @@ class Composer:
     def get_bass_range(
         self, specific_pitches: deque[theory.SpecificPitch]
     ) -> theory.Tessitura:
-        if specific_pitches[0].generic_pitch == self.score.scale:
+        if specific_pitches[0].generic_pitch == self.score.major_scale:
             up_shift = theory.Interval.get("P1")
             down_shift = theory.Interval.get("P8")
         else:

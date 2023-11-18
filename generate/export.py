@@ -156,7 +156,7 @@ class LilypondFactory:
 
         with open("logs/template.txt", "r") as sheet_file:
             output_string = sheet_file.read()
-        tonic_designator = cls.convert_generic_pitch(input_score.scale[0])
+        tonic_designator = cls.convert_generic_pitch(input_score.major_scale[0])
         output_string = output_string.replace("KEY_SIG", tonic_designator)
 
         output_string = output_string.replace(
@@ -182,7 +182,7 @@ class LilypondFactory:
     def export_score(cls, input_score: theory.AbstractScore) -> None:
         with open("logs/custom.txt", "r") as sheet_file:
             output_string = sheet_file.read()
-        tonic_designator = cls.convert_generic_pitch(input_score.scale[0])
+        tonic_designator = cls.convert_generic_pitch(input_score.minor_scale[0])
         space_chr = " "
         voice_parts_markup = []
 
@@ -232,7 +232,7 @@ def export_midi(input_score: theory.AbstractScore) -> None:
     channel = 0
     time = 0
 
-    time_sig_beats = {"4/4": "1", "7/8": "1", "12/8": "2/3", "6/8": "2/3"}
+    time_sig_beats = {"4/4": "1", "7/8": "1", "12/8": "2/3", "6/8": "2/3", "3/4": "1"}
     beats_per_quarter_note = Fraction(time_sig_beats[str(input_score.time_sig)])
 
     def get_tick_duration(metric_duration: Fraction) -> int:

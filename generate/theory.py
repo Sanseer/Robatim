@@ -276,7 +276,7 @@ class SpecificPitch(GenericPitch, ValueComparator):
         return interval_count
 
     def consonant_shift(
-        self, chosen_scale: Scale, chosen_chord: GenericChord, scale_shift: int
+        self, chosen_scale: GenericScale, chosen_chord: GenericChord, scale_shift: int
     ) -> SpecificPitch:
         if scale_shift == 0:
             return self
@@ -394,10 +394,52 @@ class ImperfectibleQuality(IntervalQuality):
 
 class EngravingError(Exception):
     def __str__(self) -> str:
-        return f"Double accidentals detected: {self.args[0]}"
+        return f"Multiple accidentals detected: {self.args[0]}"
 
 
-class Scale(GenericPitch):
+class GenericScale(StringDefinedEntity):
+    scale_intervals = ["P1", "P5"]
+
+    def __init__(
+        self, symbol: str | None = None, /, *, is_practical: bool = True
+    ) -> None:
+        if symbol is None:
+            self.letter = random.choice(GenericPitch.letters)
+            self.accidental = Accidental()
+        elif not symbol or symbol[0] not in GenericPitch.letters:
+            raise ValueError
+        else:
+            self.letter = symbol[0]
+            self.accidental = Accidental(symbol[1:])
+
+        tonic_pitch = GenericPitch(str(self))
+        print(f"{self.__class__.__name__} chosen: {tonic_pitch}")
+
+        self._members = [
+            tonic_pitch + Interval.get(interval_symbol)
+            for interval_symbol in self.scale_intervals
+        ]
+
+        """Lilypond can't render triple accidentals. Preventing double accidentals 
+        ensures that altered notes don't have triple accidentals."""
+        if is_practical:
+            for scale_pitch in self._members:
+                number_of_accidentals = abs(scale_pitch.accidental.value)
+                if number_of_accidentals >= 2:
+                    raise EngravingError(scale_pitch)
+
+    def __str__(self) -> str:
+        return f"{self.letter}{self.accidental}"
+
+    def __getitem__(self, index: int) -> GenericPitch:
+        return self._members[index]
+
+    def __iter__(self) -> Iterator[GenericPitch]:
+        return iter(self._members)
+
+
+class MajorScale(GenericScale):
+    scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "M7"]
     roman_numeral_to_degree = {
         "I": 0,
         "II": 1,
@@ -408,31 +450,11 @@ class Scale(GenericPitch):
         "VII": 6,
     }
 
-    def __init__(self, symbol: str | None = None, /) -> None:
-        super().__init__(symbol)
+    def __init__(
+        self, symbol: str | None = None, /, *, is_practical: bool = True
+    ) -> None:
+        super().__init__(symbol, is_practical=is_practical)
         self.chord_cache: dict[str, GenericChord] = {}
-        tonic_pitch = GenericPitch(str(self))
-        print(f"Chosen scale: {tonic_pitch}")
-
-        major_scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "M7"]
-        self._members = [
-            tonic_pitch + Interval.get(interval_symbol)
-            for interval_symbol in major_scale_intervals
-        ]
-
-        """Lilypond can't render triple accidentals. 
-        Preventing double accidentals on the major scale ensures that 
-        altered notes don't have triple accidentals."""
-        for scale_pitch in self._members:
-            number_of_accidentals = abs(scale_pitch.accidental.value)
-            if number_of_accidentals >= 2:
-                raise EngravingError(scale_pitch)
-
-    def __getitem__(self, index: int) -> GenericPitch:
-        return self._members[index]
-
-    def __iter__(self) -> Iterator[GenericPitch]:
-        return iter(self._members)
 
     def get_chord(self, input_symbol: str, /) -> GenericChord:
         if input_symbol in self.chord_cache:
@@ -482,6 +504,10 @@ class Scale(GenericPitch):
         chosen_pitch.increment_value(accidental_mod.value)
 
         return chosen_pitch
+
+
+class NaturalMinorScale(GenericScale):
+    scale_intervals = ["P1", "M2", "m3", "P4", "P5", "m6", "m7"]
 
 
 class GenericChord(StringDefinedEntity):
@@ -660,14 +686,15 @@ class NoteCluster:
 class AbstractScore:
     def __init__(self) -> None:
         while True:
+            self.major_scale = MajorScale(is_practical=False)
             try:
-                self.scale = Scale()
+                self.minor_scale = NaturalMinorScale(str(self.major_scale))
             except EngravingError as err:
                 print(err)
                 print("Reattempting...")
             else:
                 break
-        print(f"Scale members: {self.scale._members}")
+        print(f"Scale members: {self.minor_scale._members}")
         self._time_sig: TimeSignature
         self.tempo: int
         """The same instrument can be used for multiple parts
