@@ -1,7 +1,7 @@
 import json
 import functools
 import random
-from collections import deque
+from collections import defaultdict, deque
 from fractions import Fraction
 
 from generate import theory
@@ -64,33 +64,83 @@ def include_generic_pitch(
 
 
 def checked_next_fragment_leap(
-    next_melody_fragment: list[theory.SpecificPitch],
-    before_leap_note: theory.SpecificPitch,
+    second_melody_fragment: list[theory.SpecificPitch],
+    first_melody_fragment: list[theory.SpecificPitch],
+    first_chord: theory.GenericChord,
 ) -> bool:
-    after_leap_note = next_melody_fragment[0]
-    interval_distance = theory.SpecificPitch.get_interval_distance(
-        before_leap_note, after_leap_note
-    )
-    return interval_distance <= 3
+    args = first_melody_fragment, second_melody_fragment, first_chord
+    return checked_previous_fragment_leap(*args)
 
 
 def checked_previous_fragment_leap(
-    previous_melody_fragment: list[theory.SpecificPitch],
-    after_leap_note: theory.SpecificPitch,
+    first_melody_fragment: list[theory.SpecificPitch],
+    second_melody_fragment: list[theory.SpecificPitch],
+    first_chord: theory.GenericChord,
 ) -> bool:
-    before_leap_note = previous_melody_fragment[-1]
-    interval_distance = theory.SpecificPitch.get_interval_distance(
-        before_leap_note, after_leap_note
+    penultimate_pitch = first_melody_fragment[-1]
+    ultimate_pitch = second_melody_fragment[0]
+    ultimate_interval_distance = theory.SpecificPitch.get_interval_distance(
+        penultimate_pitch, ultimate_pitch
     )
-    return interval_distance <= 3
+    if ultimate_interval_distance > 3:
+        return False
+    if theory.GenericPitch(penultimate_pitch.generic_pitch) in first_chord:
+        return True
+
+    antepenultimate_pitch = first_melody_fragment[-2]
+    if antepenultimate_pitch == ultimate_pitch:
+        return False
+
+    penultimate_interval_distance = theory.SpecificPitch.get_interval_distance(
+        antepenultimate_pitch, penultimate_pitch
+    )
+    return penultimate_interval_distance == ultimate_interval_distance == 1
+
+
+def checked_next_resolution(
+    second_melody_fragment: list[theory.SpecificPitch],
+    first_melody_fragment: list[theory.SpecificPitch],
+) -> bool:
+    return checked_previous_resolution(first_melody_fragment, second_melody_fragment)
+
+
+def checked_previous_resolution(
+    first_melody_fragment: list[theory.SpecificPitch],
+    second_melody_fragment: list[theory.SpecificPitch],
+) -> bool:
+    penultimate_pitch = first_melody_fragment[-1]
+    ultimate_pitch = second_melody_fragment[0]
+    resolution_distance = theory.SpecificPitch.get_interval_distance(
+        penultimate_pitch, ultimate_pitch
+    )
+    return resolution_distance <= 1
+
+
+def is_fragment_valid(
+    current_melody_fragment: list[theory.SpecificPitch],
+    imagined_tessitura: theory.Tessitura,
+) -> bool:
+    return current_melody_fragment[0] in imagined_tessitura
+
+
+starting_tessitura = theory.Tessitura(
+    theory.SpecificPitch("C0"), theory.SpecificPitch("C8")
+)
 
 
 class Composer:
     def __init__(self) -> None:
         self.score = theory.AbstractScore()
         self.score.time_sig = random.choice(time_sigs)
+        self.index_repeats: dict[int, set[int]] = defaultdict(set)
+        self.index_repeats.update({0: {8}, 8: {0}, 1: {9}, 9: {1}})
 
     def fill_score(self) -> None:
+        strum_duration = self.score.time_sig.groove_duration
+        unnested_bass_degrees = self.write_bassline(strum_duration)
+        self.write_melody(strum_duration, unnested_bass_degrees)
+
+    def write_bassline(self, strum_duration: Fraction) -> list[str]:
         bassline_presets = idioms["bassline_presets"]
         possible_bass_degrees = theory.WaveFunction(
             bassline_presets, self.has_bass_degree_propagated
@@ -102,6 +152,7 @@ class Composer:
             for bass_degree_section in nested_bass_degrees
             for bass_degree in bass_degree_section
         ]
+        unnested_bass_degrees.pop()
         bass_generic_pitches = [
             self.score.major_scale.get_pitch_from_scale_degree(bass_degree)
             for bass_degree in unnested_bass_degrees
@@ -125,12 +176,17 @@ class Composer:
         final_bass_pitches = next(iter(possible_basslines))
 
         chosen_instrument = random.choice(instruments_bass)
-        strum_duration = self.score.time_sig.groove_duration
-        self.score.tonal_parts[(chosen_instrument, 0)] = [
+        current_score_part = self.score.tonal_parts[(chosen_instrument, 0)]
+        current_score_part.extend(
             theory.SpecificNote(bass_pitch, strum_duration)
             for bass_pitch in final_bass_pitches
-        ]
+        )
+        current_score_part.append(theory.RestNote(strum_duration))
+        return unnested_bass_degrees
 
+    def write_melody(
+        self, strum_duration: Fraction, unnested_bass_degrees: list[str]
+    ) -> None:
         rhythm_options = idioms["rhythm_options"][str(self.score.time_sig)]
         chosen_rhythms = {
             rhythm_id: random.choice(rhythm_options[rhythm_id])
@@ -142,6 +198,7 @@ class Composer:
         print(f"{chosen_rhythm_config = }")
         nested_melody_rhythm = []
 
+        chosen_rhythm_config.pop()
         for rhythm_id in chosen_rhythm_config:
             if rhythm_id == sustain_rhythm_id:
                 nested_melody_rhythm.append([strum_duration])
@@ -218,8 +275,11 @@ class Composer:
                 )
             nested_melody_prospects.append(possible_melody_fragments)
 
+        has_melody_propagated = functools.partial(
+            self.has_melody_propagated, chosen_chords=chosen_chords
+        )
         possible_nested_melodies = theory.WaveFunction(
-            nested_melody_prospects, self.has_melody_propagated
+            nested_melody_prospects, has_melody_propagated
         )
         chosen_nested_melody = next(iter(possible_nested_melodies))
         chosen_instrument = random.choice(instruments_melody)
@@ -232,6 +292,7 @@ class Composer:
                 current_score_part.append(
                     theory.SpecificNote(melody_pitch, note_duration)
                 )
+        current_score_part.append(theory.RestNote(strum_duration))
 
     @staticmethod
     def has_bass_degree_propagated(
@@ -343,21 +404,143 @@ class Composer:
         nested_melody_prospects: list[list[list[theory.SpecificPitch]]],
         propagate_index: int,
         nested_melody: list[list[theory.SpecificPitch] | None],
-        chosen_melody_fragment: list[theory.SpecificPitch],
+        current_melody_fragment: list[theory.SpecificPitch],
+        chosen_chords: list[theory.GenericChord],
     ) -> bool:
-        if propagate_index != len(nested_melody) - 1:
+        for duplicate_index in self.index_repeats[propagate_index]:
+            nested_melody_prospects[duplicate_index] = [current_melody_fragment]
+
+        if propagate_index != (final_index := len(nested_melody) - 1):
             next_prospects = nested_melody_prospects[propagate_index + 1]
-            has_prospect_succeeded = functools.partial(
-                checked_next_fragment_leap, before_leap_note=chosen_melody_fragment[-1]
-            )
-            if not filter_prospects(next_prospects, has_prospect_succeeded):
-                return False
+            prospect_validators = [
+                functools.partial(
+                    checked_next_fragment_leap,
+                    first_melody_fragment=current_melody_fragment,
+                    first_chord=chosen_chords[propagate_index],
+                )
+            ]
+            if propagate_index == final_index - 1:
+                prospect_validators.append(
+                    functools.partial(
+                        checked_next_resolution,
+                        first_melody_fragment=current_melody_fragment,
+                    )
+                )
+            for prospect_validator in prospect_validators:
+                if not filter_prospects(next_prospects, prospect_validator):
+                    return False
+
         if propagate_index != 0:
             previous_prospects = nested_melody_prospects[propagate_index - 1]
+            prospect_validators = [
+                functools.partial(
+                    checked_previous_fragment_leap,
+                    second_melody_fragment=current_melody_fragment,
+                    first_chord=chosen_chords[propagate_index - 1],
+                )
+            ]
+            if propagate_index == final_index:
+                prospect_validators.append(
+                    functools.partial(
+                        checked_previous_resolution,
+                        second_melody_fragment=current_melody_fragment,
+                    )
+                )
+            for prospect_validator in prospect_validators:
+                if not filter_prospects(previous_prospects, prospect_validator):
+                    return False
+
+        queue = deque([propagate_index])
+        queue_set = set(queue)
+
+        imagined_tessituras = [starting_tessitura.clone() for _ in nested_melody]
+        scaffold_tessituras = [
+            self.get_scaffold_tessitura(index_prospects)
+            for index_prospects in nested_melody_prospects
+        ]
+        while queue:
+            primary_index = queue.popleft()
+            imagined_tessitura = imagined_tessituras[primary_index]
+            current_prospects = nested_melody_prospects[primary_index]
+
             has_prospect_succeeded = functools.partial(
-                checked_previous_fragment_leap,
-                after_leap_note=chosen_melody_fragment[0],
+                is_fragment_valid, imagined_tessitura=imagined_tessitura
             )
-            if not filter_prospects(previous_prospects, has_prospect_succeeded):
+            if not filter_prospects(current_prospects, has_prospect_succeeded):
                 return False
+
+            current_scaffold_tessitura = self.get_scaffold_tessitura(current_prospects)
+            scaffold_tessituras[primary_index] = current_scaffold_tessitura
+
+            adjacent_imagined_tessitura = current_scaffold_tessitura.clone()
+            adjacent_imagined_tessitura.highest_pitch += theory.Interval.get("P5")
+            adjacent_imagined_tessitura.lowest_pitch -= theory.Interval.get("P5")
+
+            if primary_index != final_index:
+                next_index = primary_index + 1
+                next_scaffold_tessitura = scaffold_tessituras[next_index]
+                imagined_tessituras[next_index].shrink(adjacent_imagined_tessitura)
+                if (
+                    next_index not in queue_set
+                    and next_scaffold_tessitura not in adjacent_imagined_tessitura
+                ):
+                    queue.append(next_index)
+                    queue_set.add(next_index)
+
+            if primary_index != 0:
+                previous_index = primary_index - 1
+                previous_scaffold_tessitura = scaffold_tessituras[previous_index]
+                imagined_tessituras[previous_index].shrink(adjacent_imagined_tessitura)
+                if (
+                    previous_index not in queue_set
+                    and previous_scaffold_tessitura not in adjacent_imagined_tessitura
+                ):
+                    queue.append(previous_index)
+                    queue_set.add(previous_index)
+
+            if primary_index == final_index:
+                global_imagined_tessitura = current_scaffold_tessitura.clone()
+                global_imagined_tessitura.highest_pitch += theory.Interval.get("m7")
+                global_imagined_tessitura.lowest_pitch -= theory.Interval.get("M3")
+
+                for secondary_index, local_scaffold_tessitura in enumerate(
+                    scaffold_tessituras
+                ):
+                    imagined_tessituras[secondary_index].shrink(
+                        global_imagined_tessitura
+                    )
+                    if (
+                        secondary_index not in queue_set
+                        and local_scaffold_tessitura not in global_imagined_tessitura
+                    ):
+                        queue.append(secondary_index)
+                        queue_set.add(secondary_index)
+            elif primary_index == 0:
+                global_imagined_tessitura = current_scaffold_tessitura.clone()
+                global_imagined_tessitura.highest_pitch += theory.Interval.get("M6")
+                global_imagined_tessitura.lowest_pitch -= theory.Interval.get("P5")
+
+                for secondary_index, local_scaffold_tessitura in enumerate(
+                    scaffold_tessituras
+                ):
+                    imagined_tessituras[secondary_index].shrink(
+                        global_imagined_tessitura
+                    )
+                    if (
+                        secondary_index not in queue_set
+                        and local_scaffold_tessitura not in global_imagined_tessitura
+                    ):
+                        queue.append(secondary_index)
+                        queue_set.add(secondary_index)
+
+            queue_set.remove(primary_index)
+
         return True
+
+    @staticmethod
+    def get_scaffold_tessitura(
+        current_prospects: list[list[theory.SpecificPitch]],
+    ) -> theory.Tessitura:
+        lowest_scaffold_pitch = min(current_prospects, key=lambda x: x[0])[0]
+        highest_scaffold_pitch = max(current_prospects, key=lambda x: x[0])[0]
+        return theory.Tessitura(lowest_scaffold_pitch, highest_scaffold_pitch)

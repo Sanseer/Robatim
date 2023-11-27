@@ -597,6 +597,9 @@ class Tessitura:
             second_conditional = self._highest_pitch >= input_obj.highest_pitch
             return first_conditional and second_conditional
 
+    def clone(self) -> Tessitura:
+        return self.__class__(self._lowest_pitch, self._highest_pitch)
+
     def filter(self, obj_collection: deque[SpecificPitch] | deque[NoteCluster]) -> None:
         # The assumption is that the objects are in ascending order
         # This should be faster than list comprehension since you only check the ends
