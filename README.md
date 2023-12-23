@@ -1,6 +1,6 @@
 # Robatim
 
-Robatim is a deterministic music generator based on wave function collapse. [Video Demonstration](https://www.youtube.com/watch?v=eQ8Ll_BAHo0).
+Robatim is a deterministic music generator based on wave function collapse. [Video Demonstration](https://www.youtube.com/watch?v=oLbpJTWE6kg).
 
 ## Requirements
 
@@ -8,13 +8,13 @@ Robatim is a deterministic music generator based on wave function collapse. [Vid
 
 ## Setup (User)
 
-Because this repository is a script rather than a package, it must be cloned rather than installed. 
+Because this repository is a script rather than a package, it must be cloned/downloaded rather than installed. 
 
 ```
 git clone https://github.com/Sanseer/Robatim
 ```
 
-Download [idioms.json](https://gist.github.com/Sanseer/6e9c06cdffb8bc630cbd42b4fb89cb82) and put it in the main directory.
+Download [idioms_vgm.json](https://gist.github.com/Sanseer/4acfd518582d4cc286746adfcd0bc9ed) and put it in the main directory.
 
 ## Usage 
 
@@ -43,4 +43,5 @@ pre-commit run --all-files
 - [MidiEditor](https://github.com/markusschwenk/midieditor): for helping me understand how MIDI works
 - [Martin Donald](https://www.youtube.com/watch?v=2SuvO4Gi7uY): for the inspiration for the wave function collapse algorithm
 - [Trevor0402](https://www.doomworld.com/forum/topic/118828-trevor0402s-sc-55-soundfont/): Midi soundfont used in video demonstration
+- [VGMusic](https://www.vgmusic.com/): for the musical inspiration
 - Dave Smith et al.: for inventing MIDI  
