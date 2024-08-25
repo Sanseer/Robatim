@@ -9,6 +9,21 @@ from typing import Any, Callable, Iterator, TypeVar
 import copy
 
 
+def split_by_characters(
+    input_string: str, segment1_identifiers: set[str]
+) -> tuple[str, str]:
+    for index, character in enumerate(input_string):
+        if character not in segment1_identifiers:
+            string_segment1 = input_string[:index]
+            string_segment2 = input_string[index:]
+            break
+    else:
+        string_segment1 = input_string
+        string_segment2 = ""
+
+    return string_segment1, string_segment2
+
+
 def create_reversible_map(old_mapping: dict[str, str]) -> dict[str, str]:
     new_mapping = {}
     for key, value in old_mapping.items():
@@ -34,21 +49,6 @@ class StringDefinedEntity:
 
     def clone(self: TStringDefinedEntity) -> TStringDefinedEntity:
         return self.__class__(str(self))
-
-    @staticmethod
-    def split_by_characters(
-        input_string: str, segment1_identifiers: set[str]
-    ) -> tuple[str, str]:
-        for index, character in enumerate(input_string):
-            if character not in segment1_identifiers:
-                string_segment1 = input_string[:index]
-                string_segment2 = input_string[index:]
-                break
-        else:
-            string_segment1 = input_string
-            string_segment2 = ""
-
-        return string_segment1, string_segment2
 
 
 class ValueComparator:
@@ -164,7 +164,7 @@ class SpecificPitch(GenericPitch, ValueComparator):
     def __init__(self, symbol: str | None = None, /) -> None:
         if symbol is None:
             super().__init__()
-            self._octave = random.randint(1, 7)
+            self.octave = random.randint(1, 7)
         else:
             for index, character in enumerate(symbol):
                 if character.isdigit():
@@ -178,15 +178,15 @@ class SpecificPitch(GenericPitch, ValueComparator):
                 raise ValueError
 
             super().__init__(pitch_symbol)
-            self._octave = int(octave_symbol)
+            self.octave = int(octave_symbol)
 
         self.value = self.letter_map[self.letter]
-        self.value += 12 * (self._octave + 1)
-        reference_pitch = GenericPitch(self.letter)
-        self.value += self.accidental.value - reference_pitch.accidental.value
+        # e.g., C4 has midi value 60
+        self.value += 12 * (self.octave + 1)
+        self.value += self.accidental.value
 
     def __str__(self) -> str:
-        return f"{self.generic_pitch}{self._octave}"
+        return f"{self.generic_pitch}{self.octave}"
 
     def increment_value(self, increment: int, /) -> None:
         super().increment_value(increment)
@@ -217,7 +217,7 @@ class SpecificPitch(GenericPitch, ValueComparator):
                 self.accidental.increment(-2 * direction)
 
             if current_letter == octave_step:
-                self._octave += direction
+                self.octave += direction
         self.letter = current_letter
 
     @property
@@ -227,6 +227,13 @@ class SpecificPitch(GenericPitch, ValueComparator):
     @property
     def octave(self) -> int:
         return self._octave
+
+    @octave.setter
+    def octave(self, value: int) -> None:
+        # Cannot go below C0 or above midi pitch 127
+        if value > 9 or value < 0:
+            raise ValueError
+        self._octave = value
 
     @classmethod
     def get_pitch_from_value(cls, input_value: int, /) -> SpecificPitch:
@@ -261,8 +268,20 @@ class SpecificPitch(GenericPitch, ValueComparator):
     ) -> int:
         if first_pitch < second_pitch:
             increment = 1
-        else:
+        elif first_pitch > second_pitch:
             increment = -1
+        else:
+            if first_pitch == second_pitch:
+                return 0
+            # handles enharmonic equivalents
+            first_index = GenericPitch.letters.index(first_pitch.letter)
+            second_index = GenericPitch.letters.index(second_pitch.letter)
+            if (first_index + 1) % 7 == second_index:
+                increment = 1
+            elif (first_index - 1) % 7 == second_index:
+                increment = -1
+            else:
+                raise ValueError
 
         search_pitch = first_pitch.clone()
         interval_count = 0
@@ -377,9 +396,9 @@ class IntervalQuality(StringDefinedEntity):
         if self.symbol in self.possible_intervals:
             return self.possible_intervals.index(self.symbol)
         elif "AA" in self.symbol:
-            return self.symbol.count("A") + len(self.possible_intervals) - 2
+            return len(self.possible_intervals) + self.symbol.count("A") - 2
         elif "dd" in self.symbol:
-            return self.symbol.count("d") * -1 + 1
+            return 1 - self.symbol.count("d")
         else:
             raise ValueError
 
@@ -461,7 +480,7 @@ class MajorScale(GenericScale):
             return self.chord_cache[input_symbol]
 
         pitch_identifiers = {"#", "b", "V", "I"}
-        roman_symbol, chord_modifier = self.split_by_characters(
+        roman_symbol, chord_modifier = split_by_characters(
             input_symbol, pitch_identifiers
         )
 
@@ -494,7 +513,7 @@ class MajorScale(GenericScale):
 
     def get_pitch_from_scale_degree(self, scale_degree: str, /) -> GenericPitch:
         pitch_modifiers = {"b", "#"}
-        accidental_repr, degree_repr = self.split_by_characters(
+        accidental_repr, degree_repr = split_by_characters(
             scale_degree, pitch_modifiers
         )
         scale_index = int(degree_repr) - 1
@@ -523,7 +542,7 @@ class GenericChord(StringDefinedEntity):
             self.chord_id = random.choice(list(self.chord_types.keys()))
         else:
             pitch_identifiers = {"#", "b", "A", "B", "C", "D", "E", "F", "G"}
-            pitch_symbol, chord_id = self.split_by_characters(symbol, pitch_identifiers)
+            pitch_symbol, chord_id = split_by_characters(symbol, pitch_identifiers)
             if chord_id not in self.chord_types:
                 raise ValueError
             self.chord_id = chord_id

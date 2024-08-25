@@ -209,7 +209,8 @@ class Composer:
 
         degree_to_chord_symbol = idioms["degree_to_chord_symbol"]
         chosen_chord_symbols = [
-            degree_to_chord_symbol[bass_degree] for bass_degree in unnested_bass_degrees
+            random.choice(degree_to_chord_symbol[bass_degree])
+            for bass_degree in unnested_bass_degrees
         ]
         print(f"{chosen_chord_symbols = }")
         chosen_chords = [

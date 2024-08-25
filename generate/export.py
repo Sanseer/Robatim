@@ -219,12 +219,12 @@ class LilypondFactory:
 
 
 def export_midi(input_score: theory.AbstractScore) -> None:
-    TICKS_PER_QUARTERNOTE = 960
+    TICKS_PER_BEAT = 960
     # Don't forget about percussion
     NUMBER_OF_TRACKS = len(input_score.tonal_parts) + 1
     new_midi = MIDIFile(
         numTracks=NUMBER_OF_TRACKS,
-        ticks_per_quarternote=TICKS_PER_QUARTERNOTE,
+        ticks_per_quarternote=TICKS_PER_BEAT,
         eventtime_is_ticks=True,
     )
     new_midi.addTempo(0, 0, input_score.tempo)
@@ -236,7 +236,8 @@ def export_midi(input_score: theory.AbstractScore) -> None:
     beats_per_quarter_note = Fraction(time_sig_beats[str(input_score.time_sig)])
 
     def get_tick_duration(metric_duration: Fraction) -> int:
-        return int(metric_duration * 4 * beats_per_quarter_note * TICKS_PER_QUARTERNOTE)
+        num_of_quarter_notes = metric_duration * 4
+        return int(num_of_quarter_notes * beats_per_quarter_note * TICKS_PER_BEAT)
 
     for (instrument, _), score_part in input_score.tonal_parts.items():
         new_midi.addProgramChange(track, channel, 0, instrument.number)
