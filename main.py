@@ -1,8 +1,7 @@
-from generate import export, vgm
+from generate import export, dance
 
 
 if __name__ == "__main__":
-    composer = vgm.Composer()
-    composer.fill_score()
-    export.export_midi(composer.score)
-    export.LilypondFactory.export_score(composer.score)
+    dance_score = dance.get_new_score()
+    export.LilypondFactory.export_dance_score(dance_score)
+    export.export_dance_midi(dance_score)

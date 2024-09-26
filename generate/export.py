@@ -95,6 +95,29 @@ class LilypondFactory:
         return math.log(integer, 2).is_integer()
 
     @classmethod
+    def revert_duration(cls, input_repr: str, /) -> Fraction:
+        for index, character in enumerate(input_repr):
+            if character == ".":
+                break
+        else:
+            index += 1
+
+        undotted_repr = input_repr[:index]
+        dot_modifications = input_repr[index:]
+        if len(set(dot_modifications)) > 1:
+            raise ValueError
+
+        if not cls.is_power_of_two(int(undotted_repr)):
+            raise ValueError
+        final_duration = Fraction(f"1/{undotted_repr}")
+        temp_fraction = final_duration
+        for _ in dot_modifications:
+            temp_fraction /= 2
+            final_duration += temp_fraction
+
+        return final_duration
+
+    @classmethod
     def convert_drum_obj(
         cls, input_obj: theory.DrumNote | theory.DrumCluster | theory.RestNote
     ) -> str:
@@ -217,6 +240,39 @@ class LilypondFactory:
         with open("logs/output.txt", "w") as sheet_file:
             sheet_file.write(output_string)
 
+    @classmethod
+    def export_dance_score(cls, input_score: theory.DanceScore) -> None:
+        with open("logs/custom.txt", "r") as sheet_file:
+            output_string = sheet_file.read()
+        tonic_designator = cls.convert_generic_pitch(input_score.scale[0])
+        space_chr = " "
+        voice_parts_markup = []
+
+        for part_index, (clef_name, melodic_sequence) in enumerate(input_score.parts):
+            part_sequence = [f"\\key {tonic_designator} \\{input_score.scale.type}"]
+            if part_index == 0:
+                part_sequence.append(f"\\time 2/2")
+            part_sequence.append(f'\\clef "{clef_name}"')
+
+            part_sequence.extend(
+                cls.convert_tonal_obj(sound_obj) for sound_obj in melodic_sequence
+            )
+            part_repr = " ".join(part_sequence)
+
+            voice_part_markup = [
+                f"{space_chr * 6}\\new Staff <<",
+                f"{space_chr * 8}\\new Voice {{ {part_repr} }}",
+                f"{space_chr * 6}>>",
+            ]
+            voice_parts_markup.append("\n".join(voice_part_markup))
+
+        output_string = output_string.replace(
+            "VOICE_PARTS", "\n".join(voice_parts_markup[::-1])
+        )
+
+        with open("logs/output.txt", "w") as sheet_file:
+            sheet_file.write(output_string)
+
 
 def export_midi(input_score: theory.AbstractScore) -> None:
     TICKS_PER_BEAT = 960
@@ -278,6 +334,52 @@ def export_midi(input_score: theory.AbstractScore) -> None:
                         track, channel, drum_pitch, time, tick_duration, 100
                     )
             time += tick_duration
+        time = 0
+
+    try:
+        with open("logs/output.mid", "wb") as output_file:
+            new_midi.writeFile(output_file)
+    except PermissionError:
+        print("Close the midi file and try again.")
+
+
+def export_dance_midi(input_score: theory.DanceScore) -> None:
+    TICKS_PER_BEAT = 960
+    NUMBER_OF_TRACKS = len(input_score.parts)
+    new_midi = MIDIFile(
+        numTracks=NUMBER_OF_TRACKS,
+        ticks_per_quarternote=TICKS_PER_BEAT,
+        eventtime_is_ticks=True,
+    )
+    new_midi.addTempo(0, 0, input_score.tempo)
+    track = 0
+    channel = 0
+    time = 0
+
+    beats_per_quarter_note = Fraction("1/2")
+
+    def get_tick_duration(metric_duration: Fraction) -> int:
+        num_of_quarter_notes = metric_duration * 4
+        return int(num_of_quarter_notes * beats_per_quarter_note * TICKS_PER_BEAT)
+
+    for _, melodic_sequence in input_score.parts:
+        new_midi.addProgramChange(track, channel, 0, input_score.instrument.number)
+        for sound_obj in melodic_sequence:
+            tick_duration = get_tick_duration(sound_obj.duration)
+
+            if isinstance(sound_obj, theory.SpecificNote):
+                new_midi.addNote(
+                    track,
+                    channel,
+                    sound_obj.specific_pitch.value,
+                    time,
+                    tick_duration,
+                    115,
+                )
+            time += tick_duration
+
+        track += 1
+        channel += 1
         time = 0
 
     try:

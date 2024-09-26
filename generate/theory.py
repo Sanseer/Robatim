@@ -457,6 +457,55 @@ class GenericScale(StringDefinedEntity):
         return iter(self._members)
 
 
+class ModalScale(GenericScale):
+    @property
+    def type(self) -> str:
+        return self.__class__.__name__[:-5].lower()
+
+    def scale_shift(self, chosen_pitch: SpecificPitch, vector: int) -> SpecificPitch:
+        if vector == 0:
+            return chosen_pitch
+
+        result_pitch = chosen_pitch.clone()
+        result_pitch.increment_letter(vector)
+        target_pitch_letter = result_pitch.letter
+
+        for scale_pitch in self:
+            if scale_pitch.letter == target_pitch_letter:
+                return SpecificPitch(f"{scale_pitch}{result_pitch.octave}")
+        else:
+            raise ValueError
+
+    def get_specific_iter(self) -> Iterator[SpecificPitch]:
+        current_specific_pitch = SpecificPitch(f"{self[0]}0")
+        iterating_intervals = [
+            Interval.get(interval_str) for interval_str in self.scale_intervals[1:]
+        ]
+
+        while True:
+            yield current_specific_pitch
+            for current_interval in iterating_intervals:
+                yield current_specific_pitch + current_interval
+
+            current_specific_pitch += Interval.get("P8")
+
+
+class IonianScale(ModalScale):
+    scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "M7"]
+
+
+class DorianScale(ModalScale):
+    scale_intervals = ["P1", "M2", "m3", "P4", "P5", "M6", "m7"]
+
+
+class MixolydianScale(ModalScale):
+    scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "m7"]
+
+
+class AeolianScale(ModalScale):
+    scale_intervals = ["P1", "M2", "m3", "P4", "P5", "m6", "m7"]
+
+
 class MajorScale(GenericScale):
     scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "M7"]
     roman_numeral_to_degree = {
@@ -786,13 +835,42 @@ class DrumNote:
 class MidiInstrument:
     name: str
     number: int
-    lower_bound: int
-    upper_bound: int
 
 
 @dataclass
 class RestNote:
     duration: Fraction
+
+
+MelodicSequence = list[SpecificNote]
+MeasureStack = tuple[MelodicSequence, MelodicSequence, MelodicSequence, MelodicSequence]
+
+
+class DanceScore:
+    def __init__(
+        self,
+        chosen_scale: ModalScale,
+        clef_group: list[str],
+        score_sequence: list[MeasureStack],
+        chosen_instruemnt: MidiInstrument,
+    ) -> None:
+        self.scale = chosen_scale
+        print(f"Using {chosen_instruemnt}")
+        self.instrument = chosen_instruemnt
+        """You can have two parts with the same clef 
+        (e.g., contratenor and tenor voices using the alto clef) 
+        Therefore, a list is used instead of a dictionary"""
+        self.parts = []
+
+        voice_measures: tuple[MelodicSequence, ...]
+        for clef_name, voice_measures in zip(clef_group, zip(*score_sequence)):
+            melodic_sequence = [
+                specific_note
+                for voice_measure in voice_measures
+                for specific_note in voice_measure
+            ]
+            self.parts.append((clef_name, melodic_sequence))
+        self.tempo = random.randint(100, 170)
 
 
 class DrumCluster:
@@ -889,8 +967,7 @@ class WaveFunction:
     ) -> None:
         for propagate_index, index_prospects in enumerate(sequence_prospects):
             if not index_prospects:
-                print(f"No prospects at index {propagate_index}")
-                raise ValueError
+                raise ValueError(f"No prospects at index {propagate_index}")
 
         self.sequence_prospects = copy.deepcopy(sequence_prospects)
         self.has_propagated = has_propagated
@@ -947,7 +1024,7 @@ class WaveFunction:
         self, sequence_prospects: list[list] | list[deque]
     ) -> list[int]:
         # arbitrary initial value that is higher than all possible states
-        lowest_entropy = 10000
+        lowest_entropy = 1_000_000_000_000
         lowest_entropy_indices = []
 
         for current_index, index_choices in enumerate(sequence_prospects):
