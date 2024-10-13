@@ -88,11 +88,11 @@ DuoMeasureTest = tuple[
 def get_measure_combos(
     pitch_sequences: dict[str, list[theory.MelodicSequence]]
 ) -> list[theory.MeasureStack]:
-    combos_to_check: tuple[DuoMeasureTest, ...]
+    duos_to_check: tuple[DuoMeasureTest, ...]
     possible_measure_combos = []
     for bassus_measure in pitch_sequences["bassus"]:
         for tenor_measure in pitch_sequences["tenor"]:
-            combos_to_check = (
+            duos_to_check = (
                 (
                     bassus_measure,
                     tenor_measure,
@@ -100,10 +100,10 @@ def get_measure_combos(
                     rules.lower_voice_consonances,
                 ),
             )
-            if not are_pitch_columns_valid(combos_to_check):
+            if not are_pitch_columns_valid(duos_to_check):
                 continue
             for contratenor_measure in pitch_sequences["contratenor"]:
-                combos_to_check = (
+                duos_to_check = (
                     (
                         bassus_measure,
                         contratenor_measure,
@@ -117,10 +117,14 @@ def get_measure_combos(
                         rules.upper_voice_consonances,
                     ),
                 )
-                if not are_pitch_columns_valid(combos_to_check):
+                if not are_pitch_columns_valid(duos_to_check):
+                    continue
+                if not has_valid_fourths(
+                    bassus_measure, tenor_measure, contratenor_measure
+                ):
                     continue
                 for superius_measure in pitch_sequences["superius"]:
-                    combos_to_check = (
+                    duos_to_check = (
                         (
                             bassus_measure,
                             superius_measure,
@@ -140,7 +144,15 @@ def get_measure_combos(
                             rules.upper_voice_consonances,
                         ),
                     )
-                    if not are_pitch_columns_valid(combos_to_check):
+                    if not are_pitch_columns_valid(duos_to_check):
+                        continue
+                    if not has_valid_fourths(
+                        bassus_measure, tenor_measure, superius_measure
+                    ):
+                        continue
+                    if not has_valid_fourths(
+                        bassus_measure, contratenor_measure, superius_measure
+                    ):
                         continue
                     possible_measure_combos.append(
                         (
@@ -160,38 +172,43 @@ def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bo
         additional_tests,
         consonant_ids,
     ) in duo_measure_tests:
-        previous_lower_pitch = lower_voice_measure[0].specific_pitch
-        previous_upper_pitch = upper_voice_measure[0].specific_pitch
+        previous_lower_note = lower_voice_measure[0]
+        previous_upper_note = upper_voice_measure[0]
 
         if not rules.is_duo_consonant(
-            previous_lower_pitch, previous_upper_pitch, consonant_ids
+            previous_lower_note.specific_pitch,
+            previous_upper_note.specific_pitch,
+            consonant_ids,
         ):
             return False
-        duo_iter = get_pitch_pairs(lower_voice_measure, upper_voice_measure)
-        for current_lower_pitch, current_upper_pitch in duo_iter:
+        duo_iter = get_note_duo(lower_voice_measure, upper_voice_measure)
+        for current_lower_note, current_upper_note in duo_iter:
             for additional_test in additional_tests:
-                if not additional_test(current_lower_pitch, current_upper_pitch):
+                if not additional_test(
+                    current_lower_note.specific_pitch,
+                    current_upper_note.specific_pitch,
+                ):
                     return False
 
             if not rules.is_duo_motion_valid(
-                previous_lower_pitch,
-                previous_upper_pitch,
-                current_lower_pitch,
-                current_upper_pitch,
+                previous_lower_note,
+                previous_upper_note,
+                current_lower_note,
+                current_upper_note,
                 consonant_ids,
                 True,
             ):
                 return False
 
-            previous_lower_pitch = current_lower_pitch
-            previous_upper_pitch = current_upper_pitch
+            previous_lower_note = current_lower_note
+            previous_upper_note = current_upper_note
     return True
 
 
-def get_pitch_pairs(
+def get_note_duo(
     lower_voice_measure: theory.MelodicSequence,
     upper_voice_measure: theory.MelodicSequence,
-) -> Iterator[tuple[theory.SpecificPitch, theory.SpecificPitch]]:
+) -> Iterator[tuple[theory.SpecificNote, theory.SpecificNote]]:
     lower_voice_iter = iter(lower_voice_measure)
     upper_voice_iter = iter(upper_voice_measure)
 
@@ -201,7 +218,7 @@ def get_pitch_pairs(
     upper_voice_duration = upper_voice_note.duration
 
     while True:
-        yield lower_voice_note.specific_pitch, upper_voice_note.specific_pitch
+        yield lower_voice_note, upper_voice_note
 
         intersect_duration = min(lower_voice_duration, upper_voice_duration)
         lower_voice_duration -= intersect_duration
@@ -214,5 +231,88 @@ def get_pitch_pairs(
             if not upper_voice_duration:
                 upper_voice_note = next(upper_voice_iter)
                 upper_voice_duration = upper_voice_note.duration
+        except StopIteration:
+            break
+
+
+def has_valid_fourths(
+    lowest_voice_measure: theory.MelodicSequence,
+    middle_voice_measure: theory.MelodicSequence,
+    highest_voice_measure: theory.MelodicSequence,
+) -> bool:
+    trio_iter = get_pitch_trio(
+        lowest_voice_measure, middle_voice_measure, highest_voice_measure
+    )
+    previous_middle_pitch = middle_voice_measure[0].specific_pitch
+    previous_highest_pitch = highest_voice_measure[0].specific_pitch
+
+    for current_lowest_pitch, current_middle_pitch, current_highest_pitch in trio_iter:
+        middle_voice_distance = theory.SpecificPitch.get_interval_distance(
+            previous_middle_pitch, current_middle_pitch
+        )
+        highest_voice_distance = theory.SpecificPitch.get_interval_distance(
+            previous_highest_pitch, current_highest_pitch
+        )
+        previous_middle_pitch = current_middle_pitch
+        previous_highest_pitch = current_highest_pitch
+
+        if middle_voice_distance and highest_voice_distance:
+            concerning_value = (
+                current_middle_pitch + theory.Interval.get("P4")
+            ).generic_pitch
+            if current_highest_pitch.generic_pitch != concerning_value:
+                continue
+            consonant_bass_values = {
+                (current_middle_pitch - theory.Interval.get("M3")).generic_pitch,
+                (current_middle_pitch - theory.Interval.get("m3")).generic_pitch,
+                (current_middle_pitch - theory.Interval.get("P5")).generic_pitch,
+            }
+            if current_lowest_pitch.generic_pitch not in consonant_bass_values:
+                return False
+
+    return True
+
+
+def get_pitch_trio(
+    lowest_voice_measure: theory.MelodicSequence,
+    middle_voice_measure: theory.MelodicSequence,
+    highest_voice_measure: theory.MelodicSequence,
+) -> Iterator[tuple[theory.SpecificPitch, theory.SpecificPitch, theory.SpecificPitch]]:
+    lowest_voice_iter = iter(lowest_voice_measure)
+    middle_voice_iter = iter(middle_voice_measure)
+    highest_voice_iter = iter(highest_voice_measure)
+
+    lowest_voice_note = next(lowest_voice_iter)
+    middle_voice_note = next(middle_voice_iter)
+    highest_voice_note = next(highest_voice_iter)
+    lowest_voice_duration = lowest_voice_note.duration
+    middle_voice_duration = middle_voice_note.duration
+    highest_voice_duration = highest_voice_note.duration
+
+    while True:
+        result = (
+            lowest_voice_note.specific_pitch,
+            middle_voice_note.specific_pitch,
+            highest_voice_note.specific_pitch,
+        )
+        yield result
+
+        intersect_duration = min(
+            lowest_voice_duration, middle_voice_duration, highest_voice_duration
+        )
+        lowest_voice_duration -= intersect_duration
+        middle_voice_duration -= intersect_duration
+        highest_voice_duration -= intersect_duration
+
+        try:
+            if not lowest_voice_duration:
+                lowest_voice_note = next(lowest_voice_iter)
+                lowest_voice_duration = lowest_voice_note.duration
+            if not middle_voice_duration:
+                middle_voice_note = next(middle_voice_iter)
+                middle_voice_duration = middle_voice_note.duration
+            if not highest_voice_duration:
+                highest_voice_note = next(highest_voice_iter)
+                highest_voice_duration = highest_voice_note.duration
         except StopIteration:
             break

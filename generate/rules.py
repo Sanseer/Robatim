@@ -38,13 +38,30 @@ def checked_solo_transition(
         voice_distance = theory.SpecificPitch.get_interval_distance(
             first_pitch, second_pitch
         )
+        if voice_distance > 7 or voice_distance == 6:
+            return False
 
-        if voice_distance > 7:
-            return False
-        if voice_distance == 6:
-            return False
+        leap_direction = get_direction(first_pitch, second_pitch)
+        if voice_distance == 7 and len(second_voice_measure) > 1:
+            resolving_pitch = second_voice_measure[1].specific_pitch
+            resolving_direction = get_direction(second_pitch, resolving_pitch)
+            if leap_direction == resolving_direction:
+                return False
+
         if voice_distance == 5:
             if second_pitch != first_pitch + theory.Interval.get("m6"):
+                return False
+            if len(second_voice_measure) == 1:
+                return False
+
+            resolving_pitch = second_voice_measure[1].specific_pitch
+            resolving_distance = theory.SpecificPitch.get_interval_distance(
+                second_pitch, resolving_pitch
+            )
+            if resolving_distance != 1:
+                return False
+            resolving_direction = get_direction(second_pitch, resolving_pitch)
+            if leap_direction == resolving_direction:
                 return False
         if first_voice_measure[-1].duration <= Fraction("1/4") and voice_distance != 1:
             return False
@@ -83,13 +100,18 @@ def is_duo_consonant(
 
 
 def is_duo_motion_valid(
-    first_lower_pitch: theory.SpecificPitch,
-    first_upper_pitch: theory.SpecificPitch,
-    second_lower_pitch: theory.SpecificPitch,
-    second_upper_pitch: theory.SpecificPitch,
+    first_lower_note: theory.SpecificNote,
+    first_upper_note: theory.SpecificNote,
+    second_lower_note: theory.SpecificNote,
+    second_upper_note: theory.SpecificNote,
     consonant_ids: set[str],
     is_prelim_check: bool,
 ) -> bool:
+    first_lower_pitch = first_lower_note.specific_pitch
+    first_upper_pitch = first_upper_note.specific_pitch
+    second_lower_pitch = second_lower_note.specific_pitch
+    second_upper_pitch = second_upper_note.specific_pitch
+
     lower_voice_distance = theory.SpecificPitch.get_interval_distance(
         first_lower_pitch, second_lower_pitch
     )
@@ -124,6 +146,10 @@ def is_duo_motion_valid(
                     first_lower_pitch, first_upper_pitch, consonant_ids
                 ):
                     return False
+                if first_lower_note.duration < Fraction("1/2"):
+                    return False
+                if first_upper_note.duration < Fraction("1/2"):
+                    return False
     return True
 
 
@@ -137,21 +163,16 @@ def checked_duo_transition(
     second_measure_stack: theory.MeasureStack,
 ) -> bool:
     for first_voice_index, second_voice_index in all_voice_pairs:
-        first_lower_pitch = first_measure_stack[first_voice_index][-1].specific_pitch
-        first_upper_pitch = first_measure_stack[second_voice_index][-1].specific_pitch
-        second_lower_pitch = second_measure_stack[first_voice_index][0].specific_pitch
-        second_upper_pitch = second_measure_stack[second_voice_index][0].specific_pitch
-
         if first_voice_index == 0:
             consonant_ids = lower_voice_consonances
         else:
             consonant_ids = upper_voice_consonances
 
         if not is_duo_motion_valid(
-            first_lower_pitch,
-            first_upper_pitch,
-            second_lower_pitch,
-            second_upper_pitch,
+            first_measure_stack[first_voice_index][-1],
+            first_measure_stack[second_voice_index][-1],
+            second_measure_stack[first_voice_index][0],
+            second_measure_stack[second_voice_index][0],
             consonant_ids,
             False,
         ):
@@ -173,18 +194,18 @@ def filter_prospects(
 def has_counterpoint_propagated(
     sequence_prospects: list[list[theory.MeasureStack]],
     propagate_index: int,
-    score_sequence: list[theory.MeasureStack | None],
+    score_sequence: theory.CognizantSequence,
     current_measure_stack: theory.MeasureStack,
 ) -> bool:
-    final_index = len(score_sequence) - 1
     previous_index = propagate_index - 1
     next_index = propagate_index + 1
 
-    if propagate_index != final_index:
+    if propagate_index != score_sequence.final_index:
         next_prospects = sequence_prospects[next_index]
         prospect_validators = [
             partial(checked_solo_transition, current_measure_stack),
             partial(checked_duo_transition, current_measure_stack),
+            partial(score_sequence.checked_stipulations, next_index),
         ]
         for prospect_validator in prospect_validators:
             if not filter_prospects(next_prospects, prospect_validator):
@@ -201,6 +222,7 @@ def has_counterpoint_propagated(
                 checked_duo_transition,
                 second_measure_stack=current_measure_stack,
             ),
+            partial(score_sequence.checked_stipulations, previous_index),
         ]
         for prospect_validator in prospect_validators:
             if not filter_prospects(previous_prospects, prospect_validator):

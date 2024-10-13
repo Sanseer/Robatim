@@ -846,12 +846,223 @@ MelodicSequence = list[SpecificNote]
 MeasureStack = tuple[MelodicSequence, MelodicSequence, MelodicSequence, MelodicSequence]
 
 
+@dataclass
+class ConsecutiveMarker:
+    duration: Fraction
+    count: int
+
+
+@dataclass
+class ScoreRule:
+    direction: str
+    voice_index: int
+    rule: ConsecutiveMarker
+
+
+class Stipulation:
+    def __init__(self, score_rules: list[ScoreRule]) -> None:
+        self.left_marker = {}
+        self.right_marker = {}
+        for score_rule in score_rules:
+            if score_rule.direction == "left":
+                self.left_marker[score_rule.voice_index] = score_rule.rule
+            else:
+                self.right_marker[score_rule.voice_index] = score_rule.rule
+
+
+class CognizantSequence:
+    consecutive_limits = {Fraction("1"): 3, Fraction("1/2"): 7, Fraction("1/4"): 14}
+    all_voice_indices = (0, 1, 2, 3)
+
+    def __init__(self, length: int) -> None:
+        self.sequence: list[MeasureStack | None] = [None for _ in range(length)]
+        self.final_index = length - 1
+
+    def __iter__(self) -> Iterator[MeasureStack | None]:
+        return iter(self.sequence)
+
+    def __getitem__(self, index: int) -> MeasureStack | None:
+        return self.sequence[index]
+
+    def __setitem__(self, index: int, measure_stack: MeasureStack | None) -> None:
+        self.sequence[index] = measure_stack
+
+    @staticmethod
+    def get_stipulation(measure_stack: MeasureStack) -> Stipulation:
+        score_rules = []
+
+        for voice_index, voice_measure in enumerate(measure_stack):
+            consecutive_duration = voice_measure[0].duration
+            consecutive_count = 0
+            for voice_note in voice_measure:
+                if voice_note.duration == consecutive_duration:
+                    consecutive_count += 1
+                else:
+                    break
+
+            consecutive_marker = ConsecutiveMarker(
+                consecutive_duration, consecutive_count
+            )
+            score_rules.append(ScoreRule("left", voice_index, consecutive_marker))
+
+            consecutive_duration = voice_measure[-1].duration
+            consecutive_count = 0
+            for voice_note in reversed(voice_measure):
+                if voice_note.duration == consecutive_duration:
+                    consecutive_count += 1
+                else:
+                    break
+
+            consecutive_marker = ConsecutiveMarker(
+                consecutive_duration, consecutive_count
+            )
+            score_rules.append(ScoreRule("right", voice_index, consecutive_marker))
+
+        return Stipulation(score_rules)
+
+    def checked_stipulations(
+        self,
+        propagate_index: int,
+        attempted_measure_stack: MeasureStack,
+    ) -> bool:
+        attempted_stipulation = self.get_stipulation(attempted_measure_stack)
+        if propagate_index == self.final_index:
+            test_measure_stack = self.test_leftward
+        elif propagate_index == 0:
+            test_measure_stack = self.test_rightward
+        else:
+            test_measure_stack = self.test_dual_outward
+
+        for voice_index in self.all_voice_indices:
+            left_marker = attempted_stipulation.left_marker[voice_index]
+            right_marker = attempted_stipulation.right_marker[voice_index]
+            if (
+                left_marker.duration == right_marker.duration
+                and left_marker.count == len(attempted_measure_stack[voice_index])
+                and propagate_index != 0
+                and propagate_index != self.final_index
+            ):
+                verdict = self.test_single_outward(
+                    propagate_index, voice_index, attempted_stipulation
+                )
+            else:
+                verdict = test_measure_stack(
+                    propagate_index, voice_index, attempted_stipulation
+                )
+            if not verdict:
+                return False
+        return True
+
+    def test_leftward(
+        self,
+        propagate_index: int,
+        voice_index: int,
+        attempted_stipulation: Stipulation,
+    ) -> bool:
+        left_marker = attempted_stipulation.left_marker[voice_index]
+        consecutive_duration = left_marker.duration
+        consecutive_count = left_marker.count
+
+        for current_index in range(propagate_index - 1, -1, -1):
+            if (current_measure_stack := self.sequence[current_index]) is not None:
+                for voice_note in reversed(current_measure_stack[voice_index]):
+                    if voice_note.duration != consecutive_duration:
+                        break
+                    consecutive_count += 1
+                else:
+                    continue
+                break
+            else:
+                break
+
+        consecutive_limit = self.consecutive_limits[consecutive_duration]
+        return consecutive_count <= consecutive_limit
+
+    def test_rightward(
+        self,
+        propagate_index: int,
+        voice_index: int,
+        attempted_stipulation: Stipulation,
+    ) -> bool:
+        right_marker = attempted_stipulation.right_marker[voice_index]
+        consecutive_duration = right_marker.duration
+        consecutive_count = right_marker.count
+
+        for current_index in range(propagate_index + 1, self.final_index + 1):
+            if (current_measure_stack := self.sequence[current_index]) is not None:
+                for voice_note in current_measure_stack[voice_index]:
+                    if voice_note.duration != consecutive_duration:
+                        break
+                    consecutive_count += 1
+                else:
+                    continue
+                break
+            else:
+                break
+
+        consecutive_limit = self.consecutive_limits[consecutive_duration]
+        return consecutive_count <= consecutive_limit
+
+    def test_dual_outward(
+        self,
+        propagate_index: int,
+        voice_index: int,
+        attempted_stipulation: Stipulation,
+    ) -> bool:
+        left_condition = self.test_leftward(
+            propagate_index, voice_index, attempted_stipulation
+        )
+        if not left_condition:
+            return False
+        right_condition = self.test_rightward(
+            propagate_index, voice_index, attempted_stipulation
+        )
+        return right_condition
+
+    def test_single_outward(
+        self,
+        propagate_index: int,
+        voice_index: int,
+        attempted_stipulation: Stipulation,
+    ) -> bool:
+        left_marker = attempted_stipulation.left_marker[voice_index]
+        consecutive_duration = left_marker.duration
+        consecutive_count = left_marker.count
+
+        for current_index in range(propagate_index - 1, -1, -1):
+            if (current_measure_stack := self.sequence[current_index]) is not None:
+                for voice_note in reversed(current_measure_stack[voice_index]):
+                    if voice_note.duration != consecutive_duration:
+                        break
+                    consecutive_count += 1
+                else:
+                    continue
+                break
+            else:
+                break
+
+        for current_index in range(propagate_index + 1, self.final_index + 1):
+            if (current_measure_stack := self.sequence[current_index]) is not None:
+                for voice_note in current_measure_stack[voice_index]:
+                    if voice_note.duration != consecutive_duration:
+                        break
+                    consecutive_count += 1
+                else:
+                    continue
+                break
+            else:
+                break
+
+        consecutive_limit = self.consecutive_limits[consecutive_duration]
+        return consecutive_count <= consecutive_limit
+
+
 class DanceScore:
     def __init__(
         self,
         chosen_scale: ModalScale,
         clef_group: list[str],
-        score_sequence: list[MeasureStack],
+        score_sequence: CognizantSequence,
         chosen_instruemnt: MidiInstrument,
     ) -> None:
         self.scale = chosen_scale
@@ -962,8 +1173,8 @@ class WaveFunction:
 
     def __init__(
         self,
-        sequence_prospects: list[list] | list[deque],
-        has_propagated: Callable[[list, int, list, Any], bool],
+        sequence_prospects: list[list],
+        has_propagated: Callable[[list, int, CognizantSequence, MeasureStack], bool],
     ) -> None:
         for propagate_index, index_prospects in enumerate(sequence_prospects):
             if not index_prospects:
@@ -974,21 +1185,15 @@ class WaveFunction:
         """A sequence is not necessarily validated from left to right 
         but is instead validated based on entropy. 
         The propagate function should account for this unpredictable validation order."""
-        self.final_sequence = [None for _ in sequence_prospects]
+        self.final_sequence = CognizantSequence(len(sequence_prospects))
 
-    def __iter__(self) -> Iterator[list]:
+    def __iter__(self) -> Iterator[CognizantSequence]:
         """If this part is confusing, watch this video: https://www.youtube.com/watch?v=2SuvO4Gi7uY
         This could have been implemented iteratively rather than recursively but
         recursion provides a cleaner solution, especially when backtracking."""
-        for result in self.collapse(self.sequence_prospects):
-            if isinstance(result, bool):
-                raise ValueError
-            else:
-                yield result
+        return self.collapse(self.sequence_prospects)
 
-    def collapse(
-        self, sequence_prospects: list[list] | list[deque]
-    ) -> Iterator[list | bool]:
+    def collapse(self, sequence_prospects: list[list]) -> Iterator[CognizantSequence]:
         """Propagation requires removal of multiple items from a collection.
         SpecificPitch objects are not hashable, so we cannot create a set.
         Deque allows fast removal from ends of a collection of mutable objects."""
@@ -996,8 +1201,8 @@ class WaveFunction:
         lowest_entropy_indices = self.find_lowest_entropy(sequence_prospects)
         # After yielding a solution, a portion of it is erased to look for new solutions
         if not lowest_entropy_indices:
-            yield True
-            yield False
+            yield self.final_sequence
+            return
 
         chosen_index = random.choice(lowest_entropy_indices)
         slot_options = sequence_prospects[chosen_index]
@@ -1013,16 +1218,12 @@ class WaveFunction:
                 modified_prospects, chosen_index, self.final_sequence, chosen_item
             )
             if propagate_verdict:
-                recursive_stack = self.collapse(modified_prospects)
-                while next(recursive_stack, False):
-                    yield self.final_sequence
+                yield from self.collapse(modified_prospects)
 
             slot_options.remove(chosen_item)
             self.final_sequence[chosen_index] = None
 
-    def find_lowest_entropy(
-        self, sequence_prospects: list[list] | list[deque]
-    ) -> list[int]:
+    def find_lowest_entropy(self, sequence_prospects: list[list]) -> list[int]:
         # arbitrary initial value that is higher than all possible states
         lowest_entropy = 1_000_000_000_000
         lowest_entropy_indices = []
