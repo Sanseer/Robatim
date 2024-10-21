@@ -871,7 +871,12 @@ class Stipulation:
 
 
 class CognizantSequence:
-    consecutive_limits = {Fraction("1"): 3, Fraction("1/2"): 7, Fraction("1/4"): 14}
+    consecutive_limits = {
+        Fraction("1"): 3,
+        Fraction("1/2"): 7,
+        Fraction("1/4"): 14,
+        Fraction("3/4"): 1,
+    }
     all_voice_indices = (0, 1, 2, 3)
 
     def __init__(self, length: int) -> None:

@@ -62,9 +62,12 @@ def get_new_score() -> theory.DanceScore:
                     else:
                         pitch_sequences[voice_name].append(pitch_sequence)
 
-    possible_measure_combos = get_measure_combos(pitch_sequences)
-    print(f"Generated {len(possible_measure_combos)} measures")
-    sequence_prospects = [possible_measure_combos[:] for _ in range(12)]
+    measure_stack_groups = get_measure_stacks(pitch_sequences)
+    total_measure_count = sum(len(v) for v in measure_stack_groups.values())
+    print(f"Generated {total_measure_count} measures")
+    sequence_prospects = get_sequence_prospects(measure_stack_groups)
+    prospect_counts = [len(index_prospects) for index_prospects in sequence_prospects]
+    print(f"Allocated available measures: {prospect_counts}")
 
     possible_measure_sequences = theory.WaveFunction(
         sequence_prospects, rules.has_counterpoint_propagated
@@ -85,11 +88,15 @@ DuoMeasureTest = tuple[
 ]
 
 
-def get_measure_combos(
+def count_whole_notes(measure_stack: theory.MeasureStack) -> int:
+    return sum(1 for voice_measure in measure_stack if len(voice_measure) == 1)
+
+
+def get_measure_stacks(
     pitch_sequences: dict[str, list[theory.MelodicSequence]]
-) -> list[theory.MeasureStack]:
+) -> dict[str, list[theory.MeasureStack]]:
     duos_to_check: tuple[DuoMeasureTest, ...]
-    possible_measure_combos = []
+    measure_stack_groups = defaultdict(list)
     for bassus_measure in pitch_sequences["bassus"]:
         for tenor_measure in pitch_sequences["tenor"]:
             duos_to_check = (
@@ -154,15 +161,26 @@ def get_measure_combos(
                         bassus_measure, contratenor_measure, superius_measure
                     ):
                         continue
-                    possible_measure_combos.append(
-                        (
-                            bassus_measure,
-                            tenor_measure,
-                            contratenor_measure,
-                            superius_measure,
-                        )
+                    possible_measure_stack = (
+                        bassus_measure,
+                        tenor_measure,
+                        contratenor_measure,
+                        superius_measure,
                     )
-    return possible_measure_combos
+                    whole_note_count = count_whole_notes(possible_measure_stack)
+                    if whole_note_count == 0:
+                        measure_stack_groups["no_whole_notes"].append(
+                            possible_measure_stack
+                        )
+                    elif whole_note_count == 4:
+                        measure_stack_groups["all_whole_notes"].append(
+                            possible_measure_stack
+                        )
+                    else:
+                        measure_stack_groups["some_whole_notes"].append(
+                            possible_measure_stack
+                        )
+    return measure_stack_groups
 
 
 def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
@@ -243,32 +261,30 @@ def has_valid_fourths(
     trio_iter = get_pitch_trio(
         lowest_voice_measure, middle_voice_measure, highest_voice_measure
     )
+    previous_lowest_pitch = lowest_voice_measure[0].specific_pitch
     previous_middle_pitch = middle_voice_measure[0].specific_pitch
     previous_highest_pitch = highest_voice_measure[0].specific_pitch
 
+    if not rules.is_perfect_fourth_consonant(
+        previous_lowest_pitch, previous_middle_pitch, previous_highest_pitch
+    ):
+        return False
+
     for current_lowest_pitch, current_middle_pitch, current_highest_pitch in trio_iter:
-        middle_voice_distance = theory.SpecificPitch.get_interval_distance(
-            previous_middle_pitch, current_middle_pitch
-        )
-        highest_voice_distance = theory.SpecificPitch.get_interval_distance(
-            previous_highest_pitch, current_highest_pitch
-        )
+        if not rules.is_trio_motion_valid(
+            previous_lowest_pitch,
+            previous_middle_pitch,
+            previous_highest_pitch,
+            current_lowest_pitch,
+            current_middle_pitch,
+            current_highest_pitch,
+            True,
+        ):
+            return False
+
+        previous_lowest_pitch = current_lowest_pitch
         previous_middle_pitch = current_middle_pitch
         previous_highest_pitch = current_highest_pitch
-
-        if middle_voice_distance and highest_voice_distance:
-            concerning_value = (
-                current_middle_pitch + theory.Interval.get("P4")
-            ).generic_pitch
-            if current_highest_pitch.generic_pitch != concerning_value:
-                continue
-            consonant_bass_values = {
-                (current_middle_pitch - theory.Interval.get("M3")).generic_pitch,
-                (current_middle_pitch - theory.Interval.get("m3")).generic_pitch,
-                (current_middle_pitch - theory.Interval.get("P5")).generic_pitch,
-            }
-            if current_lowest_pitch.generic_pitch not in consonant_bass_values:
-                return False
 
     return True
 
@@ -316,3 +332,21 @@ def get_pitch_trio(
                 highest_voice_duration = highest_voice_note.duration
         except StopIteration:
             break
+
+
+def get_sequence_prospects(
+    measure_stack_groups: dict[str, list[theory.MeasureStack]]
+) -> list[list[theory.MeasureStack]]:
+    sequence_prospects: list[list[theory.MeasureStack]] = [[] for _ in range(12)]
+    for measure_stack in measure_stack_groups["all_whole_notes"]:
+        for current_index in (4, 5, 10, 11):
+            sequence_prospects[current_index].append(measure_stack)
+
+    for measure_stack in measure_stack_groups["some_whole_notes"]:
+        for current_index in (4, 5, 10):
+            sequence_prospects[current_index].append(measure_stack)
+
+    for measure_stack in measure_stack_groups["no_whole_notes"]:
+        for current_index in range(11):
+            sequence_prospects[current_index].append(measure_stack)
+    return sequence_prospects
