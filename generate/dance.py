@@ -62,10 +62,19 @@ def get_new_score() -> theory.DanceScore:
                     else:
                         pitch_sequences[voice_name].append(pitch_sequence)
 
-    measure_stack_groups = get_measure_stacks(pitch_sequences)
-    total_measure_count = sum(len(v) for v in measure_stack_groups.values())
-    print(f"Generated {total_measure_count} measures")
-    sequence_prospects = get_sequence_prospects(measure_stack_groups)
+    sequence_prospects: list[list[theory.MeasureStack]] = [[] for _ in range(12)]
+    whole_note_iter = VoiceMeasureStacker.get_measure_stacks(
+        VoiceMeasureStacker.get_whole_note_measures,
+        pitch_sequences["bassus"],
+        pitch_sequences["tenor"],
+        pitch_sequences["contratenor"],
+        pitch_sequences["superius"],
+    )
+    sequence_prospects[-1] = list(whole_note_iter)
+    voice_measure_stacker = VoiceMeasureStacker(pitch_sequences)
+    measure_stack_groups = next(iter(voice_measure_stacker))
+
+    fill_sequence_prospects(sequence_prospects, measure_stack_groups)
     prospect_counts = [len(index_prospects) for index_prospects in sequence_prospects]
     print(f"Allocated available measures: {prospect_counts}")
 
@@ -86,101 +95,6 @@ DuoMeasureTest = tuple[
     tuple[Callable[[theory.SpecificPitch, theory.SpecificPitch], bool], ...],
     set[str],
 ]
-
-
-def count_whole_notes(measure_stack: theory.MeasureStack) -> int:
-    return sum(1 for voice_measure in measure_stack if len(voice_measure) == 1)
-
-
-def get_measure_stacks(
-    pitch_sequences: dict[str, list[theory.MelodicSequence]]
-) -> dict[str, list[theory.MeasureStack]]:
-    duos_to_check: tuple[DuoMeasureTest, ...]
-    measure_stack_groups = defaultdict(list)
-    for bassus_measure in pitch_sequences["bassus"]:
-        for tenor_measure in pitch_sequences["tenor"]:
-            duos_to_check = (
-                (
-                    bassus_measure,
-                    tenor_measure,
-                    (rules.is_lowest_duo_good,),
-                    rules.lower_voice_consonances,
-                ),
-            )
-            if not are_pitch_columns_valid(duos_to_check):
-                continue
-            for contratenor_measure in pitch_sequences["contratenor"]:
-                duos_to_check = (
-                    (
-                        bassus_measure,
-                        contratenor_measure,
-                        tuple(),
-                        rules.lower_voice_consonances,
-                    ),
-                    (
-                        tenor_measure,
-                        contratenor_measure,
-                        (rules.is_upper_duo_good,),
-                        rules.upper_voice_consonances,
-                    ),
-                )
-                if not are_pitch_columns_valid(duos_to_check):
-                    continue
-                if not has_valid_fourths(
-                    bassus_measure, tenor_measure, contratenor_measure
-                ):
-                    continue
-                for superius_measure in pitch_sequences["superius"]:
-                    duos_to_check = (
-                        (
-                            bassus_measure,
-                            superius_measure,
-                            tuple(),
-                            rules.lower_voice_consonances,
-                        ),
-                        (
-                            tenor_measure,
-                            superius_measure,
-                            tuple(),
-                            rules.upper_voice_consonances,
-                        ),
-                        (
-                            contratenor_measure,
-                            superius_measure,
-                            (rules.is_upper_duo_good,),
-                            rules.upper_voice_consonances,
-                        ),
-                    )
-                    if not are_pitch_columns_valid(duos_to_check):
-                        continue
-                    if not has_valid_fourths(
-                        bassus_measure, tenor_measure, superius_measure
-                    ):
-                        continue
-                    if not has_valid_fourths(
-                        bassus_measure, contratenor_measure, superius_measure
-                    ):
-                        continue
-                    possible_measure_stack = (
-                        bassus_measure,
-                        tenor_measure,
-                        contratenor_measure,
-                        superius_measure,
-                    )
-                    whole_note_count = count_whole_notes(possible_measure_stack)
-                    if whole_note_count == 0:
-                        measure_stack_groups["no_whole_notes"].append(
-                            possible_measure_stack
-                        )
-                    elif whole_note_count == 4:
-                        measure_stack_groups["all_whole_notes"].append(
-                            possible_measure_stack
-                        )
-                    else:
-                        measure_stack_groups["some_whole_notes"].append(
-                            possible_measure_stack
-                        )
-    return measure_stack_groups
 
 
 def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
@@ -334,12 +248,12 @@ def get_pitch_trio(
             break
 
 
-def get_sequence_prospects(
-    measure_stack_groups: dict[str, list[theory.MeasureStack]]
-) -> list[list[theory.MeasureStack]]:
-    sequence_prospects: list[list[theory.MeasureStack]] = [[] for _ in range(12)]
+def fill_sequence_prospects(
+    sequence_prospects: list[list[theory.MeasureStack]],
+    measure_stack_groups: dict[str, list[theory.MeasureStack]],
+) -> None:
     for measure_stack in measure_stack_groups["all_whole_notes"]:
-        for current_index in (4, 5, 10, 11):
+        for current_index in (4, 5, 10):
             sequence_prospects[current_index].append(measure_stack)
 
     for measure_stack in measure_stack_groups["some_whole_notes"]:
@@ -349,4 +263,161 @@ def get_sequence_prospects(
     for measure_stack in measure_stack_groups["no_whole_notes"]:
         for current_index in range(11):
             sequence_prospects[current_index].append(measure_stack)
-    return sequence_prospects
+
+
+class VoiceMeasureStacker:
+    def __init__(
+        self, pitch_sequences: dict[str, list[theory.MelodicSequence]]
+    ) -> None:
+        self.bassus_measures = pitch_sequences["bassus"]
+        self.tenor_measures = pitch_sequences["tenor"]
+        self.contratenor_measures = pitch_sequences["contratenor"]
+        self.superius_measures = pitch_sequences["superius"]
+
+    def __iter__(self) -> Iterator[dict[str, list[theory.MeasureStack]]]:
+        random.shuffle(self.bassus_measures)
+        sub_iters = []
+        for bassus_measure in self.bassus_measures:
+            sub_iters.append(
+                self.get_measure_stacks(
+                    self.shuffle_iter,
+                    [bassus_measure],
+                    self.tenor_measures,
+                    self.contratenor_measures,
+                    self.superius_measures,
+                )
+            )
+
+        valid_result_count = 0
+        measure_stack_groups = defaultdict(list)
+        sub_iter_count = len(sub_iters)
+        sample_index = 0
+
+        while True:
+            if sample_index == sub_iter_count:
+                sample_index = 0
+            try:
+                current_measure_stack = next(sub_iters[sample_index])
+            except StopIteration:
+                sub_iters.pop(sample_index)
+                sub_iter_count -= 1
+                print(f"Emptied sub iterator. {sub_iter_count} remaining.")
+                continue
+            whole_note_count = self.count_whole_notes(current_measure_stack)
+
+            if whole_note_count == 0:
+                measure_stack_groups["no_whole_notes"].append(current_measure_stack)
+                valid_result_count += 1
+                if valid_result_count == 3_500:
+                    yield measure_stack_groups
+                    valid_result_count = 0
+                    measure_stack_groups.clear()
+            elif whole_note_count == 4:
+                measure_stack_groups["all_whole_notes"].append(current_measure_stack)
+            else:
+                measure_stack_groups["some_whole_notes"].append(current_measure_stack)
+            sample_index += 1
+
+    @staticmethod
+    def count_whole_notes(measure_stack: theory.MeasureStack) -> int:
+        return sum(1 for voice_measure in measure_stack if len(voice_measure) == 1)
+
+    @staticmethod
+    def get_whole_note_measures(
+        voice_measures: list[theory.MelodicSequence],
+    ) -> Iterator[theory.MelodicSequence]:
+        for voice_measure in voice_measures:
+            if len(voice_measure) == 1:
+                yield voice_measure
+
+    @staticmethod
+    def shuffle_iter(
+        voice_measures: list[theory.MelodicSequence],
+    ) -> Iterator[theory.MelodicSequence]:
+        measure_indices = list(range(len(voice_measures)))
+        random.shuffle(measure_indices)
+        for measure_index in measure_indices:
+            yield voice_measures[measure_index]
+
+    @staticmethod
+    def get_measure_stacks(
+        measure_iter: Callable[
+            [list[theory.MelodicSequence]], Iterator[theory.MelodicSequence]
+        ],
+        bassus_measures: list[theory.MelodicSequence],
+        tenor_measures: list[theory.MelodicSequence],
+        contratenor_measures: list[theory.MelodicSequence],
+        superius_measures: list[theory.MelodicSequence],
+    ) -> Iterator[theory.MeasureStack]:
+        duos_to_check: tuple[DuoMeasureTest, ...]
+        for bassus_measure in measure_iter(bassus_measures):
+            for tenor_measure in measure_iter(tenor_measures):
+                duos_to_check = (
+                    (
+                        bassus_measure,
+                        tenor_measure,
+                        (rules.is_lowest_duo_good,),
+                        rules.lower_voice_consonances,
+                    ),
+                )
+                if not are_pitch_columns_valid(duos_to_check):
+                    continue
+                for contratenor_measure in measure_iter(contratenor_measures):
+                    duos_to_check = (
+                        (
+                            bassus_measure,
+                            contratenor_measure,
+                            tuple(),
+                            rules.lower_voice_consonances,
+                        ),
+                        (
+                            tenor_measure,
+                            contratenor_measure,
+                            (rules.is_upper_duo_good,),
+                            rules.upper_voice_consonances,
+                        ),
+                    )
+                    if not are_pitch_columns_valid(duos_to_check):
+                        continue
+                    if not has_valid_fourths(
+                        bassus_measure, tenor_measure, contratenor_measure
+                    ):
+                        continue
+                    for superius_measure in measure_iter(superius_measures):
+                        duos_to_check = (
+                            (
+                                bassus_measure,
+                                superius_measure,
+                                tuple(),
+                                rules.lower_voice_consonances,
+                            ),
+                            (
+                                tenor_measure,
+                                superius_measure,
+                                tuple(),
+                                rules.upper_voice_consonances,
+                            ),
+                            (
+                                contratenor_measure,
+                                superius_measure,
+                                (rules.is_upper_duo_good,),
+                                rules.upper_voice_consonances,
+                            ),
+                        )
+                        if not are_pitch_columns_valid(duos_to_check):
+                            continue
+                        if not has_valid_fourths(
+                            bassus_measure, tenor_measure, superius_measure
+                        ):
+                            continue
+                        if not has_valid_fourths(
+                            bassus_measure, contratenor_measure, superius_measure
+                        ):
+                            continue
+                        possible_measure_stack = (
+                            bassus_measure,
+                            tenor_measure,
+                            contratenor_measure,
+                            superius_measure,
+                        )
+                        yield possible_measure_stack
