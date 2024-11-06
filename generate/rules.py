@@ -41,14 +41,16 @@ def checked_solo_transition(
         if voice_distance > 7 or voice_distance == 6:
             return False
 
-        leap_direction = get_direction(first_pitch, second_pitch)
-        if voice_distance == 7 and len(second_voice_measure) > 1:
-            resolving_pitch = second_voice_measure[1].specific_pitch
-            resolving_direction = get_direction(second_pitch, resolving_pitch)
-            if leap_direction == resolving_direction:
-                return False
-
-        if voice_distance == 5:
+        leap_direction = theory.SpecificPitch.get_direction(first_pitch, second_pitch)
+        if voice_distance == 7:
+            if len(second_voice_measure) > 1:
+                resolving_pitch = second_voice_measure[1].specific_pitch
+                resolving_direction = theory.SpecificPitch.get_direction(
+                    second_pitch, resolving_pitch
+                )
+                if leap_direction == resolving_direction:
+                    return False
+        elif voice_distance == 5:
             if second_pitch != first_pitch + theory.Interval.get("m6"):
                 return False
             if len(second_voice_measure) == 1:
@@ -60,7 +62,9 @@ def checked_solo_transition(
             )
             if resolving_distance != 1:
                 return False
-            resolving_direction = get_direction(second_pitch, resolving_pitch)
+            resolving_direction = theory.SpecificPitch.get_direction(
+                second_pitch, resolving_pitch
+            )
             if leap_direction == resolving_direction:
                 return False
         if first_voice_measure[-1].duration <= Fraction("1/4"):
@@ -87,18 +91,6 @@ def checked_solo_transition(
             return False
 
     return True
-
-
-def get_direction(
-    previous_pitch: theory.SpecificPitch, current_pitch: theory.SpecificPitch
-) -> int:
-    difference = current_pitch.value - previous_pitch.value
-    if difference > 0:
-        return 1
-    elif difference < 0:
-        return -1
-    else:
-        return 0
 
 
 def is_duo_consonant(
@@ -149,8 +141,12 @@ def is_duo_motion_valid(
         ):
             return False
 
-        lower_voice_direction = get_direction(first_lower_pitch, second_lower_pitch)
-        upper_voice_direction = get_direction(first_upper_pitch, second_upper_pitch)
+        lower_voice_direction = theory.SpecificPitch.get_direction(
+            first_lower_pitch, second_lower_pitch
+        )
+        upper_voice_direction = theory.SpecificPitch.get_direction(
+            first_upper_pitch, second_upper_pitch
+        )
 
         if lower_voice_direction == upper_voice_direction:
             current_undesired_values = {
@@ -173,6 +169,57 @@ def is_duo_motion_valid(
             second_lower_pitch, second_upper_pitch, consonant_ids
         ):
             return False
+
+    return True
+
+
+def is_cadential_duo_valid(
+    first_lower_note: theory.SpecificNote,
+    first_upper_note: theory.SpecificNote,
+    second_lower_note: theory.SpecificNote,
+    second_upper_note: theory.SpecificNote,
+    consonant_ids: set[str],
+) -> bool:
+    first_lower_pitch = first_lower_note.specific_pitch
+    first_upper_pitch = first_upper_note.specific_pitch
+    second_lower_pitch = second_lower_note.specific_pitch
+    second_upper_pitch = second_upper_note.specific_pitch
+
+    lower_voice_distance = theory.SpecificPitch.get_interval_distance(
+        first_lower_pitch, second_lower_pitch
+    )
+    upper_voice_distance = theory.SpecificPitch.get_interval_distance(
+        first_upper_pitch, second_upper_pitch
+    )
+    if lower_voice_distance and upper_voice_distance:
+        if second_lower_pitch >= first_upper_pitch:
+            return False
+        if second_upper_pitch <= first_lower_pitch:
+            return False
+        if not is_duo_consonant(second_lower_pitch, second_upper_pitch, consonant_ids):
+            return False
+
+        lower_voice_direction = theory.SpecificPitch.get_direction(
+            first_lower_pitch, second_lower_pitch
+        )
+        upper_voice_direction = theory.SpecificPitch.get_direction(
+            first_upper_pitch, second_upper_pitch
+        )
+
+        if lower_voice_direction == upper_voice_direction:
+            current_undesired_values = {
+                (second_lower_pitch + theory.Interval.get("P5")).generic_pitch,
+                (second_lower_pitch + theory.Interval.get("P8")).generic_pitch,
+            }
+            if second_upper_pitch.generic_pitch in current_undesired_values:
+                if upper_voice_distance != 1:
+                    return False
+                if lower_voice_distance == 1:
+                    return False
+                if first_lower_note.duration < Fraction("1/2"):
+                    return False
+                if first_upper_note.duration < Fraction("1/2"):
+                    return False
 
     return True
 
@@ -257,6 +304,29 @@ def is_trio_motion_valid(
     return True
 
 
+def is_cadential_trio_valid(
+    first_lowest_pitch: theory.SpecificPitch,
+    first_middle_pitch: theory.SpecificPitch,
+    first_highest_pitch: theory.SpecificPitch,
+    second_lowest_pitch: theory.SpecificPitch,
+    second_middle_pitch: theory.SpecificPitch,
+    second_highest_pitch: theory.SpecificPitch,
+) -> bool:
+    middle_voice_distance = theory.SpecificPitch.get_interval_distance(
+        first_middle_pitch, second_middle_pitch
+    )
+    highest_voice_distance = theory.SpecificPitch.get_interval_distance(
+        first_highest_pitch, second_highest_pitch
+    )
+
+    if middle_voice_distance and highest_voice_distance:
+        if not is_perfect_fourth_consonant(
+            second_lowest_pitch, second_middle_pitch, second_highest_pitch
+        ):
+            return False
+    return True
+
+
 bass_trios = ((0, 1, 2), (0, 1, 3), (0, 2, 3))
 
 
@@ -286,6 +356,40 @@ def checked_trio_transition(
     return True
 
 
+def checked_cadential_predecessor(
+    first_measure_stack: theory.MeasureStack,
+    second_measure_stack: theory.MeasureStack,
+) -> bool:
+    first_superius_pitch = first_measure_stack[-1][-1].specific_pitch
+    second_superius_pitch = second_measure_stack[-1][0].specific_pitch
+    interval_vector = theory.SpecificPitch.get_interval_vector(
+        first_superius_pitch, second_superius_pitch
+    )
+    return interval_vector == -1
+
+
+valid_cadential_motions = {0: {-4, 3}, 1: {-1}, 2: {0, -2}, 3: {1}}
+
+
+def checked_cadential_successor(
+    first_measure_stack: theory.MeasureStack,
+    second_measure_stack: theory.MeasureStack,
+) -> bool:
+    stack_index = 0
+    for first_voice_measure, second_voice_measure in zip(
+        first_measure_stack, second_measure_stack
+    ):
+        first_pitch = first_voice_measure[-1].specific_pitch
+        second_pitch = second_voice_measure[0].specific_pitch
+        interval_vector = theory.SpecificPitch.get_interval_vector(
+            first_pitch, second_pitch
+        )
+        if interval_vector not in valid_cadential_motions[stack_index]:
+            return False
+        stack_index += 1
+    return True
+
+
 def filter_prospects(
     index_prospects: list, has_prospect_succeeded: partial[bool]
 ) -> list:
@@ -303,10 +407,8 @@ def has_counterpoint_propagated(
     score_sequence: theory.CognizantSequence,
     current_measure_stack: theory.MeasureStack,
 ) -> bool:
-    previous_index = propagate_index - 1
-    next_index = propagate_index + 1
-
     if propagate_index != score_sequence.final_index:
+        next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
         prospect_validators = [
             partial(checked_solo_transition, current_measure_stack),
@@ -314,11 +416,16 @@ def has_counterpoint_propagated(
             partial(checked_trio_transition, current_measure_stack),
             partial(score_sequence.checked_stipulations, next_index),
         ]
+        if propagate_index == score_sequence.final_index - 1:
+            prospect_validators.append(
+                partial(checked_cadential_successor, current_measure_stack)
+            )
         for prospect_validator in prospect_validators:
             if not filter_prospects(next_prospects, prospect_validator):
                 return False
 
     if propagate_index != 0:
+        previous_index = propagate_index - 1
         previous_prospects = sequence_prospects[previous_index]
         prospect_validators = [
             partial(
@@ -335,6 +442,13 @@ def has_counterpoint_propagated(
             ),
             partial(score_sequence.checked_stipulations, previous_index),
         ]
+        if propagate_index == score_sequence.final_index - 1:
+            prospect_validators.append(
+                partial(
+                    checked_cadential_predecessor,
+                    second_measure_stack=current_measure_stack,
+                )
+            )
         for prospect_validator in prospect_validators:
             if not filter_prospects(previous_prospects, prospect_validator):
                 return False

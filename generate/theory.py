@@ -263,6 +263,15 @@ class SpecificPitch(GenericPitch, ValueComparator):
                 yield current_pitch
 
     @staticmethod
+    def get_direction(first_pitch: SpecificPitch, second_pitch: SpecificPitch) -> int:
+        difference = second_pitch.value - first_pitch.value
+        if difference > 0:
+            return 1
+        elif difference < 0:
+            return -1
+        return 0
+
+    @staticmethod
     def get_interval_distance(
         first_pitch: SpecificPitch, second_pitch: SpecificPitch
     ) -> int:
@@ -293,6 +302,14 @@ class SpecificPitch(GenericPitch, ValueComparator):
             interval_count += 1
 
         return interval_count
+
+    @classmethod
+    def get_interval_vector(
+        cls, first_pitch: SpecificPitch, second_pitch: SpecificPitch
+    ) -> int:
+        interval_distance = cls.get_interval_distance(first_pitch, second_pitch)
+        leap_direction = cls.get_direction(first_pitch, second_pitch)
+        return interval_distance * leap_direction
 
     def consonant_shift(
         self, chosen_scale: GenericScale, chosen_chord: GenericChord, scale_shift: int
@@ -458,6 +475,8 @@ class GenericScale(StringDefinedEntity):
 
 
 class ModalScale(GenericScale):
+    melodic_minor_degrees = {-1, -2}
+
     @property
     def type(self) -> str:
         return self.__class__.__name__[:-5].lower()
@@ -488,6 +507,31 @@ class ModalScale(GenericScale):
                 yield current_specific_pitch + current_interval
 
             current_specific_pitch += Interval.get("P8")
+
+    def get_cadential_pitch(self, scale_degree: int) -> GenericPitch:
+        cadential_pitch = self[scale_degree].clone()
+        if (
+            scale_degree in self.melodic_minor_degrees
+            and self.scale_intervals[scale_degree][0] == "m"
+        ):
+            cadential_pitch.increment_value(1)
+        return cadential_pitch
+
+    def cadential_shift(
+        self,
+        previous_specific_pitch: SpecificPitch,
+        previous_scale_degree: int,
+        current_scale_degree: int,
+    ) -> SpecificPitch:
+        interval_difference = current_scale_degree - previous_scale_degree
+        current_specific_pitch = previous_specific_pitch.clone()
+        current_specific_pitch.increment_letter(interval_difference)
+
+        cadential_generic_pitch = self.get_cadential_pitch(current_scale_degree)
+        current_specific_pitch = SpecificPitch(
+            f"{cadential_generic_pitch}{current_specific_pitch.octave}"
+        )
+        return current_specific_pitch
 
 
 class IonianScale(ModalScale):

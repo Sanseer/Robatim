@@ -69,8 +69,13 @@ def get_new_score() -> theory.DanceScore:
         pitch_sequences["tenor"],
         pitch_sequences["contratenor"],
         pitch_sequences["superius"],
+        are_pitch_columns_valid,
+        has_valid_fourths,
     )
     sequence_prospects[-1] = list(whole_note_iter)
+    sequence_prospects[-2] = get_penultimate_measure_stacks(
+        chosen_scale, voice_tessituras
+    )
     voice_measure_stacker = VoiceMeasureStacker(pitch_sequences)
     measure_stack_groups = next(iter(voice_measure_stacker))
 
@@ -248,20 +253,159 @@ def get_pitch_trio(
             break
 
 
+def get_penultimate_measure_stacks(
+    chosen_scale: theory.ModalScale, voice_tessituras: dict[str, theory.Tessitura]
+) -> list[theory.MeasureStack]:
+    penultimate_sequences = defaultdict(list)
+    for voice_name, voice_formulae in idioms["cadential_formulae"].items():
+        voice_tessitura = voice_tessituras[voice_name]
+        for voice_formula in voice_formulae:
+            voice_measures = elucidate_sequence(
+                chosen_scale, voice_formula, voice_tessitura
+            )
+            penultimate_sequences[voice_name].extend(voice_measures)
+
+    cadential_iter = VoiceMeasureStacker.get_measure_stacks(
+        VoiceMeasureStacker.shuffle_iter,
+        penultimate_sequences["bassus"],
+        penultimate_sequences["tenor"],
+        penultimate_sequences["contratenor"],
+        penultimate_sequences["superius"],
+        are_cadential_columns_valid,
+        has_cadential_fourths,
+    )
+
+    return list(cadential_iter)
+
+
+def elucidate_sequence(
+    chosen_scale: theory.ModalScale,
+    voice_formula: list[tuple[int, str]],
+    voice_tessitura: theory.Tessitura,
+) -> list[theory.MelodicSequence]:
+    starting_scale_degree = voice_formula[0][0]
+    starting_generic_pitch = chosen_scale.get_cadential_pitch(starting_scale_degree)
+    starting_specific_pitches = voice_tessitura.find_equivalent_pitches(
+        starting_generic_pitch
+    )
+    revert_duration = export.LilypondFactory.revert_duration
+    starting_duration = revert_duration(voice_formula[0][1])
+
+    pitch_sequences = []
+    for starting_specific_pitch in starting_specific_pitches:
+        pitch_sequence = [
+            theory.SpecificNote(starting_specific_pitch, starting_duration)
+        ]
+        previous_scale_degree = starting_scale_degree
+        previous_specific_pitch = starting_specific_pitch
+
+        for current_scale_degree, duration_repr in voice_formula[1:]:
+            current_specific_pitch = chosen_scale.cadential_shift(
+                previous_specific_pitch, previous_scale_degree, current_scale_degree
+            )
+            if current_specific_pitch not in voice_tessitura:
+                break
+
+            current_duration = revert_duration(duration_repr)
+            pitch_sequence.append(
+                theory.SpecificNote(current_specific_pitch, current_duration)
+            )
+            previous_scale_degree = current_scale_degree
+            previous_specific_pitch = current_specific_pitch
+        else:
+            pitch_sequences.append(pitch_sequence)
+
+    return pitch_sequences
+
+
+def are_cadential_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
+    for (
+        lower_voice_measure,
+        upper_voice_measure,
+        additional_tests,
+        consonant_ids,
+    ) in duo_measure_tests:
+        previous_lower_note = lower_voice_measure[0]
+        previous_upper_note = upper_voice_measure[0]
+
+        if not rules.is_duo_consonant(
+            previous_lower_note.specific_pitch,
+            previous_upper_note.specific_pitch,
+            consonant_ids,
+        ):
+            return False
+        duo_iter = get_note_duo(lower_voice_measure, upper_voice_measure)
+        for current_lower_note, current_upper_note in duo_iter:
+            for additional_test in additional_tests:
+                if not additional_test(
+                    current_lower_note.specific_pitch,
+                    current_upper_note.specific_pitch,
+                ):
+                    return False
+
+            if not rules.is_cadential_duo_valid(
+                previous_lower_note,
+                previous_upper_note,
+                current_lower_note,
+                current_upper_note,
+                consonant_ids,
+            ):
+                return False
+
+            previous_lower_note = current_lower_note
+            previous_upper_note = current_upper_note
+    return True
+
+
+def has_cadential_fourths(
+    lowest_voice_measure: theory.MelodicSequence,
+    middle_voice_measure: theory.MelodicSequence,
+    highest_voice_measure: theory.MelodicSequence,
+) -> bool:
+    trio_iter = get_pitch_trio(
+        lowest_voice_measure, middle_voice_measure, highest_voice_measure
+    )
+    previous_lowest_pitch = lowest_voice_measure[0].specific_pitch
+    previous_middle_pitch = middle_voice_measure[0].specific_pitch
+    previous_highest_pitch = highest_voice_measure[0].specific_pitch
+
+    if not rules.is_perfect_fourth_consonant(
+        previous_lowest_pitch, previous_middle_pitch, previous_highest_pitch
+    ):
+        return False
+
+    for current_lowest_pitch, current_middle_pitch, current_highest_pitch in trio_iter:
+        if not rules.is_cadential_trio_valid(
+            previous_lowest_pitch,
+            previous_middle_pitch,
+            previous_highest_pitch,
+            current_lowest_pitch,
+            current_middle_pitch,
+            current_highest_pitch,
+        ):
+            return False
+
+        previous_lowest_pitch = current_lowest_pitch
+        previous_middle_pitch = current_middle_pitch
+        previous_highest_pitch = current_highest_pitch
+
+    return True
+
+
 def fill_sequence_prospects(
     sequence_prospects: list[list[theory.MeasureStack]],
     measure_stack_groups: dict[str, list[theory.MeasureStack]],
 ) -> None:
     for measure_stack in measure_stack_groups["all_whole_notes"]:
-        for current_index in (4, 5, 10):
+        for current_index in (4, 5):
             sequence_prospects[current_index].append(measure_stack)
 
     for measure_stack in measure_stack_groups["some_whole_notes"]:
-        for current_index in (4, 5, 10):
+        for current_index in (4, 5):
             sequence_prospects[current_index].append(measure_stack)
 
     for measure_stack in measure_stack_groups["no_whole_notes"]:
-        for current_index in range(11):
+        for current_index in range(10):
             sequence_prospects[current_index].append(measure_stack)
 
 
@@ -285,6 +429,8 @@ class VoiceMeasureStacker:
                     self.tenor_measures,
                     self.contratenor_measures,
                     self.superius_measures,
+                    are_pitch_columns_valid,
+                    has_valid_fourths,
                 )
             )
 
@@ -348,6 +494,11 @@ class VoiceMeasureStacker:
         tenor_measures: list[theory.MelodicSequence],
         contratenor_measures: list[theory.MelodicSequence],
         superius_measures: list[theory.MelodicSequence],
+        is_duo_valid: Callable[[tuple[DuoMeasureTest, ...]], bool],
+        is_trio_valid: Callable[
+            [theory.MelodicSequence, theory.MelodicSequence, theory.MelodicSequence],
+            bool,
+        ],
     ) -> Iterator[theory.MeasureStack]:
         duos_to_check: tuple[DuoMeasureTest, ...]
         for bassus_measure in measure_iter(bassus_measures):
@@ -360,7 +511,7 @@ class VoiceMeasureStacker:
                         rules.lower_voice_consonances,
                     ),
                 )
-                if not are_pitch_columns_valid(duos_to_check):
+                if not is_duo_valid(duos_to_check):
                     continue
                 for contratenor_measure in measure_iter(contratenor_measures):
                     duos_to_check = (
@@ -377,9 +528,9 @@ class VoiceMeasureStacker:
                             rules.upper_voice_consonances,
                         ),
                     )
-                    if not are_pitch_columns_valid(duos_to_check):
+                    if not is_duo_valid(duos_to_check):
                         continue
-                    if not has_valid_fourths(
+                    if not is_trio_valid(
                         bassus_measure, tenor_measure, contratenor_measure
                     ):
                         continue
@@ -404,13 +555,13 @@ class VoiceMeasureStacker:
                                 rules.upper_voice_consonances,
                             ),
                         )
-                        if not are_pitch_columns_valid(duos_to_check):
+                        if not is_duo_valid(duos_to_check):
                             continue
-                        if not has_valid_fourths(
+                        if not is_trio_valid(
                             bassus_measure, tenor_measure, superius_measure
                         ):
                             continue
-                        if not has_valid_fourths(
+                        if not is_trio_valid(
                             bassus_measure, contratenor_measure, superius_measure
                         ):
                             continue
