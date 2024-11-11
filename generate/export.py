@@ -2,7 +2,7 @@ from fractions import Fraction
 import math
 
 from generate.midiutil import MIDIFile
-from generate import theory
+from generate import theory, limits
 
 
 class LilypondFactory:
@@ -241,7 +241,7 @@ class LilypondFactory:
             sheet_file.write(output_string)
 
     @classmethod
-    def export_dance_score(cls, input_score: theory.DanceScore) -> None:
+    def export_dance_score(cls, input_score: limits.DanceScore) -> None:
         with open("logs/custom.txt", "r") as sheet_file:
             output_string = sheet_file.read()
         tonic_designator = cls.convert_generic_pitch(input_score.scale[0])
@@ -343,7 +343,7 @@ def export_midi(input_score: theory.AbstractScore) -> None:
         print("Close the midi file and try again.")
 
 
-def export_dance_midi(input_score: theory.DanceScore) -> None:
+def export_dance_midi(input_score: limits.DanceScore) -> None:
     TICKS_PER_BEAT = 960
     NUMBER_OF_TRACKS = len(input_score.parts)
     new_midi = MIDIFile(

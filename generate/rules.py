@@ -1,7 +1,7 @@
 from functools import partial
 from fractions import Fraction
 
-from generate import theory
+from generate import theory, limits
 
 
 def is_lowest_duo_good(
@@ -404,7 +404,7 @@ def filter_prospects(
 def has_counterpoint_propagated(
     sequence_prospects: list[list[theory.MeasureStack]],
     propagate_index: int,
-    score_sequence: theory.CognizantSequence,
+    score_sequence: limits.CognizantSequence,
     current_measure_stack: theory.MeasureStack,
 ) -> bool:
     if propagate_index != score_sequence.final_index:
@@ -417,8 +417,8 @@ def has_counterpoint_propagated(
             partial(score_sequence.checked_stipulations, next_index),
         ]
         if propagate_index == score_sequence.final_index - 1:
-            prospect_validators.append(
-                partial(checked_cadential_successor, current_measure_stack)
+            prospect_validators.insert(
+                0, partial(checked_cadential_successor, current_measure_stack)
             )
         for prospect_validator in prospect_validators:
             if not filter_prospects(next_prospects, prospect_validator):
@@ -443,11 +443,12 @@ def has_counterpoint_propagated(
             partial(score_sequence.checked_stipulations, previous_index),
         ]
         if propagate_index == score_sequence.final_index - 1:
-            prospect_validators.append(
+            prospect_validators.insert(
+                0,
                 partial(
                     checked_cadential_predecessor,
                     second_measure_stack=current_measure_stack,
-                )
+                ),
             )
         for prospect_validator in prospect_validators:
             if not filter_prospects(previous_prospects, prospect_validator):

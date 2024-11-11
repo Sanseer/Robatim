@@ -3,7 +3,7 @@ import random
 from collections import defaultdict
 from typing import Iterator, Callable
 
-from generate import theory, export, rules
+from generate import theory, export, rules, limits
 
 with open("dance.json", "r") as f:
     idioms = json.load(f)
@@ -16,7 +16,7 @@ scale_map = {
 }
 
 
-def get_new_score() -> theory.DanceScore:
+def get_new_score() -> limits.DanceScore:
     clef_group = random.choice(idioms["clef_groups"])
     print(f"{clef_group = }")
     voice_tessituras = {}
@@ -83,13 +83,13 @@ def get_new_score() -> theory.DanceScore:
     prospect_counts = [len(index_prospects) for index_prospects in sequence_prospects]
     print(f"Allocated available measures: {prospect_counts}")
 
-    possible_measure_sequences = theory.WaveFunction(
+    possible_measure_sequences = limits.WaveFunction(
         sequence_prospects, rules.has_counterpoint_propagated
     )
     score_sequence = next(iter(possible_measure_sequences))
     chosen_instruemnt = theory.MidiInstrument(*random.choice(idioms["instruments"]))
 
-    return theory.DanceScore(
+    return limits.DanceScore(
         chosen_scale, clef_group, score_sequence, chosen_instruemnt
     )
 
