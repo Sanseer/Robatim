@@ -85,10 +85,14 @@ def checked_solo_transition(
         if second_pitch.generic_pitch in current_undesired_values:
             return False
 
-        if len(first_voice_measure) > 1 and str(first_voice_measure) == str(
-            second_voice_measure
-        ):
-            return False
+        if len(first_voice_measure) > 1 and len(second_voice_measure) > 1:
+            first_pitch = first_voice_measure[0].specific_pitch
+            second_pitch = first_voice_measure[1].specific_pitch
+            third_pitch = second_voice_measure[0].specific_pitch
+            fourth_pitch = second_voice_measure[1].specific_pitch
+
+            if first_pitch == third_pitch and second_pitch == fourth_pitch:
+                return False
 
     return True
 
@@ -356,16 +360,17 @@ def checked_trio_transition(
     return True
 
 
-def checked_cadential_predecessor(
+def checked_superius_transition(
     first_measure_stack: theory.MeasureStack,
     second_measure_stack: theory.MeasureStack,
+    allowed_vectors: set[int],
 ) -> bool:
     first_superius_pitch = first_measure_stack[-1][-1].specific_pitch
     second_superius_pitch = second_measure_stack[-1][0].specific_pitch
     interval_vector = theory.SpecificPitch.get_interval_vector(
         first_superius_pitch, second_superius_pitch
     )
-    return interval_vector == -1
+    return interval_vector in allowed_vectors
 
 
 valid_cadential_motions = {0: {-4, 3}, 1: {-1}, 2: {0, -2}, 3: {1}}
@@ -390,6 +395,33 @@ def checked_cadential_successor(
     return True
 
 
+def is_superius_duplicated(
+    first_measure_stack: theory.MeasureStack,
+    second_measure_stack: theory.MeasureStack,
+) -> bool:
+    first_superius_measure = first_measure_stack[-1]
+    second_superius_measure = second_measure_stack[-1]
+    return str(first_superius_measure) == str(second_superius_measure)
+
+
+def is_voice_measure_unique(
+    first_measure_stack: theory.MeasureStack,
+    second_measure_stack: theory.MeasureStack,
+) -> bool:
+    for first_voice_measure, second_voice_measure in zip(
+        first_measure_stack, second_measure_stack
+    ):
+        if len(first_voice_measure) > 1 and len(second_voice_measure) > 1:
+            first_pitch = first_voice_measure[0].specific_pitch
+            second_pitch = first_voice_measure[1].specific_pitch
+            third_pitch = second_voice_measure[0].specific_pitch
+            fourth_pitch = second_voice_measure[1].specific_pitch
+
+            if first_pitch == third_pitch and second_pitch == fourth_pitch:
+                return False
+    return True
+
+
 def filter_prospects(
     index_prospects: list, has_prospect_succeeded: partial[bool]
 ) -> list:
@@ -407,6 +439,18 @@ def has_counterpoint_propagated(
     score_sequence: limits.CognizantSequence,
     current_measure_stack: theory.MeasureStack,
 ) -> bool:
+    for duplicate_index in score_sequence.duplicates[propagate_index]:
+        prospect_validator = partial(is_superius_duplicated, current_measure_stack)
+        index_prospects = sequence_prospects[duplicate_index]
+        if not filter_prospects(index_prospects, prospect_validator):
+            return False
+
+    for unique_index in score_sequence.uniques[propagate_index]:
+        prospect_validator = partial(is_voice_measure_unique, current_measure_stack)
+        index_prospects = sequence_prospects[unique_index]
+        if not filter_prospects(index_prospects, prospect_validator):
+            return False
+
     if propagate_index != score_sequence.final_index:
         next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
@@ -416,6 +460,32 @@ def has_counterpoint_propagated(
             partial(checked_trio_transition, current_measure_stack),
             partial(score_sequence.checked_stipulations, next_index),
         ]
+        if propagate_index == 4:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_superius_transition,
+                    current_measure_stack,
+                    allowed_vectors={-1, 1},
+                ),
+            )
+        elif propagate_index == score_sequence.final_index - 2:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_superius_transition,
+                    current_measure_stack,
+                    allowed_vectors={-1},
+                ),
+            )
+        else:
+            prospect_validators.append(
+                partial(
+                    checked_superius_transition,
+                    current_measure_stack,
+                    allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
+                )
+            )
         if propagate_index == score_sequence.final_index - 1:
             prospect_validators.insert(
                 0, partial(checked_cadential_successor, current_measure_stack)
@@ -442,13 +512,31 @@ def has_counterpoint_propagated(
             ),
             partial(score_sequence.checked_stipulations, previous_index),
         ]
-        if propagate_index == score_sequence.final_index - 1:
+        if propagate_index == 5:
             prospect_validators.insert(
                 0,
                 partial(
-                    checked_cadential_predecessor,
+                    checked_superius_transition,
                     second_measure_stack=current_measure_stack,
+                    allowed_vectors={-1, 1},
                 ),
+            )
+        elif propagate_index == score_sequence.final_index - 1:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_superius_transition,
+                    second_measure_stack=current_measure_stack,
+                    allowed_vectors={-1},
+                ),
+            )
+        else:
+            prospect_validators.append(
+                partial(
+                    checked_superius_transition,
+                    second_measure_stack=current_measure_stack,
+                    allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
+                )
             )
         for prospect_validator in prospect_validators:
             if not filter_prospects(previous_prospects, prospect_validator):

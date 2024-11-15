@@ -63,6 +63,9 @@ def get_new_score() -> limits.DanceScore:
                         pitch_sequences[voice_name].append(pitch_sequence)
 
     sequence_prospects: list[list[theory.MeasureStack]] = [[] for _ in range(12)]
+    sequence_prospects[0] = get_first_measure_stacks(pitch_sequences, chosen_scale)
+    sequence_prospects[6] = sequence_prospects[0][:]
+
     whole_note_iter = VoiceMeasureStacker.get_measure_stacks(
         VoiceMeasureStacker.get_whole_note_measures,
         pitch_sequences["bassus"],
@@ -253,6 +256,39 @@ def get_pitch_trio(
             break
 
 
+def get_first_measure_stacks(
+    pitch_sequences: dict[str, list[theory.MelodicSequence]],
+    chosen_scale: theory.ModalScale,
+) -> list[theory.MeasureStack]:
+    first_sequences = defaultdict(list)
+
+    for voice_name, voice_measures in pitch_sequences.items():
+        allowed_first_motions = set(idioms["first_motions"][voice_name])
+        allowed_start_pitches = {
+            str(chosen_scale[first_degree])
+            for first_degree in idioms["first_degrees"][voice_name]
+        }
+        for voice_measure in voice_measures:
+            if len(voice_measure) == 1:
+                continue
+            first_specific_pitch = voice_measure[0].specific_pitch
+            if first_specific_pitch.generic_pitch not in allowed_start_pitches:
+                continue
+
+            second_specific_pitch = voice_measure[1].specific_pitch
+            interval_vector = theory.SpecificPitch.get_interval_vector(
+                first_specific_pitch, second_specific_pitch
+            )
+            if interval_vector not in allowed_first_motions:
+                continue
+            first_sequences[voice_name].append(voice_measure)
+
+    voice_measure_stacker = VoiceMeasureStacker(first_sequences)
+    measure_stack_groups = next(iter(voice_measure_stacker))
+
+    return measure_stack_groups["no_whole_notes"]
+
+
 def get_penultimate_measure_stacks(
     chosen_scale: theory.ModalScale, voice_tessituras: dict[str, theory.Tessitura]
 ) -> list[theory.MeasureStack]:
@@ -405,7 +441,9 @@ def fill_sequence_prospects(
             sequence_prospects[current_index].append(measure_stack)
 
     for measure_stack in measure_stack_groups["no_whole_notes"]:
-        for current_index in range(10):
+        for current_index in range(1, 6):
+            sequence_prospects[current_index].append(measure_stack)
+        for current_index in range(7, 10):
             sequence_prospects[current_index].append(measure_stack)
 
 
@@ -439,7 +477,7 @@ class VoiceMeasureStacker:
         sub_iter_count = len(sub_iters)
         sample_index = 0
 
-        while True:
+        while sub_iters:
             if sample_index == sub_iter_count:
                 sample_index = 0
             try:
@@ -463,6 +501,8 @@ class VoiceMeasureStacker:
             else:
                 measure_stack_groups["some_whole_notes"].append(current_measure_stack)
             sample_index += 1
+
+        yield measure_stack_groups
 
     @staticmethod
     def count_whole_notes(measure_stack: theory.MeasureStack) -> int:

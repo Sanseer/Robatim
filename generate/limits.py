@@ -1,4 +1,4 @@
-from collections import deque
+from collections import defaultdict, deque
 import copy
 from dataclasses import dataclass
 from fractions import Fraction
@@ -42,10 +42,22 @@ class CognizantSequence:
     }
     skip_limits = {0: 3, 1: 2, 2: 2, 3: 2}
     all_voice_indices = (0, 1, 2, 3)
+    known_duplicates = {0: 6, 1: 7, 2: 8}
+    known_uniques = {0: 3, 1: 4, 2: 5}
 
     def __init__(self, length: int) -> None:
         self.sequence: list[theory.MeasureStack | None] = [None for _ in range(length)]
         self.final_index = length - 1
+        self.duplicates = defaultdict(set)
+        self.uniques = defaultdict(set)
+
+        for k, v in self.known_duplicates.items():
+            self.duplicates[k].add(v)
+            self.duplicates[v].add(k)
+
+        for k, v in self.known_uniques.items():
+            self.uniques[k].add(v)
+            self.uniques[v].add(k)
 
     def __iter__(self) -> Iterator[theory.MeasureStack | None]:
         return iter(self.sequence)
@@ -175,7 +187,7 @@ class CognizantSequence:
                 propagate_index, attempted_measure_stack, (0, 1, 2, 3, 4, 5)
             )
         elif propagate_index == 10:
-            # soprano cadential measure hard-coded as stepwise motion to tonic
+            # superius cadential measure hard-coded as stepwise motion to tonic
             return True
         else:
             return self.test_melodic_bounds(
@@ -507,28 +519,39 @@ class CognizantSequence:
     @staticmethod
     def test_pitch_boundaries(normalized_sequence: list[theory.SpecificNote]) -> bool:
         previous_note = normalized_sequence[0]
-        previous_direction = 0
+        previous_vector = 0
         pitch_boundary_count = 0
         note_index = 1
+        pitch_boundaries = set()
 
         while note_index < len(normalized_sequence):
             current_note = normalized_sequence[note_index]
-            current_direction = theory.SpecificPitch.get_direction(
+            current_vector = theory.SpecificPitch.get_interval_vector(
                 previous_note.specific_pitch, current_note.specific_pitch
             )
             if (
-                current_direction != 0
-                and previous_direction != 0
-                and current_direction != previous_direction
+                current_vector != 0
+                and previous_vector != 0
+                # checking if signs are the same
+                and (current_vector * previous_vector) < 0
             ):
                 pitch_boundary_count += 1
+                if pitch_boundary_count > 3:
+                    return False
+                if abs(current_vector) > 1 and abs(previous_vector) > 1:
+                    return False
+
+                bound_repr = str(previous_note.specific_pitch)
+                if bound_repr in pitch_boundaries:
+                    return False
+                pitch_boundaries.add(bound_repr)
 
             previous_note = current_note
-            if current_direction != 0:
-                previous_direction = current_direction
+            if current_vector != 0:
+                previous_vector = current_vector
             note_index += 1
 
-        return pitch_boundary_count <= 3
+        return True
 
 
 class DanceScore:
