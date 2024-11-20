@@ -311,6 +311,17 @@ class SpecificPitch(GenericPitch, ValueComparator):
         leap_direction = cls.get_direction(first_pitch, second_pitch)
         return interval_distance * leap_direction
 
+    def has_interval_shift(
+        self,
+        upper_pitch: SpecificPitch,
+        interval_reprs: tuple[str, ...] = ("P5", "P8"),
+    ) -> bool:
+        generic_reprs = {
+            (self + Interval.get(interval_repr)).generic_pitch
+            for interval_repr in interval_reprs
+        }
+        return upper_pitch.generic_pitch in generic_reprs
+
     def consonant_shift(
         self, chosen_scale: GenericScale, chosen_chord: GenericChord, scale_shift: int
     ) -> SpecificPitch:

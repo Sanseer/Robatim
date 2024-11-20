@@ -33,6 +33,7 @@ def get_new_score() -> limits.DanceScore:
     chosen_scale = scale_map[chosen_mode](tonic_pitch_str)
     revert_duration = export.LilypondFactory.revert_duration
     pitch_sequences = defaultdict(list)
+    concerning_vectors = {-3, 3, -4, 4}
 
     for voice_name, voice_tessitura in voice_tessituras.items():
         available_pitches = voice_tessitura.filter_pitches(
@@ -55,6 +56,11 @@ def get_new_score() -> limits.DanceScore:
                         new_pitch = chosen_scale.scale_shift(previous_pitch, vector)
                         if new_pitch not in voice_tessitura:
                             break
+                        if vector in concerning_vectors:
+                            if previous_pitch.has_interval_shift(
+                                new_pitch, ("A4", "d5")
+                            ):
+                                break
                         pitch_sequence.append(
                             theory.SpecificNote(new_pitch, rhythm_duration)
                         )
@@ -101,7 +107,7 @@ DuoMeasureTest = tuple[
     theory.MelodicSequence,
     theory.MelodicSequence,
     tuple[Callable[[theory.SpecificPitch, theory.SpecificPitch], bool], ...],
-    set[str],
+    tuple[str, ...],
 ]
 
 
@@ -121,7 +127,7 @@ def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bo
             consonant_ids,
         ):
             return False
-        duo_iter = get_note_duo(lower_voice_measure, upper_voice_measure)
+        duo_iter = limits.get_note_duo(lower_voice_measure, upper_voice_measure)
         for current_lower_note, current_upper_note in duo_iter:
             for additional_test in additional_tests:
                 if not additional_test(
@@ -137,42 +143,13 @@ def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bo
                 current_upper_note,
                 consonant_ids,
                 True,
+                True,
             ):
                 return False
 
             previous_lower_note = current_lower_note
             previous_upper_note = current_upper_note
     return True
-
-
-def get_note_duo(
-    lower_voice_measure: theory.MelodicSequence,
-    upper_voice_measure: theory.MelodicSequence,
-) -> Iterator[tuple[theory.SpecificNote, theory.SpecificNote]]:
-    lower_voice_iter = iter(lower_voice_measure)
-    upper_voice_iter = iter(upper_voice_measure)
-
-    lower_voice_note = next(lower_voice_iter)
-    upper_voice_note = next(upper_voice_iter)
-    lower_voice_duration = lower_voice_note.duration
-    upper_voice_duration = upper_voice_note.duration
-
-    while True:
-        yield lower_voice_note, upper_voice_note
-
-        intersect_duration = min(lower_voice_duration, upper_voice_duration)
-        lower_voice_duration -= intersect_duration
-        upper_voice_duration -= intersect_duration
-
-        try:
-            if not lower_voice_duration:
-                lower_voice_note = next(lower_voice_iter)
-                lower_voice_duration = lower_voice_note.duration
-            if not upper_voice_duration:
-                upper_voice_note = next(upper_voice_iter)
-                upper_voice_duration = upper_voice_note.duration
-        except StopIteration:
-            break
 
 
 def has_valid_fourths(
@@ -370,7 +347,7 @@ def are_cadential_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -
             consonant_ids,
         ):
             return False
-        duo_iter = get_note_duo(lower_voice_measure, upper_voice_measure)
+        duo_iter = limits.get_note_duo(lower_voice_measure, upper_voice_measure)
         for current_lower_note, current_upper_note in duo_iter:
             for additional_test in additional_tests:
                 if not additional_test(

@@ -78,11 +78,7 @@ def checked_solo_transition(
 
         if second_voice_measure[0].duration == Fraction("1/4") and voice_distance > 1:
             return False
-        current_undesired_values = {
-            (first_pitch + theory.Interval.get("A4")).generic_pitch,
-            (first_pitch + theory.Interval.get("d5")).generic_pitch,
-        }
-        if second_pitch.generic_pitch in current_undesired_values:
+        if first_pitch.has_interval_shift(second_pitch, ("A4", "d5")):
             return False
 
         if len(first_voice_measure) > 1 and len(second_voice_measure) > 1:
@@ -100,13 +96,9 @@ def checked_solo_transition(
 def is_duo_consonant(
     lower_pitch: theory.SpecificPitch,
     upper_pitch: theory.SpecificPitch,
-    consonant_ids: set[str],
+    consonant_ids: tuple[str, ...],
 ) -> bool:
-    consonant_options = {
-        (lower_pitch + theory.Interval.get(consonant_id)).generic_pitch
-        for consonant_id in consonant_ids
-    }
-    return upper_pitch.generic_pitch in consonant_options
+    return lower_pitch.has_interval_shift(upper_pitch, consonant_ids)
 
 
 def is_duo_motion_valid(
@@ -114,8 +106,9 @@ def is_duo_motion_valid(
     first_upper_note: theory.SpecificNote,
     second_lower_note: theory.SpecificNote,
     second_upper_note: theory.SpecificNote,
-    consonant_ids: set[str],
+    consonant_ids: tuple[str, ...],
     is_prelim_check: bool,
+    allowed_downbeat_unison: bool,
 ) -> bool:
     first_lower_pitch = first_lower_note.specific_pitch
     first_upper_pitch = first_upper_note.specific_pitch
@@ -140,9 +133,12 @@ def is_duo_motion_valid(
         if preceded_by_dissonance:
             if lower_voice_distance > 1 or upper_voice_distance > 1:
                 return False
-        if is_prelim_check and not is_duo_consonant(
-            second_lower_pitch, second_upper_pitch, consonant_ids
-        ):
+        if is_prelim_check:
+            if not is_duo_consonant(
+                second_lower_pitch, second_upper_pitch, consonant_ids
+            ):
+                return False
+        elif not allowed_downbeat_unison and second_lower_pitch == second_upper_pitch:
             return False
 
         lower_voice_direction = theory.SpecificPitch.get_direction(
@@ -153,11 +149,7 @@ def is_duo_motion_valid(
         )
 
         if lower_voice_direction == upper_voice_direction:
-            current_undesired_values = {
-                (second_lower_pitch + theory.Interval.get("P5")).generic_pitch,
-                (second_lower_pitch + theory.Interval.get("P8")).generic_pitch,
-            }
-            if second_upper_pitch.generic_pitch in current_undesired_values:
+            if second_lower_pitch.has_interval_shift(second_upper_pitch):
                 if upper_voice_distance != 1:
                     return False
                 if lower_voice_distance == 1:
@@ -173,6 +165,8 @@ def is_duo_motion_valid(
             second_lower_pitch, second_upper_pitch, consonant_ids
         ):
             return False
+    elif not allowed_downbeat_unison and second_lower_pitch == second_upper_pitch:
+        return False
 
     return True
 
@@ -182,7 +176,7 @@ def is_cadential_duo_valid(
     first_upper_note: theory.SpecificNote,
     second_lower_note: theory.SpecificNote,
     second_upper_note: theory.SpecificNote,
-    consonant_ids: set[str],
+    consonant_ids: tuple[str, ...],
 ) -> bool:
     first_lower_pitch = first_lower_note.specific_pitch
     first_upper_pitch = first_upper_note.specific_pitch
@@ -211,11 +205,7 @@ def is_cadential_duo_valid(
         )
 
         if lower_voice_direction == upper_voice_direction:
-            current_undesired_values = {
-                (second_lower_pitch + theory.Interval.get("P5")).generic_pitch,
-                (second_lower_pitch + theory.Interval.get("P8")).generic_pitch,
-            }
-            if second_upper_pitch.generic_pitch in current_undesired_values:
+            if second_lower_pitch.has_interval_shift(second_upper_pitch):
                 if upper_voice_distance != 1:
                     return False
                 if lower_voice_distance == 1:
@@ -228,16 +218,18 @@ def is_cadential_duo_valid(
     return True
 
 
-all_voice_pairs = ((0, 1), (1, 2), (2, 3), (0, 2), (0, 3), (1, 3))
-lower_voice_consonances = {"P8", "P5", "M3", "m3", "M6", "m6"}
-upper_voice_consonances = lower_voice_consonances | {"P4"}
+lower_voice_consonances = ("P8", "P5", "M3", "m3", "M6", "m6")
+upper_voice_consonances = ("P8", "P5", "M3", "m3", "M6", "m6", "P4")
 
 
 def checked_duo_transition(
     first_measure_stack: theory.MeasureStack,
     second_measure_stack: theory.MeasureStack,
+    second_sequence_index: int,
 ) -> bool:
-    for first_voice_index, second_voice_index in all_voice_pairs:
+    consonant_ids: tuple[str, ...]
+    allowed_downbeat_unison = second_sequence_index == 11
+    for first_voice_index, second_voice_index in limits.all_voice_pairs:
         if first_voice_index == 0:
             consonant_ids = lower_voice_consonances
         else:
@@ -250,6 +242,7 @@ def checked_duo_transition(
             second_measure_stack[second_voice_index][0],
             consonant_ids,
             False,
+            allowed_downbeat_unison,
         ):
             return False
     return True
@@ -260,14 +253,8 @@ def is_perfect_fourth_consonant(
     middle_pitch: theory.SpecificPitch,
     highest_pitch: theory.SpecificPitch,
 ) -> bool:
-    concerning_value = (middle_pitch + theory.Interval.get("P4")).generic_pitch
-    if highest_pitch.generic_pitch == concerning_value:
-        consonant_bass_values = {
-            (middle_pitch - theory.Interval.get("M3")).generic_pitch,
-            (middle_pitch - theory.Interval.get("m3")).generic_pitch,
-            (middle_pitch - theory.Interval.get("P5")).generic_pitch,
-        }
-        return lowest_pitch.generic_pitch in consonant_bass_values
+    if middle_pitch.has_interval_shift(highest_pitch, ("P4",)):
+        return lowest_pitch.has_interval_shift(middle_pitch, ("M3", "m3", "P5"))
     return True
 
 
@@ -316,14 +303,10 @@ def is_cadential_trio_valid(
     second_middle_pitch: theory.SpecificPitch,
     second_highest_pitch: theory.SpecificPitch,
 ) -> bool:
-    middle_voice_distance = theory.SpecificPitch.get_interval_distance(
-        first_middle_pitch, second_middle_pitch
-    )
-    highest_voice_distance = theory.SpecificPitch.get_interval_distance(
-        first_highest_pitch, second_highest_pitch
-    )
+    has_middle_voice_moved = first_middle_pitch != second_middle_pitch
+    has_highest_voice_moved = first_highest_pitch != second_highest_pitch
 
-    if middle_voice_distance and highest_voice_distance:
+    if has_middle_voice_moved and has_highest_voice_moved:
         if not is_perfect_fourth_consonant(
             second_lowest_pitch, second_middle_pitch, second_highest_pitch
         ):
@@ -456,7 +439,11 @@ def has_counterpoint_propagated(
         next_prospects = sequence_prospects[next_index]
         prospect_validators = [
             partial(checked_solo_transition, current_measure_stack),
-            partial(checked_duo_transition, current_measure_stack),
+            partial(
+                checked_duo_transition,
+                current_measure_stack,
+                second_sequence_index=next_index,
+            ),
             partial(checked_trio_transition, current_measure_stack),
             partial(score_sequence.checked_stipulations, next_index),
         ]
@@ -505,6 +492,7 @@ def has_counterpoint_propagated(
             partial(
                 checked_duo_transition,
                 second_measure_stack=current_measure_stack,
+                second_sequence_index=propagate_index,
             ),
             partial(
                 checked_trio_transition,

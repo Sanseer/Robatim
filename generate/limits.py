@@ -7,6 +7,38 @@ from typing import Callable, Iterator
 
 from generate import theory
 
+all_voice_pairs = ((0, 1), (1, 2), (2, 3), (0, 2), (0, 3), (1, 3))
+
+
+def get_note_duo(
+    lower_voice_measure: theory.MelodicSequence | deque[theory.SpecificNote],
+    upper_voice_measure: theory.MelodicSequence | deque[theory.SpecificNote],
+) -> Iterator[tuple[theory.SpecificNote, theory.SpecificNote]]:
+    lower_voice_iter = iter(lower_voice_measure)
+    upper_voice_iter = iter(upper_voice_measure)
+
+    lower_voice_note = next(lower_voice_iter)
+    upper_voice_note = next(upper_voice_iter)
+    lower_voice_duration = lower_voice_note.duration
+    upper_voice_duration = upper_voice_note.duration
+
+    while True:
+        yield lower_voice_note, upper_voice_note
+
+        intersect_duration = min(lower_voice_duration, upper_voice_duration)
+        lower_voice_duration -= intersect_duration
+        upper_voice_duration -= intersect_duration
+
+        try:
+            if not lower_voice_duration:
+                lower_voice_note = next(lower_voice_iter)
+                lower_voice_duration = lower_voice_note.duration
+            if not upper_voice_duration:
+                upper_voice_note = next(upper_voice_iter)
+                upper_voice_duration = upper_voice_note.duration
+        except StopIteration:
+            break
+
 
 @dataclass
 class ConsecutiveMarker:
@@ -70,71 +102,68 @@ class CognizantSequence:
     ) -> None:
         self.sequence[index] = measure_stack
 
-    @staticmethod
-    def get_stipulation(measure_stack: theory.MeasureStack) -> Stipulation:
+    def get_stipulation(
+        self, propagate_index: int, measure_stack: theory.MeasureStack
+    ) -> Stipulation:
         score_rules = []
-
         for voice_index, voice_measure in enumerate(measure_stack):
-            consecutive_duration = voice_measure[0].duration
-            rhythm_count = 0
-            for current_note in voice_measure:
-                if current_note.duration == consecutive_duration:
-                    rhythm_count += 1
-                else:
-                    break
-
-            previous_pitch = voice_measure[0].specific_pitch
-            skip_count = 0
-            for current_note in voice_measure[1:]:
-                current_pitch = current_note.specific_pitch
-                interval_distance = theory.SpecificPitch.get_interval_distance(
-                    previous_pitch, current_pitch
+            if propagate_index != 0:
+                score_rules.append(
+                    ScoreRule(
+                        "left",
+                        voice_index,
+                        self.get_consecutive_marker(voice_measure),
+                    )
                 )
-                if interval_distance > 1:
-                    skip_count += 1
-                else:
-                    break
-                previous_pitch = current_pitch
-
-            consecutive_marker = ConsecutiveMarker(
-                consecutive_duration, rhythm_count, skip_count
-            )
-            score_rules.append(ScoreRule("left", voice_index, consecutive_marker))
-
-            consecutive_duration = voice_measure[-1].duration
-            rhythm_count = 0
-            for current_note in reversed(voice_measure):
-                if current_note.duration == consecutive_duration:
-                    rhythm_count += 1
-                else:
-                    break
-
-            previous_pitch = voice_measure[-1].specific_pitch
-            skip_count = 0
-            for current_note in reversed(voice_measure[:-1]):
-                current_pitch = current_note.specific_pitch
-                interval_distance = theory.SpecificPitch.get_interval_distance(
-                    previous_pitch, current_pitch
+            if propagate_index != self.final_index:
+                score_rules.append(
+                    ScoreRule(
+                        "right",
+                        voice_index,
+                        self.get_consecutive_marker(voice_measure[::-1]),
+                    )
                 )
-                if interval_distance > 1:
-                    skip_count += 1
-                else:
-                    break
-                previous_pitch = current_pitch
-
-            consecutive_marker = ConsecutiveMarker(
-                consecutive_duration, rhythm_count, skip_count
-            )
-            score_rules.append(ScoreRule("right", voice_index, consecutive_marker))
 
         return Stipulation(score_rules)
+
+    @staticmethod
+    def get_consecutive_marker(
+        voice_measure: theory.MelodicSequence,
+    ) -> ConsecutiveMarker:
+        consecutive_duration = voice_measure[0].duration
+        rhythm_count = 0
+        for current_note in voice_measure:
+            if current_note.duration == consecutive_duration:
+                rhythm_count += 1
+            else:
+                break
+
+        previous_pitch = voice_measure[0].specific_pitch
+        skip_count = 0
+        for current_note in voice_measure[1:]:
+            current_pitch = current_note.specific_pitch
+            interval_distance = theory.SpecificPitch.get_interval_distance(
+                previous_pitch, current_pitch
+            )
+            if interval_distance > 1:
+                skip_count += 1
+            else:
+                break
+            previous_pitch = current_pitch
+
+        consecutive_marker = ConsecutiveMarker(
+            consecutive_duration, rhythm_count, skip_count
+        )
+        return consecutive_marker
 
     def checked_stipulations(
         self,
         propagate_index: int,
         attempted_measure_stack: theory.MeasureStack,
     ) -> bool:
-        attempted_stipulation = self.get_stipulation(attempted_measure_stack)
+        attempted_stipulation = self.get_stipulation(
+            propagate_index, attempted_measure_stack
+        )
         if propagate_index == self.final_index:
             test_rhythm = self.test_rhythm_leftward
             test_skips = self.test_skips_leftward
@@ -147,39 +176,48 @@ class CognizantSequence:
         global_consecutive_tests = [test_rhythm, test_skips]
 
         for voice_index in self.all_voice_indices:
-            left_marker = attempted_stipulation.left_marker[voice_index]
-            right_marker = attempted_stipulation.right_marker[voice_index]
-            num_of_notes = len(attempted_measure_stack[voice_index])
+            if propagate_index != 0:
+                left_marker = attempted_stipulation.left_marker[voice_index]
+            if propagate_index != self.final_index:
+                right_marker = attempted_stipulation.right_marker[voice_index]
             local_consecutive_tests = global_consecutive_tests[:]
 
-            if (
-                left_marker.duration == right_marker.duration
-                and left_marker.rhythm_count == num_of_notes
-                and propagate_index != 0
-                and propagate_index != self.final_index
-            ):
-                local_consecutive_tests[0] = self.test_rhythm_single_outward
-
-            if left_marker.skip_count == right_marker.skip_count:
+            if propagate_index == 0:
+                if right_marker.skip_count == 0:
+                    local_consecutive_tests[1] = self.test_null
+            elif propagate_index == self.final_index:
                 if left_marker.skip_count == 0:
                     local_consecutive_tests[1] = self.test_null
-                elif (
-                    left_marker.skip_count == num_of_notes - 1
-                    and propagate_index != 0
-                    and propagate_index != self.final_index
+            else:
+                num_of_notes = len(attempted_measure_stack[voice_index])
+                if (
+                    left_marker.duration == right_marker.duration
+                    and left_marker.rhythm_count == num_of_notes
                 ):
-                    local_consecutive_tests[1] = self.test_skips_single_outward
+                    local_consecutive_tests[0] = self.test_rhythm_single_outward
 
-            verdict = all(
-                consecutive_test(
+                if left_marker.skip_count == right_marker.skip_count:
+                    if left_marker.skip_count == 0:
+                        local_consecutive_tests[1] = self.test_null
+                    elif left_marker.skip_count == num_of_notes - 1:
+                        local_consecutive_tests[1] = self.test_skips_single_outward
+
+            for consecutive_test in local_consecutive_tests:
+                if not consecutive_test(
                     propagate_index,
                     voice_index,
                     attempted_stipulation,
                     attempted_measure_stack,
-                )
-                for consecutive_test in local_consecutive_tests
-            )
-            if not verdict:
+                ):
+                    return False
+
+        for first_voice_index, second_voice_index in all_voice_pairs:
+            if not self.test_consecutive_intervals(
+                propagate_index,
+                first_voice_index,
+                second_voice_index,
+                attempted_measure_stack,
+            ):
                 return False
 
         if propagate_index in range(6):
@@ -550,6 +588,124 @@ class CognizantSequence:
             if current_vector != 0:
                 previous_vector = current_vector
             note_index += 1
+
+        return True
+
+    def test_consecutive_intervals(
+        self,
+        propagate_index: int,
+        first_voice_index: int,
+        second_voice_index: int,
+        attempted_measure_stack: theory.MeasureStack,
+    ) -> bool:
+        lower_voice_measure = attempted_measure_stack[first_voice_index]
+        upper_voice_measure = attempted_measure_stack[second_voice_index]
+        lower_voice_sequence = deque(lower_voice_measure)
+        upper_voice_sequence = deque(upper_voice_measure)
+        has_perfect_interval_boundary = False
+
+        first_lower_pitch = lower_voice_measure[0].specific_pitch
+        first_upper_pitch = upper_voice_measure[0].specific_pitch
+        last_lower_pitch = lower_voice_measure[-1].specific_pitch
+        last_upper_pitch = upper_voice_measure[-1].specific_pitch
+
+        if first_lower_pitch.has_interval_shift(first_upper_pitch):
+            has_perfect_interval_boundary = True
+            lower_motion_count = 0
+            upper_motion_count = 0
+
+            previous_lower_pitch = first_lower_pitch
+            previous_upper_pitch = first_upper_pitch
+            for current_index in range(propagate_index - 1, -1, -1):
+                if (current_measure_stack := self.sequence[current_index]) is not None:
+                    for current_note in reversed(
+                        current_measure_stack[first_voice_index]
+                    ):
+                        current_lower_pitch = current_note.specific_pitch
+                        if current_lower_pitch != previous_lower_pitch:
+                            lower_motion_count += 1
+                        lower_voice_sequence.appendleft(current_note)
+                        previous_lower_pitch = current_lower_pitch
+
+                    for current_note in reversed(
+                        current_measure_stack[second_voice_index]
+                    ):
+                        current_upper_pitch = current_note.specific_pitch
+                        if current_upper_pitch != previous_upper_pitch:
+                            upper_motion_count += 1
+                        upper_voice_sequence.appendleft(current_note)
+                        previous_upper_pitch = current_upper_pitch
+
+                    if max(lower_motion_count, upper_motion_count) >= 2:
+                        break
+                else:
+                    break
+
+        if last_lower_pitch.has_interval_shift(last_upper_pitch):
+            has_perfect_interval_boundary = True
+            lower_motion_count = 0
+            upper_motion_count = 0
+
+            previous_lower_pitch = last_lower_pitch
+            previous_upper_pitch = last_upper_pitch
+            for current_index in range(propagate_index + 1, self.final_index + 1):
+                if (current_measure_stack := self.sequence[current_index]) is not None:
+                    for current_note in current_measure_stack[first_voice_index]:
+                        current_lower_pitch = current_note.specific_pitch
+                        if current_lower_pitch != previous_lower_pitch:
+                            lower_motion_count += 1
+                        lower_voice_sequence.append(current_note)
+                        previous_lower_pitch = current_lower_pitch
+
+                    for current_note in current_measure_stack[second_voice_index]:
+                        current_upper_pitch = current_note.specific_pitch
+                        if current_upper_pitch != previous_upper_pitch:
+                            upper_motion_count += 1
+                        upper_voice_sequence.append(current_note)
+                        previous_upper_pitch = current_upper_pitch
+
+                    if max(lower_motion_count, upper_motion_count) >= 2:
+                        break
+                else:
+                    break
+
+        if not has_perfect_interval_boundary:
+            return True
+        if max(len(lower_voice_sequence), len(upper_voice_sequence)) < 3:
+            return True
+        return self.test_perfect_intervals(lower_voice_sequence, upper_voice_sequence)
+
+    def test_perfect_intervals(
+        self,
+        lower_voice_sequence: deque[theory.SpecificNote],
+        upper_voice_sequence: deque[theory.SpecificNote],
+    ) -> bool:
+        duo_iter = get_note_duo(lower_voice_sequence, upper_voice_sequence)
+        previous_lower_note, previous_upper_note = next(duo_iter)
+        previous_lower_pitch = previous_lower_note.specific_pitch
+        previous_upper_pitch = previous_upper_note.specific_pitch
+
+        if previous_lower_pitch.has_interval_shift(previous_upper_pitch):
+            perfect_interval_count = 1
+        else:
+            perfect_interval_count = 0
+
+        for current_lower_note, current_upper_note in duo_iter:
+            current_lower_pitch = current_lower_note.specific_pitch
+            current_upper_pitch = current_upper_note.specific_pitch
+
+            has_lower_voice_moved = previous_lower_pitch != current_lower_pitch
+            has_upper_voice_moved = previous_upper_pitch != current_upper_pitch
+
+            if has_lower_voice_moved or has_upper_voice_moved:
+                if current_lower_pitch.has_interval_shift(current_upper_pitch):
+                    perfect_interval_count += 1
+                    if perfect_interval_count > 2:
+                        return False
+                else:
+                    perfect_interval_count = 0
+            previous_lower_pitch = current_lower_pitch
+            previous_upper_pitch = current_upper_pitch
 
         return True
 
