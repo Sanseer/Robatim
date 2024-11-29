@@ -487,10 +487,17 @@ class GenericScale(StringDefinedEntity):
 
 class ModalScale(GenericScale):
     melodic_minor_degrees = {-1, -2}
+    flattened_index = 0
 
     @property
     def type(self) -> str:
         return self.__class__.__name__[:-5].lower()
+
+    @property
+    def flattened_pitch(self) -> GenericPitch:
+        special_pitch = self[self.flattened_index].clone()
+        special_pitch.increment_value(-1)
+        return special_pitch
 
     def scale_shift(self, chosen_pitch: SpecificPitch, vector: int) -> SpecificPitch:
         if vector == 0:
@@ -547,18 +554,22 @@ class ModalScale(GenericScale):
 
 class IonianScale(ModalScale):
     scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "M7"]
+    flattened_index = 6
 
 
 class DorianScale(ModalScale):
     scale_intervals = ["P1", "M2", "m3", "P4", "P5", "M6", "m7"]
+    flattened_index = 5
 
 
 class MixolydianScale(ModalScale):
     scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "m7"]
+    flattened_index = 2
 
 
 class AeolianScale(ModalScale):
     scale_intervals = ["P1", "M2", "m3", "P4", "P5", "m6", "m7"]
+    flattened_index = 1
 
 
 class MajorScale(GenericScale):

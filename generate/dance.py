@@ -1,3 +1,5 @@
+from fractions import Fraction
+from functools import partial
 import json
 import random
 from collections import defaultdict
@@ -14,6 +16,7 @@ scale_map = {
     "mixolydian": theory.MixolydianScale,
     "aeolian": theory.AeolianScale,
 }
+revert_duration = export.LilypondFactory.revert_duration
 
 
 def get_new_score() -> limits.DanceScore:
@@ -31,42 +34,10 @@ def get_new_score() -> limits.DanceScore:
 
     tonic_pitch_str, chosen_mode = random.choice(idioms["available_keys"])
     chosen_scale = scale_map[chosen_mode](tonic_pitch_str)
-    revert_duration = export.LilypondFactory.revert_duration
-    pitch_sequences = defaultdict(list)
-    concerning_vectors = {-3, 3, -4, 4}
-
-    for voice_name, voice_tessitura in voice_tessituras.items():
-        available_pitches = voice_tessitura.filter_pitches(
-            chosen_scale.get_specific_iter()
-        )
-
-        for starting_pitch in available_pitches:
-            for rhythm_id, melody_contours in idioms["rhythms"].items():
-                rhythm_durations = [
-                    revert_duration(rhythm_repr) for rhythm_repr in rhythm_id.split()
-                ]
-                for melody_contour in melody_contours:
-                    pitch_sequence = [
-                        theory.SpecificNote(starting_pitch, rhythm_durations[0])
-                    ]
-                    previous_pitch = starting_pitch
-                    for rhythm_duration, vector in zip(
-                        rhythm_durations[1:], melody_contour
-                    ):
-                        new_pitch = chosen_scale.scale_shift(previous_pitch, vector)
-                        if new_pitch not in voice_tessitura:
-                            break
-                        if vector in concerning_vectors:
-                            if previous_pitch.has_interval_shift(
-                                new_pitch, ("A4", "d5")
-                            ):
-                                break
-                        pitch_sequence.append(
-                            theory.SpecificNote(new_pitch, rhythm_duration)
-                        )
-                        previous_pitch = new_pitch
-                    else:
-                        pitch_sequences[voice_name].append(pitch_sequence)
+    flattened_pitch = chosen_scale.flattened_pitch
+    pitch_sequences = get_all_pitch_sequences(
+        chosen_scale, voice_tessituras, flattened_pitch.letter
+    )
 
     sequence_prospects: list[list[theory.MeasureStack]] = [[] for _ in range(12)]
     sequence_prospects[0] = get_first_measure_stacks(pitch_sequences, chosen_scale)
@@ -92,15 +63,111 @@ def get_new_score() -> limits.DanceScore:
     prospect_counts = [len(index_prospects) for index_prospects in sequence_prospects]
     print(f"Allocated available measures: {prospect_counts}")
 
-    possible_measure_sequences = limits.WaveFunction(
-        sequence_prospects, rules.has_counterpoint_propagated
+    propagator = partial(
+        rules.has_counterpoint_propagated, flattened_pitch=flattened_pitch
     )
+    possible_measure_sequences = limits.WaveFunction(sequence_prospects, propagator)
     score_sequence = next(iter(possible_measure_sequences))
     chosen_instruemnt = theory.MidiInstrument(*random.choice(idioms["instruments"]))
 
     return limits.DanceScore(
         chosen_scale, clef_group, score_sequence, chosen_instruemnt
     )
+
+
+def get_all_pitch_sequences(
+    chosen_scale: theory.ModalScale,
+    voice_tessituras: dict[str, theory.Tessitura],
+    flattened_pitch_letter: str,
+) -> dict[str, list[theory.MelodicSequence]]:
+    pitch_sequences = defaultdict(list)
+    concerning_vectors = {-3, 3, -4, 4}
+
+    for voice_name, voice_tessitura in voice_tessituras.items():
+        available_pitches = voice_tessitura.filter_pitches(
+            chosen_scale.get_specific_iter()
+        )
+
+        for starting_pitch in available_pitches:
+            for rhythm_id, melody_contours in idioms["rhythms"].items():
+                rhythm_durations = [
+                    revert_duration(rhythm_repr) for rhythm_repr in rhythm_id.split()
+                ]
+                for melody_contour in melody_contours:
+                    pitch_sequence = [
+                        theory.SpecificNote(starting_pitch, rhythm_durations[0])
+                    ]
+                    previous_pitch = starting_pitch
+                    for rhythm_duration, vector in zip(
+                        rhythm_durations[1:], melody_contour
+                    ):
+                        current_pitch = chosen_scale.scale_shift(previous_pitch, vector)
+                        if current_pitch not in voice_tessitura:
+                            break
+                        if vector in concerning_vectors:
+                            if previous_pitch.has_interval_shift(
+                                current_pitch, ("A4", "d5")
+                            ):
+                                break
+                        pitch_sequence.append(
+                            theory.SpecificNote(current_pitch, rhythm_duration)
+                        )
+                        previous_pitch = current_pitch
+                    else:
+                        pitch_sequences[voice_name].append(pitch_sequence)
+
+        for available_pitch in available_pitches:
+            if available_pitch.letter == flattened_pitch_letter:
+                starting_pitch = available_pitch.clone()
+                starting_pitch.increment_value(-1)
+                if starting_pitch not in voice_tessitura:
+                    continue
+                is_first_pitch_flattened = True
+            else:
+                starting_pitch = available_pitch
+                is_first_pitch_flattened = False
+
+            for rhythm_id, melody_contours in idioms["rhythms"].items():
+                rhythm_durations = [
+                    revert_duration(rhythm_repr) for rhythm_repr in rhythm_id.split()
+                ]
+                for melody_contour in melody_contours:
+                    pitch_sequence = [
+                        theory.SpecificNote(starting_pitch, rhythm_durations[0])
+                    ]
+                    is_contour_relevant = is_first_pitch_flattened
+                    is_previous_pitch_flattened = is_first_pitch_flattened
+                    previous_pitch = starting_pitch
+
+                    for rhythm_duration, vector in zip(
+                        rhythm_durations[1:], melody_contour
+                    ):
+                        if is_previous_pitch_flattened and not (-3 <= vector <= 0):
+                            break
+                        current_pitch = chosen_scale.scale_shift(previous_pitch, vector)
+                        if current_pitch.letter == flattened_pitch_letter:
+                            is_contour_relevant = True
+                            current_pitch.increment_value(-1)
+                            is_previous_pitch_flattened = True
+                        else:
+                            is_previous_pitch_flattened = False
+
+                        if current_pitch not in voice_tessitura:
+                            break
+                        if vector in concerning_vectors:
+                            if previous_pitch.has_interval_shift(
+                                current_pitch, ("A4", "d5")
+                            ):
+                                break
+                        pitch_sequence.append(
+                            theory.SpecificNote(current_pitch, rhythm_duration)
+                        )
+                        previous_pitch = current_pitch
+                    else:
+                        if is_contour_relevant:
+                            pitch_sequences[voice_name].append(pitch_sequence)
+
+    return pitch_sequences
 
 
 DuoMeasureTest = tuple[
@@ -301,7 +368,6 @@ def elucidate_sequence(
     starting_specific_pitches = voice_tessitura.find_equivalent_pitches(
         starting_generic_pitch
     )
-    revert_duration = export.LilypondFactory.revert_duration
     starting_duration = revert_duration(voice_formula[0][1])
 
     pitch_sequences = []
@@ -346,7 +412,18 @@ def are_cadential_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -
             previous_upper_note.specific_pitch,
             consonant_ids,
         ):
-            return False
+            if len(upper_voice_measure) != 2:
+                return False
+            if len(lower_voice_measure) != 1:
+                return False
+            if previous_upper_note.duration != Fraction("1/2"):
+                return False
+            resolution_vector = theory.SpecificPitch.get_interval_vector(
+                previous_upper_note.specific_pitch,
+                upper_voice_measure[1].specific_pitch,
+            )
+            if resolution_vector != -1:
+                return False
         duo_iter = limits.get_note_duo(lower_voice_measure, upper_voice_measure)
         for current_lower_note, current_upper_note in duo_iter:
             for additional_test in additional_tests:
@@ -385,7 +462,18 @@ def has_cadential_fourths(
     if not rules.is_perfect_fourth_consonant(
         previous_lowest_pitch, previous_middle_pitch, previous_highest_pitch
     ):
-        return False
+        if len(highest_voice_measure) != 2:
+            return False
+        if len(middle_voice_measure) != 1:
+            return False
+        if highest_voice_measure[0].duration != Fraction("1/2"):
+            return False
+        resolution_vector = theory.SpecificPitch.get_interval_vector(
+            previous_highest_pitch,
+            highest_voice_measure[1].specific_pitch,
+        )
+        if resolution_vector != -1:
+            return False
 
     for current_lowest_pitch, current_middle_pitch, current_highest_pitch in trio_iter:
         if not rules.is_cadential_trio_valid(

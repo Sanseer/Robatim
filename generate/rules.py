@@ -10,9 +10,7 @@ def is_lowest_duo_good(
     if lower_voice_pitch > upper_voice_pitch:
         return False
     second_voice_boundary = lower_voice_pitch + theory.Interval.get("P12")
-    if upper_voice_pitch > second_voice_boundary:
-        return False
-    return True
+    return upper_voice_pitch <= second_voice_boundary
 
 
 def is_upper_duo_good(
@@ -21,14 +19,13 @@ def is_upper_duo_good(
     if lower_voice_pitch > upper_voice_pitch:
         return False
     second_voice_boundary = lower_voice_pitch + theory.Interval.get("P8")
-    if upper_voice_pitch > second_voice_boundary:
-        return False
-    return True
+    return upper_voice_pitch <= second_voice_boundary
 
 
 def checked_solo_transition(
     first_measure_stack: theory.MeasureStack,
     second_measure_stack: theory.MeasureStack,
+    flattened_pitch: theory.GenericPitch,
 ) -> bool:
     for first_voice_measure, second_voice_measure in zip(
         first_measure_stack, second_measure_stack
@@ -81,6 +78,31 @@ def checked_solo_transition(
         if first_pitch.has_interval_shift(second_pitch, ("A4", "d5")):
             return False
 
+        if voice_distance:
+            if len(first_voice_measure) > 1:
+                previous_pitch = first_voice_measure[-2].specific_pitch
+                if previous_pitch != first_pitch and not test_melodic_pyramid(
+                    previous_pitch, first_pitch, second_pitch
+                ):
+                    return False
+            if len(second_voice_measure) > 1:
+                next_pitch = second_voice_measure[1].specific_pitch
+                if second_pitch != next_pitch and not test_melodic_pyramid(
+                    first_pitch, second_pitch, next_pitch
+                ):
+                    return False
+
+        if (
+            first_pitch.letter == second_pitch.letter
+            and first_pitch.generic_pitch != second_pitch.generic_pitch
+        ):
+            return False
+        if first_pitch.generic_pitch == flattened_pitch:
+            if leap_direction == 1:
+                return False
+            if voice_distance > 3:
+                return False
+
         if len(first_voice_measure) > 1 and len(second_voice_measure) > 1:
             first_pitch = first_voice_measure[0].specific_pitch
             second_pitch = first_voice_measure[1].specific_pitch
@@ -91,6 +113,24 @@ def checked_solo_transition(
                 return False
 
     return True
+
+
+def test_melodic_pyramid(
+    first_pitch: theory.SpecificPitch,
+    second_pitch: theory.SpecificPitch,
+    third_pitch: theory.SpecificPitch,
+) -> bool:
+    first_vector = theory.SpecificPitch.get_interval_vector(first_pitch, second_pitch)
+    if first_vector == -2:
+        return True
+    second_vector = theory.SpecificPitch.get_interval_vector(second_pitch, third_pitch)
+    if second_vector == 2:
+        return True
+
+    if (first_vector * second_vector) < 0:
+        return True
+    # Upward motion decelerates. Downward motion accelerates.
+    return first_vector >= second_vector
 
 
 def is_duo_consonant(
@@ -167,7 +207,16 @@ def is_duo_motion_valid(
             return False
     elif not allowed_downbeat_unison and second_lower_pitch == second_upper_pitch:
         return False
-
+    if (
+        first_lower_pitch.letter == second_upper_pitch.letter
+        and first_lower_pitch.generic_pitch != second_upper_pitch.generic_pitch
+    ):
+        return False
+    if (
+        first_upper_pitch.letter == second_lower_pitch.letter
+        and first_upper_pitch.generic_pitch != second_lower_pitch.generic_pitch
+    ):
+        return False
     return True
 
 
@@ -222,6 +271,32 @@ lower_voice_consonances = ("P8", "P5", "M3", "m3", "M6", "m6")
 upper_voice_consonances = ("P8", "P5", "M3", "m3", "M6", "m6", "P4")
 
 
+def is_bass_suspension_valid(
+    first_lower_note: theory.SpecificNote,
+    first_upper_note: theory.SpecificNote,
+    second_lower_note: theory.SpecificNote,
+    second_upper_note: theory.SpecificNote,
+) -> bool:
+    if is_duo_consonant(
+        second_lower_note.specific_pitch,
+        second_upper_note.specific_pitch,
+        lower_voice_consonances,
+    ):
+        return True
+
+    if first_lower_note.duration != Fraction("1/2"):
+        return False
+    if first_upper_note.duration != Fraction("1/2"):
+        return False
+    if not is_duo_consonant(
+        first_lower_note.specific_pitch,
+        first_upper_note.specific_pitch,
+        lower_voice_consonances,
+    ):
+        return False
+    return first_upper_note.specific_pitch == second_upper_note.specific_pitch
+
+
 def checked_duo_transition(
     first_measure_stack: theory.MeasureStack,
     second_measure_stack: theory.MeasureStack,
@@ -245,6 +320,14 @@ def checked_duo_transition(
             allowed_downbeat_unison,
         ):
             return False
+
+    if second_sequence_index == 10:
+        return is_bass_suspension_valid(
+            first_measure_stack[0][-1],
+            first_measure_stack[-1][-1],
+            second_measure_stack[0][0],
+            second_measure_stack[-1][0],
+        )
     return True
 
 
@@ -307,11 +390,36 @@ def is_cadential_trio_valid(
     has_highest_voice_moved = first_highest_pitch != second_highest_pitch
 
     if has_middle_voice_moved and has_highest_voice_moved:
-        if not is_perfect_fourth_consonant(
+        return is_perfect_fourth_consonant(
             second_lowest_pitch, second_middle_pitch, second_highest_pitch
-        ):
-            return False
+        )
     return True
+
+
+def is_upper_suspension_valid(
+    first_lowest_note: theory.SpecificNote,
+    first_middle_note: theory.SpecificNote,
+    first_highest_note: theory.SpecificNote,
+    second_lowest_pitch: theory.SpecificPitch,
+    second_middle_pitch: theory.SpecificPitch,
+    second_highest_pitch: theory.SpecificPitch,
+) -> bool:
+    if is_perfect_fourth_consonant(
+        second_lowest_pitch, second_middle_pitch, second_highest_pitch
+    ):
+        return True
+
+    if first_middle_note.duration != Fraction("1/2"):
+        return False
+    if first_highest_note.duration != Fraction("1/2"):
+        return False
+    if not is_perfect_fourth_consonant(
+        first_lowest_note.specific_pitch,
+        first_middle_note.specific_pitch,
+        first_highest_note.specific_pitch,
+    ):
+        return False
+    return first_highest_note.specific_pitch == second_highest_pitch
 
 
 bass_trios = ((0, 1, 2), (0, 1, 3), (0, 2, 3))
@@ -320,6 +428,7 @@ bass_trios = ((0, 1, 2), (0, 1, 3), (0, 2, 3))
 def checked_trio_transition(
     first_measure_stack: theory.MeasureStack,
     second_measure_stack: theory.MeasureStack,
+    second_sequence_index: int,
 ) -> bool:
     for first_voice_index, second_voice_index, third_voice_index in bass_trios:
         first_lowest_pitch = first_measure_stack[first_voice_index][-1].specific_pitch
@@ -340,6 +449,16 @@ def checked_trio_transition(
             False,
         ):
             return False
+        if second_sequence_index == 10 and third_voice_index == 3:
+            if not is_upper_suspension_valid(
+                first_measure_stack[first_voice_index][-1],
+                first_measure_stack[second_voice_index][-1],
+                first_measure_stack[third_voice_index][-1],
+                second_lowest_pitch,
+                second_middle_pitch,
+                second_highest_pitch,
+            ):
+                return False
     return True
 
 
@@ -421,6 +540,7 @@ def has_counterpoint_propagated(
     propagate_index: int,
     score_sequence: limits.CognizantSequence,
     current_measure_stack: theory.MeasureStack,
+    flattened_pitch: theory.GenericPitch,
 ) -> bool:
     for duplicate_index in score_sequence.duplicates[propagate_index]:
         prospect_validator = partial(is_superius_duplicated, current_measure_stack)
@@ -438,13 +558,21 @@ def has_counterpoint_propagated(
         next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
         prospect_validators = [
-            partial(checked_solo_transition, current_measure_stack),
+            partial(
+                checked_solo_transition,
+                current_measure_stack,
+                flattened_pitch=flattened_pitch,
+            ),
             partial(
                 checked_duo_transition,
                 current_measure_stack,
                 second_sequence_index=next_index,
             ),
-            partial(checked_trio_transition, current_measure_stack),
+            partial(
+                checked_trio_transition,
+                current_measure_stack,
+                second_sequence_index=next_index,
+            ),
             partial(score_sequence.checked_stipulations, next_index),
         ]
         if propagate_index == 4:
@@ -462,7 +590,7 @@ def has_counterpoint_propagated(
                 partial(
                     checked_superius_transition,
                     current_measure_stack,
-                    allowed_vectors={-1},
+                    allowed_vectors={0, -1},
                 ),
             )
         else:
@@ -488,6 +616,7 @@ def has_counterpoint_propagated(
             partial(
                 checked_solo_transition,
                 second_measure_stack=current_measure_stack,
+                flattened_pitch=flattened_pitch,
             ),
             partial(
                 checked_duo_transition,
@@ -497,6 +626,7 @@ def has_counterpoint_propagated(
             partial(
                 checked_trio_transition,
                 second_measure_stack=current_measure_stack,
+                second_sequence_index=propagate_index,
             ),
             partial(score_sequence.checked_stipulations, previous_index),
         ]
@@ -515,7 +645,7 @@ def has_counterpoint_propagated(
                 partial(
                     checked_superius_transition,
                     second_measure_stack=current_measure_stack,
-                    allowed_vectors={-1},
+                    allowed_vectors={0, -1},
                 ),
             )
         else:

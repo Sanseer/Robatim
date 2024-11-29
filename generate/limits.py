@@ -2,6 +2,7 @@ from collections import defaultdict, deque
 import copy
 from dataclasses import dataclass
 from fractions import Fraction
+from functools import partial
 import random
 from typing import Callable, Iterator
 
@@ -743,9 +744,7 @@ class WaveFunction:
     def __init__(
         self,
         sequence_prospects: list[list],
-        has_propagated: Callable[
-            [list, int, CognizantSequence, theory.MeasureStack], bool
-        ],
+        has_propagated: partial[bool],
     ) -> None:
         for propagate_index, index_prospects in enumerate(sequence_prospects):
             if not index_prospects:
