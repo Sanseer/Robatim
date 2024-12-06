@@ -487,29 +487,46 @@ class GenericScale(StringDefinedEntity):
 
 class ModalScale(GenericScale):
     melodic_minor_degrees = {-1, -2}
-    flattened_index = 0
+    all_modes = (
+        "ionian",
+        "dorian",
+        "phrygian",
+        "lydian",
+        "mixolydian",
+        "aeolian",
+        "locrian",
+    )
 
-    @property
-    def type(self) -> str:
-        return self.__class__.__name__[:-5].lower()
+    def __init__(
+        self, symbol: str | None = None, /, *, is_practical: bool = True
+    ) -> None:
+        super().__init__(symbol)
+        self.type = self.__class__.__name__[:-5].lower()
 
     @property
     def flattened_pitch(self) -> GenericPitch:
-        special_pitch = self[self.flattened_index].clone()
+        flattened_index = 6 - self.all_modes.index(self.type)
+        special_pitch = self[flattened_index].clone()
         special_pitch.increment_value(-1)
         return special_pitch
 
-    def scale_shift(self, chosen_pitch: SpecificPitch, vector: int) -> SpecificPitch:
-        if vector == 0:
-            return chosen_pitch
+    def scale_shift(
+        self,
+        previous_specific_pitch: SpecificPitch,
+        previous_scale_degree: int,
+        current_scale_degree: int,
+    ) -> SpecificPitch:
+        # identical function signature to cadential_shift (polymorphism)
+        if (vector := current_scale_degree - previous_scale_degree) == 0:
+            return previous_specific_pitch
 
-        result_pitch = chosen_pitch.clone()
-        result_pitch.increment_letter(vector)
-        target_pitch_letter = result_pitch.letter
+        current_specific_pitch = previous_specific_pitch.clone()
+        current_specific_pitch.increment_letter(vector)
+        target_pitch_letter = current_specific_pitch.letter
 
         for scale_pitch in self:
             if scale_pitch.letter == target_pitch_letter:
-                return SpecificPitch(f"{scale_pitch}{result_pitch.octave}")
+                return SpecificPitch(f"{scale_pitch}{current_specific_pitch.octave}")
         else:
             raise ValueError
 
@@ -541,9 +558,10 @@ class ModalScale(GenericScale):
         previous_scale_degree: int,
         current_scale_degree: int,
     ) -> SpecificPitch:
-        interval_difference = current_scale_degree - previous_scale_degree
+        if (vector := current_scale_degree - previous_scale_degree) == 0:
+            return previous_specific_pitch
         current_specific_pitch = previous_specific_pitch.clone()
-        current_specific_pitch.increment_letter(interval_difference)
+        current_specific_pitch.increment_letter(vector)
 
         cadential_generic_pitch = self.get_cadential_pitch(current_scale_degree)
         current_specific_pitch = SpecificPitch(
@@ -551,25 +569,57 @@ class ModalScale(GenericScale):
         )
         return current_specific_pitch
 
+    def random_mode_shift(self) -> ModalScale:
+        current_mode = self.type
+        available_modes = list(self.all_modes)
+        available_modes.remove(current_mode)
+        available_modes.remove("locrian")
+        new_mode = random.choice(available_modes)
+
+        current_mode_index = self.all_modes.index(current_mode)
+        mode_increment = 0
+
+        while current_mode != new_mode:
+            current_mode_index = (current_mode_index + 1) % 7
+            current_mode = self.all_modes[current_mode_index]
+            mode_increment += 1
+        new_tonic = self[0] + Interval.get(self.scale_intervals[mode_increment])
+
+        return type_map[new_mode](f"{new_tonic}")
+
 
 class IonianScale(ModalScale):
     scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "M7"]
-    flattened_index = 6
 
 
 class DorianScale(ModalScale):
     scale_intervals = ["P1", "M2", "m3", "P4", "P5", "M6", "m7"]
-    flattened_index = 5
+
+
+class PhrygianScale(ModalScale):
+    scale_intervals = ["P1", "m2", "m3", "P4", "P5", "m6", "m7"]
+
+
+class LydianScale(ModalScale):
+    scale_intervals = ["P1", "M2", "M3", "A4", "P5", "M6", "M7"]
 
 
 class MixolydianScale(ModalScale):
     scale_intervals = ["P1", "M2", "M3", "P4", "P5", "M6", "m7"]
-    flattened_index = 2
 
 
 class AeolianScale(ModalScale):
     scale_intervals = ["P1", "M2", "m3", "P4", "P5", "m6", "m7"]
-    flattened_index = 1
+
+
+type_map = {
+    "ionian": IonianScale,
+    "dorian": DorianScale,
+    "phrygian": PhrygianScale,
+    "lydian": LydianScale,
+    "mixolydian": MixolydianScale,
+    "aeolian": AeolianScale,
+}
 
 
 class MajorScale(GenericScale):

@@ -300,10 +300,10 @@ def is_bass_suspension_valid(
 def checked_duo_transition(
     first_measure_stack: theory.MeasureStack,
     second_measure_stack: theory.MeasureStack,
-    second_sequence_index: int,
+    allowed_downbeat_unison: bool,
+    check_bass_suspension: bool,
 ) -> bool:
     consonant_ids: tuple[str, ...]
-    allowed_downbeat_unison = second_sequence_index == 11
     for first_voice_index, second_voice_index in limits.all_voice_pairs:
         if first_voice_index == 0:
             consonant_ids = lower_voice_consonances
@@ -321,13 +321,15 @@ def checked_duo_transition(
         ):
             return False
 
-    if second_sequence_index == 10:
-        return is_bass_suspension_valid(
-            first_measure_stack[0][-1],
-            first_measure_stack[-1][-1],
-            second_measure_stack[0][0],
-            second_measure_stack[-1][0],
-        )
+    if check_bass_suspension:
+        for upper_voice_index in (1, 2, 3):
+            if not is_bass_suspension_valid(
+                first_measure_stack[0][-1],
+                first_measure_stack[upper_voice_index][-1],
+                second_measure_stack[0][0],
+                second_measure_stack[upper_voice_index][0],
+            ):
+                return False
     return True
 
 
@@ -428,7 +430,7 @@ bass_trios = ((0, 1, 2), (0, 1, 3), (0, 2, 3))
 def checked_trio_transition(
     first_measure_stack: theory.MeasureStack,
     second_measure_stack: theory.MeasureStack,
-    second_sequence_index: int,
+    check_upper_suspension: bool,
 ) -> bool:
     for first_voice_index, second_voice_index, third_voice_index in bass_trios:
         first_lowest_pitch = first_measure_stack[first_voice_index][-1].specific_pitch
@@ -449,7 +451,7 @@ def checked_trio_transition(
             False,
         ):
             return False
-        if second_sequence_index == 10 and third_voice_index == 3:
+        if check_upper_suspension:
             if not is_upper_suspension_valid(
                 first_measure_stack[first_voice_index][-1],
                 first_measure_stack[second_voice_index][-1],
@@ -475,7 +477,12 @@ def checked_superius_transition(
     return interval_vector in allowed_vectors
 
 
-valid_cadential_motions = {0: {-4, 3}, 1: {-1}, 2: {0, -2}, 3: {1}}
+valid_cadential_motions = {
+    0: {-1, -3, 3, -4},
+    1: {0, -1, 1},
+    2: {0, -1, 1, -2},
+    3: {-1, 1},
+}
 
 
 def checked_cadential_successor(
@@ -554,7 +561,8 @@ def has_counterpoint_propagated(
         if not filter_prospects(index_prospects, prospect_validator):
             return False
 
-    if propagate_index != score_sequence.final_index:
+    final_index = score_sequence.final_index
+    if propagate_index != final_index:
         next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
         prospect_validators = [
@@ -566,31 +574,36 @@ def has_counterpoint_propagated(
             partial(
                 checked_duo_transition,
                 current_measure_stack,
-                second_sequence_index=next_index,
+                allowed_downbeat_unison=next_index == final_index,
+                check_bass_suspension=next_index == final_index - 1,
             ),
             partial(
                 checked_trio_transition,
                 current_measure_stack,
-                second_sequence_index=next_index,
+                check_upper_suspension=next_index == final_index - 1,
             ),
             partial(score_sequence.checked_stipulations, next_index),
         ]
-        if propagate_index == 4:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    current_measure_stack,
-                    allowed_vectors={-1, 1},
-                ),
-            )
-        elif propagate_index == score_sequence.final_index - 2:
+        if propagate_index == final_index - 2:
             prospect_validators.insert(
                 0,
                 partial(
                     checked_superius_transition,
                     current_measure_stack,
                     allowed_vectors={0, -1},
+                ),
+            )
+        elif propagate_index == final_index - 1:
+            prospect_validators.insert(
+                0, partial(checked_cadential_successor, current_measure_stack)
+            )
+        elif final_index == 11 and propagate_index == 4:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_superius_transition,
+                    current_measure_stack,
+                    allowed_vectors={-1, 1},
                 ),
             )
         else:
@@ -600,10 +613,6 @@ def has_counterpoint_propagated(
                     current_measure_stack,
                     allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
                 )
-            )
-        if propagate_index == score_sequence.final_index - 1:
-            prospect_validators.insert(
-                0, partial(checked_cadential_successor, current_measure_stack)
             )
         for prospect_validator in prospect_validators:
             if not filter_prospects(next_prospects, prospect_validator):
@@ -621,31 +630,40 @@ def has_counterpoint_propagated(
             partial(
                 checked_duo_transition,
                 second_measure_stack=current_measure_stack,
-                second_sequence_index=propagate_index,
+                allowed_downbeat_unison=propagate_index == final_index,
+                check_bass_suspension=propagate_index == final_index - 1,
             ),
             partial(
                 checked_trio_transition,
                 second_measure_stack=current_measure_stack,
-                second_sequence_index=propagate_index,
+                check_upper_suspension=propagate_index == final_index - 1,
             ),
             partial(score_sequence.checked_stipulations, previous_index),
         ]
-        if propagate_index == 5:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    second_measure_stack=current_measure_stack,
-                    allowed_vectors={-1, 1},
-                ),
-            )
-        elif propagate_index == score_sequence.final_index - 1:
+        if propagate_index == final_index - 1:
             prospect_validators.insert(
                 0,
                 partial(
                     checked_superius_transition,
                     second_measure_stack=current_measure_stack,
                     allowed_vectors={0, -1},
+                ),
+            )
+        elif propagate_index == final_index:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_cadential_successor,
+                    second_measure_stack=current_measure_stack,
+                ),
+            )
+        elif final_index == 11 and propagate_index == 5:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_superius_transition,
+                    second_measure_stack=current_measure_stack,
+                    allowed_vectors={-1, 1},
                 ),
             )
         else:

@@ -84,9 +84,10 @@ class CognizantSequence:
         self.duplicates = defaultdict(set)
         self.uniques = defaultdict(set)
 
-        for k, v in self.known_duplicates.items():
-            self.duplicates[k].add(v)
-            self.duplicates[v].add(k)
+        if length == 12:
+            for k, v in self.known_duplicates.items():
+                self.duplicates[k].add(v)
+                self.duplicates[v].add(k)
 
         for k, v in self.known_uniques.items():
             self.uniques[k].add(v)
@@ -716,7 +717,7 @@ class DanceScore:
         self,
         chosen_scale: theory.ModalScale,
         clef_group: list[str],
-        score_sequence: CognizantSequence,
+        score_sequences: list[CognizantSequence],
         chosen_instruemnt: theory.MidiInstrument,
     ) -> None:
         self.scale = chosen_scale
@@ -728,13 +729,20 @@ class DanceScore:
         self.parts = []
 
         voice_measures: tuple[theory.MelodicSequence, ...]
-        for clef_name, voice_measures in zip(clef_group, zip(*score_sequence)):
+        for clef_name, voice_measures in zip(clef_group, zip(*score_sequences[0])):
             melodic_sequence = [
                 specific_note
                 for voice_measure in voice_measures
                 for specific_note in voice_measure
             ]
             self.parts.append((clef_name, melodic_sequence))
+
+        for stack_index, voice_measures in enumerate(zip(*score_sequences[1])):
+            self.parts[stack_index][1].extend(
+                specific_note
+                for voice_measure in voice_measures
+                for specific_note in voice_measure
+            )
         self.tempo = random.randint(195, 215)
 
 
