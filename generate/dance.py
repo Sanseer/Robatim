@@ -11,6 +11,7 @@ with open("dance.json", "r") as f:
     idioms = json.load(f)
 
 revert_duration = export.LilypondFactory.revert_duration
+voice_names = ("bassus", "tenor", "contratenor", "superius")
 
 
 def get_new_score() -> limits.DanceScore:
@@ -18,7 +19,6 @@ def get_new_score() -> limits.DanceScore:
     print(f"{clef_group = }")
     voice_tessituras = {}
 
-    voice_names = ["bassus", "tenor", "contratenor", "superius"]
     for clef_name, voice_name in zip(clef_group, voice_names):
         pitch_min_str, pitch_max_str = idioms["clef_ranges"][clef_name]
         pitch_min = theory.SpecificPitch(pitch_min_str)
@@ -38,6 +38,9 @@ def get_new_score() -> limits.DanceScore:
 
     sequence_prospects: list[list[theory.MeasureStack]] = [[] for _ in range(12)]
     sequence_prospects[0] = get_first_measure_stacks(all_pitch_sequences, chosen_scale)
+    sequence_prospects[5] = get_half_cadence(
+        all_pitch_sequences, chosen_scale, voice_tessituras
+    )
     sequence_prospects[6] = sequence_prospects[0][:]
 
     set_final_prospects(
@@ -50,9 +53,7 @@ def get_new_score() -> limits.DanceScore:
         sequence_prospects,
         measure_stack_groups,
         {
-            "all_whole_notes": (4, 5),
-            "some_whole_notes": (4, 5),
-            "no_whole_notes": (1, 2, 3, 4, 5, 7, 8, 9),
+            "no_whole_notes": (1, 2, 3, 4, 7, 8, 9),
         },
     )
     score_sequences = [finalize_sequence(sequence_prospects, flattened_pitch)]
@@ -355,6 +356,56 @@ def get_first_measure_stacks(
     return measure_stack_groups["no_whole_notes"]
 
 
+def get_half_cadence(
+    all_pitch_sequences: dict[str, list[theory.MelodicSequence]],
+    chosen_scale: theory.ModalScale,
+    voice_tessituras: dict[str, theory.Tessitura],
+) -> list[theory.MeasureStack]:
+    cadential_sequences = defaultdict(list)
+    tonic_generic_pitch = chosen_scale[0]
+    superius_tessitura = voice_tessituras["superius"]
+
+    interval_shifts = [theory.Interval.get("m2")]
+    if chosen_scale.scale_intervals[-1] == "m7":
+        interval_shifts.append(theory.Interval.get("M2"))
+    tonic_specific_pitches = superius_tessitura.find_equivalent_pitches(
+        tonic_generic_pitch
+    )
+
+    for interval_shift in interval_shifts:
+        for tonic_specific_pitch in tonic_specific_pitches:
+            cadence_pitch = tonic_specific_pitch - interval_shift
+            if cadence_pitch in superius_tessitura:
+                cadential_sequences["superius"].append(
+                    [
+                        theory.SpecificNote(tonic_specific_pitch, Fraction("1/2")),
+                        theory.SpecificNote(cadence_pitch, Fraction("1/2")),
+                    ]
+                )
+
+    voice_vectors = {"bassus": {-1, -3}, "tenor": {-1, 1}, "contratenor": {-1, 1}}
+    for voice_name in voice_names[:-1]:
+        allowed_vectors = voice_vectors[voice_name]
+        for voice_measure in all_pitch_sequences[voice_name]:
+            if len(voice_measure) > 2:
+                continue
+            if len(voice_measure) == 2:
+                first_note, second_note = voice_measure
+                interval_vector = theory.SpecificPitch.get_interval_vector(
+                    first_note.specific_pitch, second_note.specific_pitch
+                )
+                if interval_vector not in allowed_vectors:
+                    continue
+            cadential_sequences[voice_name].append(voice_measure)
+
+    voice_measure_stacker = VoiceMeasureStacker(cadential_sequences)
+    measure_stack_groups = next(iter(voice_measure_stacker))
+    result_stacks = measure_stack_groups["no_whole_notes"]
+    result_stacks.extend(measure_stack_groups["some_whole_notes"])
+
+    return result_stacks
+
+
 def create_picardy_third(
     has_minor_third: bool,
     designated_letter: str,
@@ -631,6 +682,7 @@ class VoiceMeasureStacker:
         valid_result_count = 0
         measure_stack_groups = defaultdict(list)
         sub_iter_count = len(sub_iters)
+        print(f"Generating stacks from {sub_iter_count} iterators.")
         sample_index = 0
 
         while sub_iters:
@@ -641,7 +693,6 @@ class VoiceMeasureStacker:
             except StopIteration:
                 sub_iters.pop(sample_index)
                 sub_iter_count -= 1
-                print(f"Emptied sub iterator. {sub_iter_count} remaining.")
                 continue
             whole_note_count = self.count_whole_notes(current_measure_stack)
 

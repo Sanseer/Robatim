@@ -248,16 +248,25 @@ class LilypondFactory:
         space_chr = " "
         voice_parts_markup = []
 
-        for part_index, (clef_name, melodic_sequence) in enumerate(input_score.parts):
-            part_sequence = [f"\\key {tonic_designator} \\{input_score.scale.type}"]
-            if part_index == 0:
-                part_sequence.append(f"\\time 2/2")
-            part_sequence.append(f'\\clef "{clef_name}"')
+        for part_index, score_part in enumerate(input_score.parts):
+            section_reprs = []
+            for section_index, section in enumerate(score_part.sections):
+                section_sequence = []
+                if section_index == 0:
+                    section_sequence.append(
+                        f"\\key {tonic_designator} \\{input_score.scale.type}"
+                    )
+                    if part_index == 3:
+                        section_sequence.append(f"\\time 2/2")
+                    section_sequence.append(f'\\clef "{score_part.clef}"')
 
-            part_sequence.extend(
-                cls.convert_tonal_obj(sound_obj) for sound_obj in melodic_sequence
-            )
-            part_repr = " ".join(part_sequence)
+                section_sequence.extend(
+                    cls.convert_tonal_obj(sound_obj) for sound_obj in section
+                )
+                section_repr = " ".join(section_sequence)
+                section_repr = f"\\repeat volta 2 {{ {section_repr} }}"
+                section_reprs.append(section_repr)
+            part_repr = " ".join(section_reprs)
 
             voice_part_markup = [
                 f"{space_chr * 6}\\new Staff <<",
@@ -362,9 +371,9 @@ def export_dance_midi(input_score: limits.DanceScore) -> None:
         num_of_quarter_notes = metric_duration * 4
         return int(num_of_quarter_notes * beats_per_quarter_note * TICKS_PER_BEAT)
 
-    for _, melodic_sequence in input_score.parts:
+    for score_part in input_score.parts:
         new_midi.addProgramChange(track, channel, 0, input_score.instrument.number)
-        for sound_obj in melodic_sequence:
+        for sound_obj in score_part:
             tick_duration = get_tick_duration(sound_obj.duration)
 
             if isinstance(sound_obj, theory.SpecificNote):

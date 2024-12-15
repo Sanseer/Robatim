@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from functools import partial
 import random
-from typing import Callable, Iterator
+from typing import Iterator, Literal
 
 from generate import theory
 
@@ -50,7 +50,7 @@ class ConsecutiveMarker:
 
 @dataclass
 class ScoreRule:
-    direction: str
+    direction: Literal["left", "right"]
     voice_index: int
     rule: ConsecutiveMarker
 
@@ -712,6 +712,21 @@ class CognizantSequence:
         return True
 
 
+class ScorePart:
+    def __init__(self, clef_name: str) -> None:
+        self.clef = clef_name
+        self.sections: list[theory.MelodicSequence] = []
+
+    def __iter__(self) -> Iterator[theory.SpecificNote]:
+        for section in self.sections:
+            for _ in range(2):
+                for specific_note in section:
+                    yield specific_note
+
+    def add_section(self, melodic_sequence: Iterator[theory.SpecificNote]) -> None:
+        self.sections.append(list(melodic_sequence))
+
+
 class DanceScore:
     def __init__(
         self,
@@ -726,23 +741,15 @@ class DanceScore:
         """You can have two parts with the same clef 
         (e.g., contratenor and tenor voices using the alto clef) 
         Therefore, a list is used instead of a dictionary"""
-        self.parts = []
+        self.parts = [ScorePart(clef_name) for clef_name in clef_group]
 
-        voice_measures: tuple[theory.MelodicSequence, ...]
-        for clef_name, voice_measures in zip(clef_group, zip(*score_sequences[0])):
-            melodic_sequence = [
-                specific_note
-                for voice_measure in voice_measures
-                for specific_note in voice_measure
-            ]
-            self.parts.append((clef_name, melodic_sequence))
-
-        for stack_index, voice_measures in enumerate(zip(*score_sequences[1])):
-            self.parts[stack_index][1].extend(
-                specific_note
-                for voice_measure in voice_measures
-                for specific_note in voice_measure
-            )
+        for score_sequence in score_sequences:
+            for score_part, voice_measures in zip(self.parts, zip(*score_sequence)):
+                score_part.add_section(
+                    specific_note
+                    for voice_measure in voice_measures
+                    for specific_note in voice_measure
+                )
         self.tempo = random.randint(195, 215)
 
 
