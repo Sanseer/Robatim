@@ -568,7 +568,7 @@ def is_upper_suspension_valid(
     return has_imperfect_resolution(second_measure_stack)
 
 
-bass_trios = ((0, 1, 2), (0, 1, 3), (0, 2, 3))
+upper_duos = ((1, 2), (1, 3), (2, 3))
 
 
 def checked_trio_transition(
@@ -576,12 +576,11 @@ def checked_trio_transition(
     second_measure_stack: theory.MeasureStack,
     check_upper_suspension: bool,
 ) -> bool:
-    for first_voice_index, second_voice_index, third_voice_index in bass_trios:
-        first_lowest_pitch = first_measure_stack[first_voice_index][-1].specific_pitch
+    first_lowest_pitch = first_measure_stack[0][-1].specific_pitch
+    second_lowest_pitch = second_measure_stack[0][0].specific_pitch
+    for second_voice_index, third_voice_index in upper_duos:
         first_middle_pitch = first_measure_stack[second_voice_index][-1].specific_pitch
         first_highest_pitch = first_measure_stack[third_voice_index][-1].specific_pitch
-
-        second_lowest_pitch = second_measure_stack[first_voice_index][0].specific_pitch
         second_middle_pitch = second_measure_stack[second_voice_index][0].specific_pitch
         second_highest_pitch = second_measure_stack[third_voice_index][0].specific_pitch
 
@@ -597,7 +596,7 @@ def checked_trio_transition(
             return False
         if check_upper_suspension:
             if not is_upper_suspension_valid(
-                first_measure_stack[first_voice_index][-1],
+                first_measure_stack[0][-1],
                 first_measure_stack[second_voice_index][-1],
                 first_measure_stack[third_voice_index][-1],
                 second_lowest_pitch,
@@ -607,6 +606,153 @@ def checked_trio_transition(
             ):
                 return False
     return True
+
+
+def check_dissonant_pass(
+    first_measure_stack: theory.MeasureStack,
+    second_measure_stack: theory.MeasureStack,
+) -> bool:
+    first_lowest_measure = first_measure_stack[0]
+    second_lowest_measure = second_measure_stack[0]
+
+    for stack_index in range(1, 4):
+        first_highest_measure = first_measure_stack[stack_index]
+        second_highest_measure = second_measure_stack[stack_index]
+
+        if not test_duo_species(
+            first_lowest_measure,
+            first_highest_measure,
+            second_lowest_measure,
+            second_highest_measure,
+        ):
+            return False
+
+    for second_voice_index, third_voice_index in upper_duos:
+        first_middle_measure = first_measure_stack[second_voice_index]
+        first_highest_measure = first_measure_stack[third_voice_index]
+        second_middle_measure = second_measure_stack[second_voice_index]
+        second_highest_measure = second_measure_stack[third_voice_index]
+
+        if not test_trio_species(
+            first_lowest_measure,
+            first_middle_measure,
+            first_highest_measure,
+            second_middle_measure,
+            second_highest_measure,
+        ):
+            return False
+    return True
+
+
+def test_duo_species(
+    first_lower_measure: theory.MelodicSequence,
+    first_upper_measure: theory.MelodicSequence,
+    second_lower_measure: theory.MelodicSequence,
+    second_upper_measure: theory.MelodicSequence,
+) -> bool:
+    lower_is_cantus, lower_is_counter = get_species_role(first_lower_measure)
+    upper_is_cantus, upper_is_counter = get_species_role(first_upper_measure)
+
+    if lower_is_cantus and upper_is_counter or lower_is_counter and upper_is_cantus:
+        if is_duo_consonant(
+            first_lower_measure[-1].specific_pitch,
+            first_upper_measure[-1].specific_pitch,
+            lower_voice_consonances,
+        ):
+            return True
+
+        if upper_is_counter:
+            return has_passing_figure(
+                first_upper_measure[-2].specific_pitch,
+                first_upper_measure[-1].specific_pitch,
+                second_upper_measure[0].specific_pitch,
+            )
+        return has_passing_figure(
+            first_lower_measure[-2].specific_pitch,
+            first_lower_measure[-1].specific_pitch,
+            second_lower_measure[0].specific_pitch,
+        )
+    return True
+
+
+def get_species_role(voice_measure: theory.MelodicSequence) -> tuple[bool, bool]:
+    if len(voice_measure) == 1:
+        is_cantus = True
+        is_counter = False
+    elif len(voice_measure) > 2:
+        is_cantus = False
+        is_counter = False
+    else:
+        first_note, second_note = voice_measure
+        if first_note.specific_pitch == second_note.specific_pitch:
+            is_cantus = True
+        else:
+            is_cantus = False
+
+        if first_note.duration == Fraction("1/2"):
+            interval_distance = theory.SpecificPitch.get_interval_distance(
+                first_note.specific_pitch, second_note.specific_pitch
+            )
+            if interval_distance == 1:
+                is_counter = True
+            else:
+                is_counter = False
+        else:
+            is_counter = False
+
+    return is_cantus, is_counter
+
+
+def has_passing_figure(
+    first_pitch: theory.SpecificPitch,
+    second_pitch: theory.SpecificPitch,
+    third_pitch: theory.SpecificPitch,
+) -> bool:
+    first_vector = theory.SpecificPitch.get_interval_vector(first_pitch, second_pitch)
+    second_vector = theory.SpecificPitch.get_interval_vector(second_pitch, third_pitch)
+    return first_vector == second_vector
+
+
+def test_trio_species(
+    first_lowest_measure: theory.MelodicSequence,
+    first_middle_measure: theory.MelodicSequence,
+    first_highest_measure: theory.MelodicSequence,
+    second_middle_measure: theory.MelodicSequence,
+    second_highest_measure: theory.MelodicSequence,
+) -> bool:
+    lower_is_cantus, lower_is_counter = get_species_role(first_middle_measure)
+    upper_is_cantus, upper_is_counter = get_species_role(first_highest_measure)
+
+    if lower_is_cantus and upper_is_counter or lower_is_counter and upper_is_cantus:
+        if is_trio_consonant(
+            find_third_quarter(first_lowest_measure),
+            first_middle_measure[-1].specific_pitch,
+            first_highest_measure[-1].specific_pitch,
+        ):
+            return True
+
+        if upper_is_counter:
+            return has_passing_figure(
+                first_highest_measure[-2].specific_pitch,
+                first_highest_measure[-1].specific_pitch,
+                second_highest_measure[0].specific_pitch,
+            )
+        return has_passing_figure(
+            first_middle_measure[-2].specific_pitch,
+            first_middle_measure[-1].specific_pitch,
+            second_middle_measure[0].specific_pitch,
+        )
+    return True
+
+
+def find_third_quarter(voice_measure: theory.MelodicSequence) -> theory.SpecificPitch:
+    elapsed_duration = Fraction("0")
+    for specific_note in voice_measure:
+        elapsed_duration += specific_note.duration
+        if elapsed_duration >= Fraction("3/4"):
+            return specific_note.specific_pitch
+    else:
+        raise ValueError
 
 
 def checked_superius_transition(
@@ -750,6 +896,7 @@ def has_counterpoint_propagated(
                 current_measure_stack,
                 check_upper_suspension=is_authentic_cadence or is_half_cadence,
             ),
+            partial(check_dissonant_pass, current_measure_stack),
             partial(score_sequence.checked_stipulations, next_index),
         ]
         if is_authentic_cadence:
@@ -817,6 +964,10 @@ def has_counterpoint_propagated(
                 checked_trio_transition,
                 second_measure_stack=current_measure_stack,
                 check_upper_suspension=is_authentic_cadence or is_half_cadence,
+            ),
+            partial(
+                check_dissonant_pass,
+                second_measure_stack=current_measure_stack,
             ),
             partial(score_sequence.checked_stipulations, previous_index),
         ]
