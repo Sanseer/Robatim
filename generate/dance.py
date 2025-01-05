@@ -240,6 +240,39 @@ def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bo
             previous_lower_note = current_lower_note
             previous_upper_note = current_upper_note
 
+        lower_is_diminished_cantus, lower_is_diminished_counter = get_species_role(
+            lower_voice_measure
+        )
+        upper_is_diminished_cantus, upper_is_diminished_counter = get_species_role(
+            upper_voice_measure
+        )
+        if (
+            lower_is_diminished_cantus
+            and upper_is_diminished_counter
+            or lower_is_diminished_counter
+            and upper_is_diminished_cantus
+        ):
+            if lower_is_diminished_cantus:
+                lower_pitch = lower_voice_measure[0].specific_pitch
+                upper_pitch = upper_voice_measure[1].specific_pitch
+            else:
+                lower_pitch = lower_voice_measure[1].specific_pitch
+                upper_pitch = upper_voice_measure[0].specific_pitch
+            if not rules.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
+                if upper_is_diminished_counter:
+                    if not rules.has_passing_figure(
+                        upper_voice_measure[0].specific_pitch,
+                        upper_voice_measure[1].specific_pitch,
+                        upper_voice_measure[2].specific_pitch,
+                    ):
+                        return False
+                elif not rules.has_passing_figure(
+                    lower_voice_measure[0].specific_pitch,
+                    lower_voice_measure[1].specific_pitch,
+                    lower_voice_measure[2].specific_pitch,
+                ):
+                    return False
+
         lower_is_dotted = lower_voice_measure[0].duration == Fraction("3/4")
         upper_is_dotted = upper_voice_measure[0].duration == Fraction("3/4")
         lower_needs_consonance = check_third_quarter(lower_voice_measure)
@@ -253,13 +286,75 @@ def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bo
         ):
             if lower_is_dotted:
                 lower_pitch = lower_voice_measure[0].specific_pitch
-                upper_pitch = rules.find_third_quarter(upper_voice_measure)
+                upper_pitch = rules.find_pitch(upper_voice_measure)
+                dotted_measure, undotted_measure = (
+                    lower_voice_measure,
+                    upper_voice_measure,
+                )
             else:
-                lower_pitch = rules.find_third_quarter(lower_voice_measure)
+                lower_pitch = rules.find_pitch(lower_voice_measure)
                 upper_pitch = upper_voice_measure[0].specific_pitch
+                dotted_measure, undotted_measure = (
+                    upper_voice_measure,
+                    lower_voice_measure,
+                )
 
-            return rules.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids)
+            if not rules.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
+                if len(undotted_measure) != 2:
+                    return False
+                if undotted_measure[1].duration != Fraction("1/2"):
+                    return False
+                first_patient_pitch = dotted_measure[0].specific_pitch
+                second_patient_pitch = dotted_measure[1].specific_pitch
+                if (
+                    theory.SpecificPitch.get_interval_vector(
+                        first_patient_pitch, second_patient_pitch
+                    )
+                    != -1
+                ):
+                    return False
+
+                if lower_is_dotted:
+                    lower_resolve_pitch = second_patient_pitch
+                    upper_resolve_pitch = upper_pitch
+                else:
+                    lower_resolve_pitch = lower_pitch
+                    upper_resolve_pitch = second_patient_pitch
+                if not lower_resolve_pitch.has_interval_shift(
+                    upper_resolve_pitch, rules.imperfect_consonances
+                ):
+                    return False
     return True
+
+
+def get_species_role(voice_measure: theory.MelodicSequence) -> tuple[bool, bool]:
+    if len(voice_measure) == 1:
+        is_diminished_cantus = False
+        is_diminished_counter = False
+
+    elif len(voice_measure) > 2:
+        first_note, second_note, *_ = voice_measure
+        is_diminished_cantus = first_note.duration == Fraction("1/2")
+
+        if first_note.duration != Fraction("1/4"):
+            is_diminished_counter = False
+        elif second_note.duration != Fraction("1/4"):
+            is_diminished_counter = False
+        else:
+            interval_distance = theory.SpecificPitch.get_interval_distance(
+                first_note.specific_pitch, second_note.specific_pitch
+            )
+            is_diminished_counter = interval_distance == 1
+    else:
+        first_note, second_note = voice_measure
+        if first_note.specific_pitch == second_note.specific_pitch:
+            is_diminished_cantus = False
+        else:
+            is_diminished_cantus = first_note.duration == Fraction("1/2")
+
+        is_diminished_counter = False
+
+    return is_diminished_cantus, is_diminished_counter
 
 
 def check_third_quarter(voice_measure: theory.MelodicSequence) -> bool:
@@ -318,6 +413,43 @@ def has_valid_fourths(
         previous_middle_pitch = current_middle_pitch
         previous_highest_pitch = current_highest_pitch
 
+    lower_is_diminished_cantus, lower_is_diminished_counter = get_species_role(
+        middle_voice_measure
+    )
+    upper_is_diminished_cantus, upper_is_diminished_counter = get_species_role(
+        highest_voice_measure
+    )
+
+    if (
+        lower_is_diminished_cantus
+        and upper_is_diminished_counter
+        or lower_is_diminished_counter
+        and upper_is_diminished_cantus
+    ):
+        if lower_is_diminished_cantus:
+            middle_pitch = middle_voice_measure[0].specific_pitch
+            highest_pitch = highest_voice_measure[1].specific_pitch
+        else:
+            middle_pitch = middle_voice_measure[1].specific_pitch
+            highest_pitch = highest_voice_measure[0].specific_pitch
+        lowest_pitch = rules.find_pitch(lowest_voice_measure, "1/2")
+        if not rules.is_perfect_fourth_consonant(
+            lowest_pitch, middle_pitch, highest_pitch
+        ):
+            if upper_is_diminished_counter:
+                if not rules.has_passing_figure(
+                    highest_voice_measure[0].specific_pitch,
+                    highest_voice_measure[1].specific_pitch,
+                    highest_voice_measure[2].specific_pitch,
+                ):
+                    return False
+            elif not rules.has_passing_figure(
+                middle_voice_measure[0].specific_pitch,
+                middle_voice_measure[1].specific_pitch,
+                middle_voice_measure[2].specific_pitch,
+            ):
+                return False
+
     lower_is_dotted = middle_voice_measure[0].duration == Fraction("3/4")
     upper_is_dotted = highest_voice_measure[0].duration == Fraction("3/4")
     lower_needs_consonance = check_third_quarter(middle_voice_measure)
@@ -331,15 +463,46 @@ def has_valid_fourths(
     ):
         if lower_is_dotted:
             middle_pitch = middle_voice_measure[0].specific_pitch
-            highest_pitch = rules.find_third_quarter(highest_voice_measure)
+            highest_pitch = rules.find_pitch(highest_voice_measure)
+            dotted_measure, undotted_measure = (
+                middle_voice_measure,
+                highest_voice_measure,
+            )
         else:
-            middle_pitch = rules.find_third_quarter(middle_voice_measure)
+            middle_pitch = rules.find_pitch(middle_voice_measure)
             highest_pitch = highest_voice_measure[0].specific_pitch
-        lowest_pitch = rules.find_third_quarter(lowest_voice_measure)
+            dotted_measure, undotted_measure = (
+                highest_voice_measure,
+                middle_voice_measure,
+            )
+        lowest_pitch = rules.find_pitch(lowest_voice_measure)
 
-        return rules.is_perfect_fourth_consonant(
+        if not rules.is_perfect_fourth_consonant(
             lowest_pitch, middle_pitch, highest_pitch
-        )
+        ):
+            if len(undotted_measure) != 2:
+                return False
+            if undotted_measure[1].duration != Fraction("1/2"):
+                return False
+            first_patient_pitch = dotted_measure[0].specific_pitch
+            second_patient_pitch = dotted_measure[1].specific_pitch
+            if (
+                theory.SpecificPitch.get_interval_vector(
+                    first_patient_pitch, second_patient_pitch
+                )
+                != -1
+            ):
+                return False
+
+            if lower_is_dotted:
+                lower_resolve_pitch = second_patient_pitch
+                upper_resolve_pitch = highest_pitch
+            else:
+                lower_resolve_pitch = middle_pitch
+                upper_resolve_pitch = second_patient_pitch
+            return lower_resolve_pitch.has_interval_shift(
+                upper_resolve_pitch, ("M3", "m3")
+            )
     return True
 
 

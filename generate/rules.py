@@ -650,10 +650,29 @@ def test_duo_species(
     second_lower_measure: theory.MelodicSequence,
     second_upper_measure: theory.MelodicSequence,
 ) -> bool:
-    lower_is_cantus, lower_is_counter = get_species_role(first_lower_measure)
-    upper_is_cantus, upper_is_counter = get_species_role(first_upper_measure)
+    (
+        lower_is_real_cantus,
+        lower_is_real_counter,
+        lower_is_diminished_cantus,
+        lower_is_diminished_counter,
+    ) = get_species_role(first_lower_measure)
+    (
+        upper_is_real_cantus,
+        upper_is_real_counter,
+        upper_is_diminished_cantus,
+        upper_is_diminished_counter,
+    ) = get_species_role(first_upper_measure)
 
-    if lower_is_cantus and upper_is_counter or lower_is_counter and upper_is_cantus:
+    if (
+        lower_is_real_cantus
+        and upper_is_real_counter
+        or lower_is_diminished_cantus
+        and upper_is_diminished_counter
+        or lower_is_real_counter
+        and upper_is_real_cantus
+        or lower_is_diminished_counter
+        and upper_is_diminished_cantus
+    ):
         if is_duo_consonant(
             first_lower_measure[-1].specific_pitch,
             first_upper_measure[-1].specific_pitch,
@@ -661,7 +680,7 @@ def test_duo_species(
         ):
             return True
 
-        if upper_is_counter:
+        if upper_is_real_counter or upper_is_diminished_counter:
             return has_passing_figure(
                 first_upper_measure[-2].specific_pitch,
                 first_upper_measure[-1].specific_pitch,
@@ -675,32 +694,48 @@ def test_duo_species(
     return True
 
 
-def get_species_role(voice_measure: theory.MelodicSequence) -> tuple[bool, bool]:
+def get_species_role(
+    voice_measure: theory.MelodicSequence,
+) -> tuple[bool, bool, bool, bool]:
     if len(voice_measure) == 1:
-        is_cantus = True
-        is_counter = False
+        is_real_cantus = True
+        is_real_counter = False
+        is_diminished_cantus = False
+        is_diminished_counter = False
+
     elif len(voice_measure) > 2:
-        is_cantus = False
-        is_counter = False
+        is_real_cantus = False
+        is_real_counter = False
+        *_, first_note, second_note = voice_measure
+        is_diminished_cantus = second_note.duration == Fraction("1/2")
+
+        if first_note.duration != Fraction("1/4"):
+            is_diminished_counter = False
+        elif second_note.duration != Fraction("1/4"):
+            is_diminished_counter = False
+        else:
+            interval_distance = theory.SpecificPitch.get_interval_distance(
+                first_note.specific_pitch, second_note.specific_pitch
+            )
+            is_diminished_counter = interval_distance == 1
     else:
         first_note, second_note = voice_measure
         if first_note.specific_pitch == second_note.specific_pitch:
-            is_cantus = True
+            is_real_cantus = True
+            is_diminished_cantus = False
         else:
-            is_cantus = False
+            is_real_cantus = False
+            is_diminished_cantus = first_note.duration == Fraction("1/2")
 
+        is_diminished_counter = False
         if first_note.duration == Fraction("1/2"):
             interval_distance = theory.SpecificPitch.get_interval_distance(
                 first_note.specific_pitch, second_note.specific_pitch
             )
-            if interval_distance == 1:
-                is_counter = True
-            else:
-                is_counter = False
+            is_real_counter = interval_distance == 1
         else:
-            is_counter = False
-
-    return is_cantus, is_counter
+            is_real_counter = False
+    return is_real_cantus, is_real_counter, is_diminished_cantus, is_diminished_counter
 
 
 def has_passing_figure(
@@ -720,18 +755,41 @@ def test_trio_species(
     second_middle_measure: theory.MelodicSequence,
     second_highest_measure: theory.MelodicSequence,
 ) -> bool:
-    lower_is_cantus, lower_is_counter = get_species_role(first_middle_measure)
-    upper_is_cantus, upper_is_counter = get_species_role(first_highest_measure)
+    (
+        lower_is_real_cantus,
+        lower_is_real_counter,
+        lower_is_diminished_cantus,
+        lower_is_diminished_counter,
+    ) = get_species_role(first_middle_measure)
+    (
+        upper_is_real_cantus,
+        upper_is_real_counter,
+        upper_is_diminished_cantus,
+        upper_is_diminished_counter,
+    ) = get_species_role(first_highest_measure)
 
-    if lower_is_cantus and upper_is_counter or lower_is_counter and upper_is_cantus:
+    if (
+        lower_is_real_cantus
+        and upper_is_real_counter
+        or lower_is_diminished_cantus
+        and upper_is_diminished_counter
+        or lower_is_real_counter
+        and upper_is_real_cantus
+        or lower_is_diminished_counter
+        and upper_is_diminished_cantus
+    ):
+        if lower_is_real_cantus or upper_is_real_cantus:
+            lowest_pitch = find_pitch(first_lowest_measure)
+        else:
+            lowest_pitch = first_lowest_measure[-1].specific_pitch
         if is_trio_consonant(
-            find_third_quarter(first_lowest_measure),
+            lowest_pitch,
             first_middle_measure[-1].specific_pitch,
             first_highest_measure[-1].specific_pitch,
         ):
             return True
 
-        if upper_is_counter:
+        if upper_is_real_counter or upper_is_diminished_counter:
             return has_passing_figure(
                 first_highest_measure[-2].specific_pitch,
                 first_highest_measure[-1].specific_pitch,
@@ -745,11 +803,14 @@ def test_trio_species(
     return True
 
 
-def find_third_quarter(voice_measure: theory.MelodicSequence) -> theory.SpecificPitch:
+def find_pitch(
+    voice_measure: theory.MelodicSequence, duration_repr: str = "3/4"
+) -> theory.SpecificPitch:
     elapsed_duration = Fraction("0")
+    sought_duration = Fraction(duration_repr)
     for specific_note in voice_measure:
         elapsed_duration += specific_note.duration
-        if elapsed_duration >= Fraction("3/4"):
+        if elapsed_duration >= sought_duration:
             return specific_note.specific_pitch
     else:
         raise ValueError
