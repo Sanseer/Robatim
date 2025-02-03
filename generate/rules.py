@@ -27,6 +27,7 @@ def checked_solo_transition(
     first_measure_stack: theory.MeasureStack,
     second_measure_stack: theory.MeasureStack,
     flattened_pitch: theory.GenericPitch,
+    is_skip_transition: bool,
 ) -> bool:
     for first_voice_measure, second_voice_measure in zip(
         first_measure_stack, second_measure_stack
@@ -74,7 +75,11 @@ def checked_solo_transition(
             ):
                 return False
 
-        if second_voice_measure[0].duration == Fraction("1/4") and voice_distance > 1:
+        if (
+            second_voice_measure[0].duration == Fraction("1/4")
+            and voice_distance > 1
+            and not is_skip_transition
+        ):
             return False
         if first_pitch.has_interval_shift(second_pitch, ("A2", "A4", "d5")):
             return False
@@ -920,6 +925,7 @@ def has_counterpoint_propagated(
     score_sequence: limits.CognizantSequence,
     current_measure_stack: theory.MeasureStack,
     flattened_pitch: theory.GenericPitch,
+    is_antecedent: bool,
 ) -> bool:
     for duplicate_index in score_sequence.duplicates[propagate_index]:
         prospect_validator = partial(is_superius_duplicated, current_measure_stack)
@@ -937,7 +943,15 @@ def has_counterpoint_propagated(
     if propagate_index != final_index:
         next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
-        is_half_cadence = final_index == 11 and next_index == 5
+        if final_index != 11:
+            is_intermediate_cadence = False
+            is_skip_transition = False
+        elif is_antecedent:
+            is_intermediate_cadence = next_index == 5
+            is_skip_transition = False
+        else:
+            is_intermediate_cadence = next_index == 4
+            is_skip_transition = next_index == 6
         is_authentic_cadence = next_index == final_index - 1
 
         prospect_validators = [
@@ -945,17 +959,18 @@ def has_counterpoint_propagated(
                 checked_solo_transition,
                 current_measure_stack,
                 flattened_pitch=flattened_pitch,
+                is_skip_transition=is_skip_transition,
             ),
             partial(
                 checked_duo_transition,
                 current_measure_stack,
                 allowed_downbeat_unison=next_index == final_index,
-                check_bass_suspension=is_authentic_cadence or is_half_cadence,
+                check_bass_suspension=is_authentic_cadence or is_intermediate_cadence,
             ),
             partial(
                 checked_trio_transition,
                 current_measure_stack,
-                check_upper_suspension=is_authentic_cadence or is_half_cadence,
+                check_upper_suspension=is_authentic_cadence or is_intermediate_cadence,
             ),
             partial(check_dissonant_pass, current_measure_stack),
             partial(score_sequence.checked_stipulations, next_index),
@@ -969,11 +984,11 @@ def has_counterpoint_propagated(
                     allowed_vectors={0, -1},
                 ),
             )
-        elif next_index == final_index:
+        elif next_index == final_index or (not is_antecedent and next_index == 5):
             prospect_validators.insert(
                 0, partial(checked_cadential_successor, current_measure_stack)
             )
-        elif propagate_index == 4:
+        elif is_intermediate_cadence:
             prospect_validators.insert(
                 0,
                 partial(
@@ -982,7 +997,7 @@ def has_counterpoint_propagated(
                     allowed_vectors={0, -1},
                 ),
             )
-        elif propagate_index == 5:
+        elif next_index == 6 and is_antecedent:
             prospect_validators.insert(
                 0,
                 partial(
@@ -1006,7 +1021,15 @@ def has_counterpoint_propagated(
     if propagate_index != 0:
         previous_index = propagate_index - 1
         previous_prospects = sequence_prospects[previous_index]
-        is_half_cadence = final_index == 11 and propagate_index == 5
+        if final_index != 11:
+            is_intermediate_cadence = False
+            is_skip_transition = False
+        elif is_antecedent:
+            is_intermediate_cadence = propagate_index == 5
+            is_skip_transition = False
+        else:
+            is_intermediate_cadence = propagate_index == 4
+            is_skip_transition = propagate_index == 6
         is_authentic_cadence = propagate_index == final_index - 1
 
         prospect_validators = [
@@ -1014,17 +1037,18 @@ def has_counterpoint_propagated(
                 checked_solo_transition,
                 second_measure_stack=current_measure_stack,
                 flattened_pitch=flattened_pitch,
+                is_skip_transition=is_skip_transition,
             ),
             partial(
                 checked_duo_transition,
                 second_measure_stack=current_measure_stack,
                 allowed_downbeat_unison=propagate_index == final_index,
-                check_bass_suspension=is_authentic_cadence or is_half_cadence,
+                check_bass_suspension=is_authentic_cadence or is_intermediate_cadence,
             ),
             partial(
                 checked_trio_transition,
                 second_measure_stack=current_measure_stack,
-                check_upper_suspension=is_authentic_cadence or is_half_cadence,
+                check_upper_suspension=is_authentic_cadence or is_intermediate_cadence,
             ),
             partial(
                 check_dissonant_pass,
@@ -1041,7 +1065,9 @@ def has_counterpoint_propagated(
                     allowed_vectors={0, -1},
                 ),
             )
-        elif propagate_index == final_index:
+        elif propagate_index == final_index or (
+            not is_antecedent and propagate_index == 5
+        ):
             prospect_validators.insert(
                 0,
                 partial(
@@ -1049,7 +1075,7 @@ def has_counterpoint_propagated(
                     second_measure_stack=current_measure_stack,
                 ),
             )
-        elif propagate_index == 5:
+        elif is_intermediate_cadence:
             prospect_validators.insert(
                 0,
                 partial(
@@ -1058,7 +1084,7 @@ def has_counterpoint_propagated(
                     allowed_vectors={0, -1},
                 ),
             )
-        elif propagate_index == 6:
+        elif propagate_index == 6 and is_antecedent:
             prospect_validators.insert(
                 0,
                 partial(
