@@ -123,14 +123,6 @@ def checked_solo_transition(
             if voice_distance > 3:
                 return False
 
-        if len(first_voice_measure) > 1 and len(second_voice_measure) > 1:
-            first_pitch = first_voice_measure[0].specific_pitch
-            second_pitch = first_voice_measure[1].specific_pitch
-            third_pitch = second_voice_measure[0].specific_pitch
-            fourth_pitch = second_voice_measure[1].specific_pitch
-
-            if first_pitch == third_pitch and second_pitch == fourth_pitch:
-                return False
     return check_cross_pitches(first_measure_stack, second_measure_stack)
 
 
@@ -227,10 +219,139 @@ def test_melodic_pyramid(
     if second_vector == 2:
         return True
 
+    # checking if signs are the same
     if (first_vector * second_vector) < 0:
         return True
     # Upward motion decelerates. Downward motion accelerates.
     return first_vector >= second_vector
+
+
+def checked_solo_partial_transition(
+    first_measure_stack: theory.PartialMeasureStack,
+    second_measure_stack: theory.MeasureStack,
+    flattened_pitch: theory.GenericPitch,
+) -> bool:
+    for first_voice_measure, second_voice_measure in zip(
+        first_measure_stack, second_measure_stack
+    ):
+        first_pitch = first_voice_measure[-1].specific_pitch
+        second_pitch = second_voice_measure[0].specific_pitch
+        voice_distance = theory.SpecificPitch.get_interval_distance(
+            first_pitch, second_pitch
+        )
+        if voice_distance > 7 or voice_distance == 6:
+            return False
+
+        leap_direction = theory.SpecificPitch.get_direction(first_pitch, second_pitch)
+        if voice_distance == 7:
+            if len(second_voice_measure) > 1:
+                resolving_pitch = second_voice_measure[1].specific_pitch
+                resolving_direction = theory.SpecificPitch.get_direction(
+                    second_pitch, resolving_pitch
+                )
+                if leap_direction == resolving_direction:
+                    return False
+        elif voice_distance == 5:
+            if second_pitch != first_pitch + theory.Interval.get("m6"):
+                return False
+            if len(second_voice_measure) == 1:
+                return False
+
+            resolving_pitch = second_voice_measure[1].specific_pitch
+            resolving_distance = theory.SpecificPitch.get_interval_distance(
+                second_pitch, resolving_pitch
+            )
+            if resolving_distance != 1:
+                return False
+            resolving_direction = theory.SpecificPitch.get_direction(
+                second_pitch, resolving_pitch
+            )
+            if leap_direction == resolving_direction:
+                return False
+
+        if second_voice_measure[0].duration == Fraction("1/4") and voice_distance > 1:
+            return False
+        if first_pitch.has_interval_shift(second_pitch, ("A2", "A4", "d5")):
+            return False
+
+        if len(second_voice_measure) > 1:
+            next_pitch = second_voice_measure[1].specific_pitch
+            if (
+                second_voice_measure[0].duration == Fraction("1/4")
+                and second_voice_measure[1].duration == Fraction("1/4")
+                and not check_chromatic_relation(first_pitch, next_pitch)
+            ):
+                return False
+            if voice_distance:
+                if second_pitch != next_pitch and not test_melodic_pyramid(
+                    first_pitch, second_pitch, next_pitch
+                ):
+                    return False
+
+        if (
+            first_pitch.letter == second_pitch.letter
+            and first_pitch.generic_pitch != second_pitch.generic_pitch
+        ):
+            return False
+        if first_pitch.generic_pitch == flattened_pitch:
+            if leap_direction == 1:
+                return False
+            if voice_distance > 3:
+                return False
+
+    return check_partial_cross_pitches(first_measure_stack, second_measure_stack)
+
+
+def get_partial_quartets(
+    first_measure_stack: theory.PartialMeasureStack,
+    second_measure_stack: theory.MeasureStack,
+) -> Iterator[
+    tuple[
+        theory.HalfMeasure,
+        theory.HalfMeasure,
+        theory.MelodicSequence,
+        theory.MelodicSequence,
+    ]
+]:
+    for first_voice_index, second_voice_index in limits.all_voice_pairs:
+        first_lower_measure = first_measure_stack[first_voice_index]
+        first_upper_measure = first_measure_stack[second_voice_index]
+        second_lower_measure = second_measure_stack[first_voice_index]
+        second_upper_measure = second_measure_stack[second_voice_index]
+        yield first_lower_measure, first_upper_measure, second_lower_measure, second_upper_measure
+
+
+def check_partial_cross_pitches(
+    first_measure_stack: theory.PartialMeasureStack,
+    second_measure_stack: theory.MeasureStack,
+) -> bool:
+    for (
+        first_lower_measure,
+        first_upper_measure,
+        second_lower_measure,
+        second_upper_measure,
+    ) in get_partial_quartets(first_measure_stack, second_measure_stack):
+        if (
+            len(second_lower_measure) > 1
+            and second_lower_measure[0].duration == Fraction("1/4")
+            and second_lower_measure[1].duration == Fraction("1/4")
+        ):
+            if not check_chromatic_relation(
+                first_upper_measure[-1].specific_pitch,
+                second_lower_measure[1].specific_pitch,
+            ):
+                return False
+        if (
+            len(second_upper_measure) > 1
+            and second_upper_measure[0].duration == Fraction("1/4")
+            and second_upper_measure[1].duration == Fraction("1/4")
+        ):
+            if not check_chromatic_relation(
+                first_lower_measure[-1].specific_pitch,
+                second_upper_measure[1].specific_pitch,
+            ):
+                return False
+    return True
 
 
 def is_duo_consonant(
@@ -890,7 +1011,7 @@ def is_superius_duplicated(
     return str(first_superius_measure) == str(second_superius_measure)
 
 
-def is_voice_measure_unique(
+def are_measure_stacks_unique(
     first_measure_stack: theory.MeasureStack,
     second_measure_stack: theory.MeasureStack,
 ) -> bool:
@@ -927,14 +1048,14 @@ def has_counterpoint_propagated(
     flattened_pitch: theory.GenericPitch,
     is_antecedent: bool,
 ) -> bool:
+    prospect_validator = partial(is_superius_duplicated, current_measure_stack)
     for duplicate_index in score_sequence.duplicates[propagate_index]:
-        prospect_validator = partial(is_superius_duplicated, current_measure_stack)
         index_prospects = sequence_prospects[duplicate_index]
         if not filter_prospects(index_prospects, prospect_validator):
             return False
 
+    prospect_validator = partial(are_measure_stacks_unique, current_measure_stack)
     for unique_index in score_sequence.uniques[propagate_index]:
-        prospect_validator = partial(is_voice_measure_unique, current_measure_stack)
         index_prospects = sequence_prospects[unique_index]
         if not filter_prospects(index_prospects, prospect_validator):
             return False
@@ -955,6 +1076,7 @@ def has_counterpoint_propagated(
         is_authentic_cadence = next_index == final_index - 1
 
         prospect_validators = [
+            partial(are_measure_stacks_unique, current_measure_stack),
             partial(
                 checked_solo_transition,
                 current_measure_stack,
@@ -1034,6 +1156,10 @@ def has_counterpoint_propagated(
 
         prospect_validators = [
             partial(
+                are_measure_stacks_unique,
+                second_measure_stack=current_measure_stack,
+            ),
+            partial(
                 checked_solo_transition,
                 second_measure_stack=current_measure_stack,
                 flattened_pitch=flattened_pitch,
@@ -1091,6 +1217,169 @@ def has_counterpoint_propagated(
                     checked_superius_transition,
                     second_measure_stack=current_measure_stack,
                     allowed_vectors={1},
+                ),
+            )
+        else:
+            prospect_validators.append(
+                partial(
+                    checked_superius_transition,
+                    second_measure_stack=current_measure_stack,
+                    allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
+                )
+            )
+        for prospect_validator in prospect_validators:
+            if not filter_prospects(previous_prospects, prospect_validator):
+                return False
+
+    return True
+
+
+def has_fragment_propagated(
+    sequence_prospects: list[list[theory.VariantMeasureStack]],
+    propagate_index: int,
+    score_sequence: limits.BasseDansePartial,
+    current_measure_stack: theory.VariantMeasureStack,
+    flattened_pitch: theory.GenericPitch,
+) -> bool:
+    prospect_validator = partial(are_measure_stacks_unique, current_measure_stack)
+    for unique_index in score_sequence.uniques[propagate_index]:
+        index_prospects = sequence_prospects[unique_index]
+        if not filter_prospects(index_prospects, prospect_validator):
+            return False
+
+    final_index = score_sequence.final_index
+    if propagate_index != final_index:
+        next_index = propagate_index + 1
+        next_prospects = sequence_prospects[next_index]
+        is_authentic_cadence = next_index == final_index - 1
+
+        prospect_validators = [
+            partial(
+                checked_duo_transition,
+                current_measure_stack,
+                allowed_downbeat_unison=next_index == final_index,
+                check_bass_suspension=is_authentic_cadence,
+            ),
+            partial(
+                checked_trio_transition,
+                current_measure_stack,
+                check_upper_suspension=is_authentic_cadence,
+            ),
+        ]
+        if propagate_index == 0:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_solo_partial_transition,
+                    current_measure_stack,
+                    flattened_pitch=flattened_pitch,
+                ),
+            )
+        else:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_solo_transition,
+                    current_measure_stack,
+                    flattened_pitch=flattened_pitch,
+                    is_skip_transition=False,
+                ),
+            )
+            prospect_validators.extend(
+                [
+                    partial(are_measure_stacks_unique, current_measure_stack),
+                    partial(check_dissonant_pass, current_measure_stack),
+                ]
+            )
+        if is_authentic_cadence:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_superius_transition,
+                    current_measure_stack,
+                    allowed_vectors={0, -1},
+                ),
+            )
+        elif next_index == final_index:
+            prospect_validators.insert(
+                0, partial(checked_cadential_successor, current_measure_stack)
+            )
+        else:
+            prospect_validators.append(
+                partial(
+                    checked_superius_transition,
+                    current_measure_stack,
+                    allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
+                )
+            )
+        for prospect_validator in prospect_validators:
+            if not filter_prospects(next_prospects, prospect_validator):
+                return False
+
+    if propagate_index != 0:
+        previous_index = propagate_index - 1
+        previous_prospects = sequence_prospects[previous_index]
+        is_authentic_cadence = propagate_index == final_index - 1
+
+        prospect_validators = [
+            partial(
+                checked_duo_transition,
+                second_measure_stack=current_measure_stack,
+                allowed_downbeat_unison=propagate_index == final_index,
+                check_bass_suspension=is_authentic_cadence,
+            ),
+            partial(
+                checked_trio_transition,
+                second_measure_stack=current_measure_stack,
+                check_upper_suspension=is_authentic_cadence,
+            ),
+        ]
+        if previous_index == 0:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_solo_partial_transition,
+                    second_measure_stack=current_measure_stack,
+                    flattened_pitch=flattened_pitch,
+                ),
+            )
+        else:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_solo_transition,
+                    second_measure_stack=current_measure_stack,
+                    flattened_pitch=flattened_pitch,
+                    is_skip_transition=False,
+                ),
+            )
+            prospect_validators.extend(
+                [
+                    partial(
+                        are_measure_stacks_unique,
+                        second_measure_stack=current_measure_stack,
+                    ),
+                    partial(
+                        check_dissonant_pass,
+                        second_measure_stack=current_measure_stack,
+                    ),
+                ]
+            )
+        if is_authentic_cadence:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_superius_transition,
+                    second_measure_stack=current_measure_stack,
+                    allowed_vectors={0, -1},
+                ),
+            )
+        elif propagate_index == final_index:
+            prospect_validators.insert(
+                0,
+                partial(
+                    checked_cadential_successor,
+                    second_measure_stack=current_measure_stack,
                 ),
             )
         else:

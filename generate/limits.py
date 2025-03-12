@@ -41,6 +41,96 @@ def get_note_duo(
             break
 
 
+class BasseDansePartial:
+    known_uniques = {1: 4, 2: 5}
+
+    def __init__(
+        self,
+        sequence_prospects: list[list[theory.VariantMeasureStack]],
+        has_propagated: partial[bool],
+    ) -> None:
+        self.length = len(sequence_prospects)
+        self.final_index = self.length - 1
+        self.uniques = defaultdict(set)
+
+        for k, v in self.known_uniques.items():
+            self.uniques[k].add(v)
+            self.uniques[v].add(k)
+
+        for propagate_index, index_prospects in enumerate(sequence_prospects):
+            if not index_prospects:
+                raise ValueError(f"No prospects at index {propagate_index}")
+
+        self.sequence: list[theory.VariantMeasureStack | None] = [
+            None for _ in range(self.length)
+        ]
+        self.sequence_prospects = copy.deepcopy(sequence_prospects)
+        self.has_propagated = has_propagated
+        self.realizer = self.collapse(self.sequence_prospects)
+
+    def __iter__(self) -> Iterator[theory.VariantMeasureStack | None]:
+        return iter(self.sequence)
+
+    def __getitem__(self, index: int) -> theory.VariantMeasureStack | None:
+        return self.sequence[index]
+
+    def __setitem__(
+        self, index: int, measure_stack: theory.VariantMeasureStack | None
+    ) -> None:
+        self.sequence[index] = measure_stack
+
+    def realize(self) -> None:
+        next(self.realizer)
+
+    def collapse(
+        self, sequence_prospects: list[list[theory.VariantMeasureStack]]
+    ) -> Iterator[None]:
+        lowest_entropy_indices = self.find_lowest_entropy(sequence_prospects)
+        # After yielding a solution, a portion of it is erased to look for new solutions
+        if not lowest_entropy_indices:
+            yield
+            return
+
+        chosen_index = random.choice(lowest_entropy_indices)
+        slot_options = sequence_prospects[chosen_index]
+
+        while slot_options:
+            chosen_item = random.choice(slot_options)
+            self[chosen_index] = chosen_item
+            modified_prospects = copy.deepcopy(sequence_prospects)
+            modified_prospects[chosen_index].clear()
+            modified_prospects[chosen_index].append(chosen_item)
+
+            propagate_verdict = self.has_propagated(
+                modified_prospects, chosen_index, self, chosen_item
+            )
+            if propagate_verdict:
+                yield from self.collapse(modified_prospects)
+
+            slot_options.remove(chosen_item)
+            self[chosen_index] = None
+
+    def find_lowest_entropy(
+        self, sequence_prospects: list[list[theory.VariantMeasureStack]]
+    ) -> list[int]:
+        # arbitrary initial value that is higher than all possible states
+        lowest_entropy = 1_000_000_000_000
+        lowest_entropy_indices = []
+
+        for current_index, index_choices in enumerate(sequence_prospects):
+            if self[current_index] is not None:
+                continue
+            choice_amount = len(index_choices)
+
+            if choice_amount < lowest_entropy:
+                lowest_entropy = choice_amount
+                lowest_entropy_indices = [current_index]
+            elif choice_amount == lowest_entropy:
+                lowest_entropy_indices.append(current_index)
+
+        return lowest_entropy_indices
+
+
 @dataclass
 class ConsecutiveMarker:
     duration: Fraction
@@ -715,16 +805,18 @@ class CognizantSequence:
 class ScorePart:
     def __init__(self, clef_name: str) -> None:
         self.clef = clef_name
-        self.sections: list[theory.MelodicSequence] = []
+        self.sections: list[list[theory.SpecificNote | theory.RestNote]] = []
 
-    def __iter__(self) -> Iterator[theory.SpecificNote]:
+    def __iter__(self) -> Iterator[theory.SpecificNote | theory.RestNote]:
         for section in self.sections:
             for _ in range(2):
-                for specific_note in section:
-                    yield specific_note
+                for sound_obj in section:
+                    yield sound_obj
 
-    def add_section(self, melodic_sequence: Iterator[theory.SpecificNote]) -> None:
-        self.sections.append(list(melodic_sequence))
+    def add_section(
+        self, sound_sequence: Iterator[theory.SpecificNote | theory.RestNote]
+    ) -> None:
+        self.sections.append(list(sound_sequence))
 
 
 class DanceScore:
@@ -732,7 +824,7 @@ class DanceScore:
         self,
         chosen_scale: theory.ModalScale,
         clef_group: list[str],
-        score_sequences: list[CognizantSequence],
+        score_sequences: list[list[theory.VariantMeasureStack]],
         chosen_instruemnt: theory.MidiInstrument,
     ) -> None:
         self.scale = chosen_scale
@@ -746,11 +838,11 @@ class DanceScore:
         for score_sequence in score_sequences:
             for score_part, voice_measures in zip(self.parts, zip(*score_sequence)):
                 score_part.add_section(
-                    specific_note
+                    sound_obj
                     for voice_measure in voice_measures
-                    for specific_note in voice_measure
+                    for sound_obj in voice_measure
                 )
-        self.tempo = random.randint(195, 215)
+        self.tempo = random.randint(115, 170)
 
 
 class WaveFunction:

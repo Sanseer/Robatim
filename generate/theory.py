@@ -960,6 +960,9 @@ class RestNote:
 
 MelodicSequence = list[SpecificNote]
 MeasureStack = tuple[MelodicSequence, MelodicSequence, MelodicSequence, MelodicSequence]
+HalfMeasure = tuple[RestNote, SpecificNote]
+PartialMeasureStack = tuple[HalfMeasure, HalfMeasure, HalfMeasure, HalfMeasure]
+VariantMeasureStack = MeasureStack | PartialMeasureStack
 
 
 class DrumCluster:
