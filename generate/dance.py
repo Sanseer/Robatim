@@ -117,14 +117,11 @@ def get_basse_danse() -> limits.DanceScore:
     )
     half_measure_stacks = get_half_measure_stacks(chosen_scale, voice_tessituras)
 
-    dance_partial1 = get_dance_partial(
-        full_measure_sequences,
-        half_measure_stacks,
-        flattened_pitch,
-        chosen_scale.random_mode_shift(),
-        voice_tessituras,
-        "intermediate_cadances",
+    top_clef = clef_group[-1]
+    max_ending_pitch = theory.SpecificPitch(
+        idioms["final_max_superius_pitch"][top_clef]
     )
+    min_ending_pitch = theory.SpecificPitch("C0")
     dance_partial2 = get_dance_partial(
         full_measure_sequences,
         half_measure_stacks,
@@ -132,11 +129,27 @@ def get_basse_danse() -> limits.DanceScore:
         chosen_scale,
         voice_tessituras,
         "final_cadances",
+        min_ending_pitch,
+        max_ending_pitch,
+    )
+
+    max_ending_pitch = theory.SpecificPitch(
+        idioms["intermediate_max_superius_pitch"][top_clef]
+    )
+    min_ending_pitch = dance_partial2[-1][-1][-1].specific_pitch
+    dance_partial1 = get_dance_partial(
+        full_measure_sequences,
+        half_measure_stacks,
+        flattened_pitch,
+        chosen_scale.random_mode_shift(),
+        voice_tessituras,
+        "intermediate_cadances",
+        min_ending_pitch,
+        max_ending_pitch,
     )
     dance_section = [
         measure_stack
         for measure_stack in itertools.chain(dance_partial1, dance_partial2)
-        if measure_stack is not None
     ]
     score_sequences = [dance_section]
     chosen_instruemnt = theory.MidiInstrument(*random.choice(idioms["instruments"]))
@@ -170,7 +183,9 @@ def get_dance_partial(
     chosen_scale: theory.ModalScale,
     voice_tessituras: dict[str, theory.Tessitura],
     cadence_id: str,
-) -> limits.BasseDansePartial:
+    min_ending_pitch: theory.SpecificPitch,
+    max_ending_pitch: theory.SpecificPitch,
+) -> list[theory.VariantMeasureStack]:
     sequence_prospects: list[list[theory.VariantMeasureStack]] = [[] for _ in range(6)]
     sequence_prospects[0] = half_measure_stacks
 
@@ -185,6 +200,16 @@ def get_dance_partial(
         },
     )
 
+    filtered_prospects = []
+    for index_prospect in sequence_prospects[-1]:
+        soprano_ending_pitch = index_prospect[-1][-1].specific_pitch
+        if soprano_ending_pitch > max_ending_pitch:
+            continue
+        if soprano_ending_pitch < min_ending_pitch:
+            continue
+        filtered_prospects.append(index_prospect)
+    sequence_prospects[-1] = filtered_prospects
+
     prospect_counts = [len(index_prospects) for index_prospects in sequence_prospects]
     print(f"Allocated available measures: {prospect_counts}")
     propagator = partial(
@@ -192,8 +217,7 @@ def get_dance_partial(
         flattened_pitch=flattened_pitch,
     )
     dance_partial = limits.BasseDansePartial(sequence_prospects, propagator)
-    dance_partial.realize()
-    return dance_partial
+    return dance_partial.realize()
 
 
 def get_all_pitch_sequences(

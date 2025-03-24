@@ -479,7 +479,10 @@ class GenericScale(StringDefinedEntity):
         return f"{self.letter}{self.accidental}"
 
     def __getitem__(self, index: int) -> GenericPitch:
-        return self._members[index]
+        """Melodic minor sequences use indices -1 and -2 to distinguish from natural
+        minor sequences, which use indices 6 and 5. The scale only contains the
+        natural version; the implementer must raise the notes themselves"""
+        return self._members[index % 7]
 
     def __iter__(self) -> Iterator[GenericPitch]:
         return iter(self._members)

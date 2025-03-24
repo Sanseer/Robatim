@@ -79,16 +79,16 @@ class BasseDansePartial:
     ) -> None:
         self.sequence[index] = measure_stack
 
-    def realize(self) -> None:
-        next(self.realizer)
+    def realize(self) -> list[theory.VariantMeasureStack]:
+        return next(self.realizer)
 
     def collapse(
         self, sequence_prospects: list[list[theory.VariantMeasureStack]]
-    ) -> Iterator[None]:
+    ) -> Iterator[list[theory.VariantMeasureStack]]:
         lowest_entropy_indices = self.find_lowest_entropy(sequence_prospects)
         # After yielding a solution, a portion of it is erased to look for new solutions
         if not lowest_entropy_indices:
-            yield
+            yield [measure_stack for measure_stack in self if measure_stack is not None]
             return
 
         chosen_index = random.choice(lowest_entropy_indices)
