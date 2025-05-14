@@ -24,10 +24,9 @@ def is_upper_duo_good(
 
 
 def checked_solo_transition(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.FullMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
     flattened_pitch: theory.GenericPitch,
-    is_skip_transition: bool,
 ) -> bool:
     for first_voice_measure, second_voice_measure in zip(
         first_measure_stack, second_measure_stack
@@ -75,11 +74,7 @@ def checked_solo_transition(
             ):
                 return False
 
-        if (
-            second_voice_measure[0].duration == Fraction("1/4")
-            and voice_distance > 1
-            and not is_skip_transition
-        ):
+        if second_voice_measure[0].duration == Fraction("1/4") and voice_distance > 1:
             return False
         if first_pitch.has_interval_shift(second_pitch, ("A2", "A4", "d5")):
             return False
@@ -135,14 +130,14 @@ def check_chromatic_relation(
 
 
 def get_measure_quartets(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.FullMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
 ) -> Iterator[
     tuple[
-        theory.MelodicSequence,
-        theory.MelodicSequence,
-        theory.MelodicSequence,
-        theory.MelodicSequence,
+        theory.FullVoiceMeasure,
+        theory.FullVoiceMeasure,
+        theory.FullVoiceMeasure,
+        theory.FullVoiceMeasure,
     ]
 ]:
     for first_voice_index, second_voice_index in limits.all_voice_pairs:
@@ -154,8 +149,8 @@ def get_measure_quartets(
 
 
 def check_cross_pitches(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.FullMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
     for (
         first_lower_measure,
@@ -227,8 +222,8 @@ def test_melodic_pyramid(
 
 
 def checked_solo_partial_transition(
-    first_measure_stack: theory.PartialMeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.HalfMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
     flattened_pitch: theory.GenericPitch,
 ) -> bool:
     for first_voice_measure, second_voice_measure in zip(
@@ -303,14 +298,14 @@ def checked_solo_partial_transition(
 
 
 def get_partial_quartets(
-    first_measure_stack: theory.PartialMeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.HalfMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
 ) -> Iterator[
     tuple[
-        theory.HalfMeasure,
-        theory.HalfMeasure,
-        theory.MelodicSequence,
-        theory.MelodicSequence,
+        theory.HalfVoiceMeasure,
+        theory.HalfVoiceMeasure,
+        theory.FullVoiceMeasure,
+        theory.FullVoiceMeasure,
     ]
 ]:
     for first_voice_index, second_voice_index in limits.all_voice_pairs:
@@ -322,8 +317,8 @@ def get_partial_quartets(
 
 
 def check_partial_cross_pitches(
-    first_measure_stack: theory.PartialMeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.HalfMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
     for (
         first_lower_measure,
@@ -497,7 +492,7 @@ def is_bass_suspension_valid(
     first_upper_note: theory.SpecificNote,
     second_lower_note: theory.SpecificNote,
     second_upper_note: theory.SpecificNote,
-    second_measure_stack: theory.MeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
     first_lower_pitch = first_lower_note.specific_pitch
     first_upper_pitch = first_upper_note.specific_pitch
@@ -530,7 +525,7 @@ def is_bass_suspension_valid(
 imperfect_consonances = ("M3", "m3", "M6", "m6")
 
 
-def has_imperfect_resolution(measure_stack: theory.MeasureStack) -> bool:
+def has_imperfect_resolution(measure_stack: theory.FullMeasureStack) -> bool:
     pitch_quartet = [
         measure_stack[0][-1].specific_pitch,
         measure_stack[1][-1].specific_pitch,
@@ -546,8 +541,8 @@ def has_imperfect_resolution(measure_stack: theory.MeasureStack) -> bool:
 
 
 def checked_duo_transition(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.VariantStack,
+    second_measure_stack: theory.FullMeasureStack,
     allowed_downbeat_unison: bool,
     check_bass_suspension: bool,
 ) -> bool:
@@ -664,7 +659,7 @@ def is_upper_suspension_valid(
     second_lowest_pitch: theory.SpecificPitch,
     second_middle_pitch: theory.SpecificPitch,
     second_highest_pitch: theory.SpecificPitch,
-    second_measure_stack: theory.MeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
     if is_trio_consonant(
         second_lowest_pitch, second_middle_pitch, second_highest_pitch
@@ -698,8 +693,8 @@ upper_duos = ((1, 2), (1, 3), (2, 3))
 
 
 def checked_trio_transition(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.VariantStack,
+    second_measure_stack: theory.FullMeasureStack,
     check_upper_suspension: bool,
 ) -> bool:
     first_lowest_pitch = first_measure_stack[0][-1].specific_pitch
@@ -735,8 +730,8 @@ def checked_trio_transition(
 
 
 def check_dissonant_pass(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.FullMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
     first_lowest_measure = first_measure_stack[0]
     second_lowest_measure = second_measure_stack[0]
@@ -771,10 +766,10 @@ def check_dissonant_pass(
 
 
 def test_duo_species(
-    first_lower_measure: theory.MelodicSequence,
-    first_upper_measure: theory.MelodicSequence,
-    second_lower_measure: theory.MelodicSequence,
-    second_upper_measure: theory.MelodicSequence,
+    first_lower_measure: theory.FullVoiceMeasure,
+    first_upper_measure: theory.FullVoiceMeasure,
+    second_lower_measure: theory.FullVoiceMeasure,
+    second_upper_measure: theory.FullVoiceMeasure,
 ) -> bool:
     (
         lower_is_real_cantus,
@@ -821,7 +816,7 @@ def test_duo_species(
 
 
 def get_species_role(
-    voice_measure: theory.MelodicSequence,
+    voice_measure: theory.FullVoiceMeasure,
 ) -> tuple[bool, bool, bool, bool]:
     if len(voice_measure) == 1:
         is_real_cantus = True
@@ -875,11 +870,11 @@ def has_passing_figure(
 
 
 def test_trio_species(
-    first_lowest_measure: theory.MelodicSequence,
-    first_middle_measure: theory.MelodicSequence,
-    first_highest_measure: theory.MelodicSequence,
-    second_middle_measure: theory.MelodicSequence,
-    second_highest_measure: theory.MelodicSequence,
+    first_lowest_measure: theory.FullVoiceMeasure,
+    first_middle_measure: theory.FullVoiceMeasure,
+    first_highest_measure: theory.FullVoiceMeasure,
+    second_middle_measure: theory.FullVoiceMeasure,
+    second_highest_measure: theory.FullVoiceMeasure,
 ) -> bool:
     (
         lower_is_real_cantus,
@@ -930,7 +925,7 @@ def test_trio_species(
 
 
 def find_pitch(
-    voice_measure: theory.MelodicSequence, duration_repr: str = "3/4"
+    voice_measure: theory.FullVoiceMeasure, duration_repr: str = "3/4"
 ) -> theory.SpecificPitch:
     elapsed_duration = Fraction("0")
     sought_duration = Fraction(duration_repr)
@@ -943,8 +938,8 @@ def find_pitch(
 
 
 def checked_superius_transition(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.VariantStack,
+    second_measure_stack: theory.FullMeasureStack,
     allowed_vectors: set[int],
 ) -> bool:
     first_superius_pitch = first_measure_stack[-1][-1].specific_pitch
@@ -964,8 +959,8 @@ valid_cadential_motions = {
 
 
 def checked_cadential_successor(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.FullMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
     stack_index = 0
     for first_voice_measure, second_voice_measure in zip(
@@ -994,26 +989,17 @@ def checked_cadential_successor(
 
 
 def has_identical_starts(
-    lower_voice_measure: theory.MelodicSequence,
-    upper_voice_measure: theory.MelodicSequence,
+    lower_voice_measure: theory.FullVoiceMeasure,
+    upper_voice_measure: theory.FullVoiceMeasure,
 ) -> bool:
     starting_lower_pitch = lower_voice_measure[0].specific_pitch
     starting_upper_pitch = upper_voice_measure[0].specific_pitch
     return starting_lower_pitch.generic_pitch == starting_upper_pitch.generic_pitch
 
 
-def is_superius_duplicated(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
-) -> bool:
-    first_superius_measure = first_measure_stack[-1]
-    second_superius_measure = second_measure_stack[-1]
-    return str(first_superius_measure) == str(second_superius_measure)
-
-
 def are_measure_stacks_unique(
-    first_measure_stack: theory.MeasureStack,
-    second_measure_stack: theory.MeasureStack,
+    first_measure_stack: theory.FullMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
     for first_voice_measure, second_voice_measure in zip(
         first_measure_stack, second_measure_stack
@@ -1040,20 +1026,15 @@ def filter_prospects(
     return index_prospects
 
 
-def has_counterpoint_propagated(
-    sequence_prospects: list[list[theory.MeasureStack]],
+def has_branle_simple_propagated(
+    sequence_prospects: list[list[theory.FullMeasureStack]],
     propagate_index: int,
-    score_sequence: limits.CognizantSequence,
-    current_measure_stack: theory.MeasureStack,
+    score_sequence: limits.BranleSimplePartial,
+    current_measure_stack: theory.FullMeasureStack,
     flattened_pitch: theory.GenericPitch,
     is_antecedent: bool,
+    is_intermediate_sequence: bool,
 ) -> bool:
-    prospect_validator = partial(is_superius_duplicated, current_measure_stack)
-    for duplicate_index in score_sequence.duplicates[propagate_index]:
-        index_prospects = sequence_prospects[duplicate_index]
-        if not filter_prospects(index_prospects, prospect_validator):
-            return False
-
     prospect_validator = partial(are_measure_stacks_unique, current_measure_stack)
     for unique_index in score_sequence.uniques[propagate_index]:
         index_prospects = sequence_prospects[unique_index]
@@ -1064,16 +1045,10 @@ def has_counterpoint_propagated(
     if propagate_index != final_index:
         next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
-        if final_index != 11:
-            is_intermediate_cadence = False
-            is_skip_transition = False
-        elif is_antecedent:
-            is_intermediate_cadence = next_index == 5
-            is_skip_transition = False
+        if is_antecedent:
+            is_cadence = next_index == 5
         else:
-            is_intermediate_cadence = next_index == 4
-            is_skip_transition = next_index == 6
-        is_authentic_cadence = next_index == final_index - 1
+            is_cadence = next_index == 4
 
         prospect_validators = [
             partial(are_measure_stacks_unique, current_measure_stack),
@@ -1081,23 +1056,35 @@ def has_counterpoint_propagated(
                 checked_solo_transition,
                 current_measure_stack,
                 flattened_pitch=flattened_pitch,
-                is_skip_transition=is_skip_transition,
             ),
             partial(
                 checked_duo_transition,
                 current_measure_stack,
-                allowed_downbeat_unison=next_index == final_index,
-                check_bass_suspension=is_authentic_cadence or is_intermediate_cadence,
+                allowed_downbeat_unison=next_index == final_index
+                and not is_intermediate_sequence,
+                check_bass_suspension=is_cadence,
             ),
             partial(
                 checked_trio_transition,
                 current_measure_stack,
-                check_upper_suspension=is_authentic_cadence or is_intermediate_cadence,
+                check_upper_suspension=is_cadence,
             ),
             partial(check_dissonant_pass, current_measure_stack),
-            partial(score_sequence.checked_stipulations, next_index),
+            partial(
+                score_sequence.checked_consecutive_durations,
+                next_index,
+            ),
+            partial(
+                score_sequence.checked_consecutive_skips,
+                next_index,
+            ),
+            partial(
+                score_sequence.checked_consecutive_intervals,
+                next_index,
+            ),
+            partial(score_sequence.checked_melodic_bounds, next_index),
         ]
-        if is_authentic_cadence:
+        if is_cadence:
             prospect_validators.insert(
                 0,
                 partial(
@@ -1106,27 +1093,9 @@ def has_counterpoint_propagated(
                     allowed_vectors={0, -1},
                 ),
             )
-        elif next_index == final_index or (not is_antecedent and next_index == 5):
+        elif not is_antecedent and next_index == final_index:
             prospect_validators.insert(
                 0, partial(checked_cadential_successor, current_measure_stack)
-            )
-        elif is_intermediate_cadence:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    current_measure_stack,
-                    allowed_vectors={0, -1},
-                ),
-            )
-        elif next_index == 6 and is_antecedent:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    current_measure_stack,
-                    allowed_vectors={1},
-                ),
             )
         else:
             prospect_validators.append(
@@ -1143,16 +1112,10 @@ def has_counterpoint_propagated(
     if propagate_index != 0:
         previous_index = propagate_index - 1
         previous_prospects = sequence_prospects[previous_index]
-        if final_index != 11:
-            is_intermediate_cadence = False
-            is_skip_transition = False
-        elif is_antecedent:
-            is_intermediate_cadence = propagate_index == 5
-            is_skip_transition = False
+        if is_antecedent:
+            is_cadence = propagate_index == 5
         else:
-            is_intermediate_cadence = propagate_index == 4
-            is_skip_transition = propagate_index == 6
-        is_authentic_cadence = propagate_index == final_index - 1
+            is_cadence = propagate_index == 4
 
         prospect_validators = [
             partial(
@@ -1163,26 +1126,38 @@ def has_counterpoint_propagated(
                 checked_solo_transition,
                 second_measure_stack=current_measure_stack,
                 flattened_pitch=flattened_pitch,
-                is_skip_transition=is_skip_transition,
             ),
             partial(
                 checked_duo_transition,
                 second_measure_stack=current_measure_stack,
-                allowed_downbeat_unison=propagate_index == final_index,
-                check_bass_suspension=is_authentic_cadence or is_intermediate_cadence,
+                allowed_downbeat_unison=propagate_index == final_index
+                and not is_intermediate_sequence,
+                check_bass_suspension=is_cadence,
             ),
             partial(
                 checked_trio_transition,
                 second_measure_stack=current_measure_stack,
-                check_upper_suspension=is_authentic_cadence or is_intermediate_cadence,
+                check_upper_suspension=is_cadence,
             ),
             partial(
                 check_dissonant_pass,
                 second_measure_stack=current_measure_stack,
             ),
-            partial(score_sequence.checked_stipulations, previous_index),
+            partial(
+                score_sequence.checked_consecutive_durations,
+                previous_index,
+            ),
+            partial(
+                score_sequence.checked_consecutive_skips,
+                previous_index,
+            ),
+            partial(
+                score_sequence.checked_consecutive_intervals,
+                previous_index,
+            ),
+            partial(score_sequence.checked_melodic_bounds, previous_index),
         ]
-        if is_authentic_cadence:
+        if is_cadence:
             prospect_validators.insert(
                 0,
                 partial(
@@ -1191,32 +1166,12 @@ def has_counterpoint_propagated(
                     allowed_vectors={0, -1},
                 ),
             )
-        elif propagate_index == final_index or (
-            not is_antecedent and propagate_index == 5
-        ):
+        elif not is_antecedent and propagate_index == final_index:
             prospect_validators.insert(
                 0,
                 partial(
                     checked_cadential_successor,
                     second_measure_stack=current_measure_stack,
-                ),
-            )
-        elif is_intermediate_cadence:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    second_measure_stack=current_measure_stack,
-                    allowed_vectors={0, -1},
-                ),
-            )
-        elif propagate_index == 6 and is_antecedent:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    second_measure_stack=current_measure_stack,
-                    allowed_vectors={1},
                 ),
             )
         else:
@@ -1234,11 +1189,11 @@ def has_counterpoint_propagated(
     return True
 
 
-def has_fragment_propagated(
-    sequence_prospects: list[list[theory.VariantMeasureStack]],
+def has_basse_danse_propagated(
+    sequence_prospects: list[list[theory.VariantStack]],
     propagate_index: int,
     score_sequence: limits.BasseDansePartial,
-    current_measure_stack: theory.VariantMeasureStack,
+    current_measure_stack: theory.VariantStack,
     flattened_pitch: theory.GenericPitch,
 ) -> bool:
     prospect_validator = partial(are_measure_stacks_unique, current_measure_stack)
@@ -1265,6 +1220,19 @@ def has_fragment_propagated(
                 current_measure_stack,
                 check_upper_suspension=is_authentic_cadence,
             ),
+            partial(
+                score_sequence.checked_consecutive_durations,
+                next_index,
+            ),
+            partial(
+                score_sequence.checked_consecutive_skips,
+                next_index,
+            ),
+            partial(
+                score_sequence.checked_consecutive_intervals,
+                next_index,
+            ),
+            partial(score_sequence.checked_melodic_bounds, next_index),
         ]
         if propagate_index == 0:
             prospect_validators.insert(
@@ -1282,7 +1250,6 @@ def has_fragment_propagated(
                     checked_solo_transition,
                     current_measure_stack,
                     flattened_pitch=flattened_pitch,
-                    is_skip_transition=False,
                 ),
             )
             prospect_validators.extend(
@@ -1333,6 +1300,19 @@ def has_fragment_propagated(
                 second_measure_stack=current_measure_stack,
                 check_upper_suspension=is_authentic_cadence,
             ),
+            partial(
+                score_sequence.checked_consecutive_durations,
+                previous_index,
+            ),
+            partial(
+                score_sequence.checked_consecutive_skips,
+                previous_index,
+            ),
+            partial(
+                score_sequence.checked_consecutive_intervals,
+                previous_index,
+            ),
+            partial(score_sequence.checked_melodic_bounds, previous_index),
         ]
         if previous_index == 0:
             prospect_validators.insert(
@@ -1350,7 +1330,6 @@ def has_fragment_propagated(
                     checked_solo_transition,
                     second_measure_stack=current_measure_stack,
                     flattened_pitch=flattened_pitch,
-                    is_skip_transition=False,
                 ),
             )
             prospect_validators.extend(

@@ -5,7 +5,7 @@ import random
 from fractions import Fraction
 from dataclasses import dataclass
 from collections import defaultdict, deque
-from typing import Any, Callable, Iterator, TypeVar
+from typing import Generic, Iterator, TypeVar
 import copy
 
 
@@ -44,7 +44,7 @@ class StringDefinedEntity:
     def __repr__(self) -> str:
         return f"'{self}'"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         return str(self) == str(other)
 
     def clone(self: TStringDefinedEntity) -> TStringDefinedEntity:
@@ -588,7 +588,7 @@ class ModalScale(GenericScale):
             mode_increment += 1
         new_tonic = self[0] + Interval.get(self.scale_intervals[mode_increment])
 
-        return type_map[new_mode](f"{new_tonic}")
+        return scale_type_map[new_mode](f"{new_tonic}")
 
 
 class IonianScale(ModalScale):
@@ -615,7 +615,7 @@ class AeolianScale(ModalScale):
     scale_intervals = ["P1", "M2", "m3", "P4", "P5", "m6", "m7"]
 
 
-type_map = {
+scale_type_map = {
     "ionian": IonianScale,
     "dorian": DorianScale,
     "phrygian": PhrygianScale,
@@ -961,11 +961,175 @@ class RestNote:
     duration: Fraction
 
 
-MelodicSequence = list[SpecificNote]
-MeasureStack = tuple[MelodicSequence, MelodicSequence, MelodicSequence, MelodicSequence]
-HalfMeasure = tuple[RestNote, SpecificNote]
-PartialMeasureStack = tuple[HalfMeasure, HalfMeasure, HalfMeasure, HalfMeasure]
-VariantMeasureStack = MeasureStack | PartialMeasureStack
+@dataclass
+class RhythmBound:
+    duration: Fraction
+    count: int
+    limits = {
+        Fraction("1"): 3,
+        Fraction("1/2"): 7,
+        Fraction("1/4"): 14,
+        Fraction("3/4"): 1,
+    }
+
+
+@dataclass
+class SkipBound:
+    count: int
+    limits = {0: 3, 1: 2, 2: 2, 3: 2}
+
+
+@dataclass
+class MeasureBound:
+    rhythm: RhythmBound
+    skip: SkipBound
+
+
+@dataclass
+class MelodyPack:
+    rhythm_durations: list[Fraction]
+    melody_contours: list[list[int]]
+
+    def __post_init__(self) -> None:
+        left_consecutive_duration = self.rhythm_durations[0]
+        left_consecutive_count = 0
+        for rhythm_duration in self.rhythm_durations:
+            if rhythm_duration != left_consecutive_duration:
+                break
+            left_consecutive_count += 1
+
+        right_consecutive_duration = self.rhythm_durations[-1]
+        right_consecutive_count = 0
+        for rhythm_duration in reversed(self.rhythm_durations):
+            if rhythm_duration != right_consecutive_duration:
+                break
+            right_consecutive_count += 1
+
+        self.left_rhythm_bound = RhythmBound(
+            left_consecutive_duration, left_consecutive_count
+        )
+        self.right_rhythm_bound = RhythmBound(
+            right_consecutive_duration, right_consecutive_count
+        )
+        self.is_rhythm_continuous = (
+            left_consecutive_duration == right_consecutive_duration
+            and left_consecutive_count == len(self.rhythm_durations)
+        )
+
+    @staticmethod
+    def get_skip_counts(melody_contour: list[int]) -> tuple[int, int]:
+        left_skip_count = 0
+        for vector in melody_contour:
+            if abs(vector) <= 1:
+                break
+            left_skip_count += 1
+
+        right_skip_count = 0
+        for vector in reversed(melody_contour):
+            if abs(vector) <= 1:
+                break
+            right_skip_count += 1
+
+        return left_skip_count, right_skip_count
+
+    @staticmethod
+    def check_skip_continuity(
+        left_skip_count: int,
+        right_skip_count: int,
+        melody_contour: list[int],
+    ) -> bool:
+        if not melody_contour:
+            return True
+        if not left_skip_count or not right_skip_count:
+            return False
+        return left_skip_count == right_skip_count == len(melody_contour)
+
+
+@dataclass
+class FullVoiceMeasure:
+    sequence: list[SpecificNote]
+    left_bound: MeasureBound
+    right_bound: MeasureBound
+    is_rhythm_continuous: bool
+    is_skip_continuous: bool
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FullVoiceMeasure):
+            return NotImplemented
+        return str(self.sequence) == str(other.sequence)
+
+    def __iter__(self) -> Iterator[SpecificNote]:
+        return iter(self.sequence)
+
+    def __getitem__(self, index: int) -> SpecificNote:
+        return self.sequence[index]
+
+    def __len__(self) -> int:
+        return len(self.sequence)
+
+
+GenericMeasure = TypeVar("GenericMeasure")
+
+
+class BaseMeasureStack(Generic[GenericMeasure]):
+    def __init__(
+        self,
+        bassus_measure: GenericMeasure,
+        tenor_measure: GenericMeasure,
+        contratenor_measure: GenericMeasure,
+        superius_measure: GenericMeasure,
+    ) -> None:
+        self.stack = (
+            bassus_measure,
+            tenor_measure,
+            contratenor_measure,
+            superius_measure,
+        )
+
+    def __iter__(self) -> Iterator[GenericMeasure]:
+        return iter(self.stack)
+
+    def __getitem__(self, index: int) -> GenericMeasure:
+        return self.stack[index]
+
+
+class FullMeasureStack(BaseMeasureStack[FullVoiceMeasure]):
+    pass
+
+
+half_duration = Fraction("1/2")
+half_rest = RestNote(half_duration)
+
+
+@dataclass
+class HalfVoiceMeasure:
+    pitch: SpecificPitch
+    left_bound = MeasureBound(RhythmBound(Fraction("0"), 0), SkipBound(0))
+    right_bound = MeasureBound(RhythmBound(Fraction("1/2"), 1), SkipBound(0))
+    is_rhythm_continuous = False
+    is_skip_continuous = False
+
+    def __post_init__(self) -> None:
+        self.sequence = (half_rest, SpecificNote(self.pitch, half_duration))
+
+    def __iter__(self) -> Iterator:
+        return iter(self.sequence)
+
+    def __getitem__(self, index: int) -> SpecificNote:
+        if index != -1 and index != 1:
+            raise ValueError
+        return self.sequence[-1]
+
+    def __len__(self) -> int:
+        return 1
+
+
+class HalfMeasureStack(BaseMeasureStack[HalfVoiceMeasure]):
+    pass
+
+
+VariantVoiceMeasure = HalfVoiceMeasure | FullVoiceMeasure
+VariantStack = HalfMeasureStack | FullMeasureStack
 
 
 class DrumCluster:
