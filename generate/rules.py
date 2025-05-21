@@ -729,7 +729,7 @@ def checked_trio_transition(
     return True
 
 
-def check_dissonant_pass(
+def checked_dissonant_pass(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
@@ -1015,6 +1015,94 @@ def are_measure_stacks_unique(
     return True
 
 
+def is_parallel_perfect(
+    first_lower_pitch: theory.SpecificPitch,
+    first_upper_pitch: theory.SpecificPitch,
+    second_lower_pitch: theory.SpecificPitch,
+    second_upper_pitch: theory.SpecificPitch,
+) -> bool:
+    lower_vector = theory.SpecificPitch.get_interval_vector(
+        first_lower_pitch, second_lower_pitch
+    )
+    upper_vector = theory.SpecificPitch.get_interval_vector(
+        first_upper_pitch, second_upper_pitch
+    )
+    if not lower_vector or not upper_vector:
+        return False
+    if lower_vector != upper_vector:
+        return False
+    for perfect_interval_repr in ("P5", "P8"):
+        if first_lower_pitch.has_interval_shift(
+            first_upper_pitch, (perfect_interval_repr,)
+        ) and second_lower_pitch.has_interval_shift(
+            second_upper_pitch, (perfect_interval_repr,)
+        ):
+            return True
+    return False
+
+
+def checked_broken_parallels(
+    first_measure_stack: theory.FullMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
+) -> bool:
+    for (
+        first_lower_measure,
+        first_upper_measure,
+        second_lower_measure,
+        second_upper_measure,
+    ) in get_measure_quartets(first_measure_stack, second_measure_stack):
+        second_lower_pitch = second_lower_measure[0].specific_pitch
+        second_upper_pitch = second_upper_measure[0].specific_pitch
+        if not second_lower_pitch.has_interval_shift(second_upper_pitch):
+            continue
+
+        lower_reverse_iter = reversed(first_lower_measure)
+        upper_reverse_iter = reversed(first_upper_measure)
+        lower_note = next(lower_reverse_iter)
+        upper_note = next(upper_reverse_iter)
+        lower_duration = lower_note.duration
+        upper_duration = upper_note.duration
+
+        if (lower_duration == Fraction("1/4")) ^ (upper_duration == Fraction("1/4")):
+            first_lower_pitch = lower_note.specific_pitch
+            first_upper_pitch = upper_note.specific_pitch
+
+            if lower_duration == Fraction("1/4"):
+                upper_duration -= lower_duration
+                while upper_duration > 0:
+                    lower_note = next(lower_reverse_iter)
+                    first_lower_pitch = lower_note.specific_pitch
+                    if is_parallel_perfect(
+                        first_lower_pitch,
+                        first_upper_pitch,
+                        second_lower_pitch,
+                        second_upper_pitch,
+                    ):
+                        return False
+                    lower_duration = lower_note.duration
+                    if lower_duration != Fraction("1/4"):
+                        break
+                    upper_duration -= lower_duration
+            else:
+                lower_duration -= upper_duration
+                while lower_duration > 0:
+                    upper_note = next(upper_reverse_iter)
+                    first_upper_pitch = upper_note.specific_pitch
+                    if is_parallel_perfect(
+                        first_lower_pitch,
+                        first_upper_pitch,
+                        second_lower_pitch,
+                        second_upper_pitch,
+                    ):
+                        return False
+                    upper_duration = upper_note.duration
+                    if upper_duration != Fraction("1/4"):
+                        break
+                    lower_duration -= upper_duration
+
+    return True
+
+
 def filter_prospects(
     index_prospects: list, has_prospect_succeeded: partial[bool]
 ) -> list:
@@ -1069,7 +1157,8 @@ def has_branle_simple_propagated(
                 current_measure_stack,
                 check_upper_suspension=is_cadence,
             ),
-            partial(check_dissonant_pass, current_measure_stack),
+            partial(checked_dissonant_pass, current_measure_stack),
+            partial(checked_broken_parallels, current_measure_stack),
             partial(
                 score_sequence.checked_consecutive_durations,
                 next_index,
@@ -1140,7 +1229,11 @@ def has_branle_simple_propagated(
                 check_upper_suspension=is_cadence,
             ),
             partial(
-                check_dissonant_pass,
+                checked_dissonant_pass,
+                second_measure_stack=current_measure_stack,
+            ),
+            partial(
+                checked_broken_parallels,
                 second_measure_stack=current_measure_stack,
             ),
             partial(
@@ -1255,7 +1348,8 @@ def has_basse_danse_propagated(
             prospect_validators.extend(
                 [
                     partial(are_measure_stacks_unique, current_measure_stack),
-                    partial(check_dissonant_pass, current_measure_stack),
+                    partial(checked_dissonant_pass, current_measure_stack),
+                    partial(checked_broken_parallels, current_measure_stack),
                 ]
             )
         if is_authentic_cadence:
@@ -1339,7 +1433,11 @@ def has_basse_danse_propagated(
                         second_measure_stack=current_measure_stack,
                     ),
                     partial(
-                        check_dissonant_pass,
+                        checked_dissonant_pass,
+                        second_measure_stack=current_measure_stack,
+                    ),
+                    partial(
+                        checked_broken_parallels,
                         second_measure_stack=current_measure_stack,
                     ),
                 ]
