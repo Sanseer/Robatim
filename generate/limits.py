@@ -52,6 +52,7 @@ class CompositionError(Exception):
 
 class SequencePartial(Generic[GenericStack]):
     known_uniques = {0: 3, 1: 4, 2: 5}
+    inner_voice_indices = {1, 2}
 
     def __init__(
         self,
@@ -74,6 +75,7 @@ class SequencePartial(Generic[GenericStack]):
         self.sequence_prospects = copy.deepcopy(sequence_prospects)
         self.has_propagated = has_propagated
         self.realizer = self.collapse(self.sequence_prospects)
+        self.dotted_counts = [0, 0, 0, 0]
 
     def __iter__(self) -> Iterator[GenericStack | None]:
         return iter(self.sequence)
@@ -82,9 +84,21 @@ class SequencePartial(Generic[GenericStack]):
         return self.sequence[index]
 
     def __setitem__(
-        self, propagate_index: int, measure_stack: GenericStack | None
+        self, propagate_index: int, adding_stack: GenericStack | None
     ) -> None:
-        self.sequence[propagate_index] = measure_stack
+        existing_stack = self.sequence[propagate_index]
+        if isinstance(existing_stack, theory.FullMeasureStack):
+            for voice_index, voice_measure in enumerate(existing_stack):
+                if voice_measure[0].duration == Fraction("3/4"):
+                    self.dotted_counts[voice_index] -= 1
+        elif isinstance(adding_stack, theory.FullMeasureStack):
+            for voice_index, voice_measure in enumerate(adding_stack):
+                if voice_measure[0].duration == Fraction("3/4"):
+                    self.dotted_counts[voice_index] += 1
+                    if self.dotted_counts[voice_index] > 1:
+                        raise CompositionError("Overused dotted rhythm")
+
+        self.sequence[propagate_index] = adding_stack
 
     def realize(self) -> list[GenericStack]:
         try:
@@ -106,7 +120,11 @@ class SequencePartial(Generic[GenericStack]):
 
         while slot_options:
             chosen_item = random.choice(slot_options)
-            self[chosen_index] = chosen_item
+            try:
+                self[chosen_index] = chosen_item
+            except CompositionError:
+                slot_options.remove(chosen_item)
+                continue
             modified_prospects = copy.deepcopy(sequence_prospects)
             modified_prospects[chosen_index].clear()
             modified_prospects[chosen_index].append(chosen_item)
@@ -398,7 +416,6 @@ class SequencePartial(Generic[GenericStack]):
         previous_vector = 0
         pitch_boundary_count = 0
         pitch_boundaries = set()
-        duplicate_count = 0
 
         for current_note in normalized_sequence[1:]:
             previous_pitch = previous_note.specific_pitch
@@ -418,13 +435,6 @@ class SequencePartial(Generic[GenericStack]):
                 if bound_repr in pitch_boundaries:
                     return False
                 pitch_boundaries.add(bound_repr)
-
-            if previous_pitch == current_pitch:
-                duplicate_count += 1
-                if duplicate_count > 4:
-                    return False
-            else:
-                duplicate_count = 0
 
             previous_note = current_note
             if current_vector != 0:
@@ -587,6 +597,171 @@ class SequencePartial(Generic[GenericStack]):
             previous_lower_pitch = current_lower_pitch
             previous_upper_pitch = current_upper_pitch
 
+        return True
+
+    def checked_melodic_outline(
+        self, propagate_index: int, starting_measure_stack: theory.VariantStack
+    ) -> bool:
+        voice_index = -1
+        for starting_voice_measure in starting_measure_stack:
+            voice_index += 1
+            if isinstance(starting_voice_measure, theory.HalfVoiceMeasure):
+                pitch_sequence = deque([starting_voice_measure.pitch])
+            else:
+                pitch_sequence = deque(
+                    current_note.specific_pitch
+                    for current_note in starting_voice_measure
+                )
+
+            include_leftmost_outline = False
+            for current_index in range(propagate_index - 1, -1, -1):
+                if (current_measure_stack := self[current_index]) is None:
+                    break
+                current_voice_measure = current_measure_stack[voice_index]
+                if isinstance(current_voice_measure, theory.HalfVoiceMeasure):
+                    pitch_sequence.appendleft(current_voice_measure.pitch)
+                    include_leftmost_outline = True
+                    break
+                else:
+                    pitch_sequence.extendleft(
+                        current_note.specific_pitch
+                        for current_note in reversed(current_voice_measure)
+                    )
+            else:
+                include_leftmost_outline = True
+
+            include_rightmost_outline = False
+            for current_index in range(propagate_index + 1, self.final_index + 1):
+                if (current_measure_stack := self[current_index]) is None:
+                    break
+                current_voice_measure = current_measure_stack[voice_index]
+                if isinstance(current_voice_measure, theory.HalfVoiceMeasure):
+                    include_rightmost_outline = True
+                    break
+                else:
+                    pitch_sequence.extend(
+                        current_note.specific_pitch
+                        for current_note in current_voice_measure
+                    )
+            else:
+                include_rightmost_outline = True
+
+            previous_direction = 0
+            previous_pitch = pitch_sequence[0]
+            prelim_outlines = []
+            prelim_outline = [previous_pitch]
+            prelim_flags = []
+
+            for current_pitch in itertools.islice(
+                pitch_sequence, 1, len(pitch_sequence)
+            ):
+                current_direction = theory.SpecificPitch.get_direction(
+                    previous_pitch, current_pitch
+                )
+                if current_direction:
+                    if previous_direction:
+                        if previous_direction == current_direction:
+                            prelim_outline.append(current_pitch)
+                        else:
+                            prelim_outlines.append(prelim_outline)
+                            prelim_outline = [previous_pitch, current_pitch]
+                            interval_distance = (
+                                theory.SpecificPitch.get_interval_distance(
+                                    previous_pitch, current_pitch
+                                )
+                            )
+                            prelim_flags.append(interval_distance == 1)
+                    else:
+                        prelim_outline.append(current_pitch)
+                    previous_direction = current_direction
+
+                previous_pitch = current_pitch
+            prelim_outlines.append(prelim_outline)
+            prelim_flags.append(True)
+
+            if len(prelim_outlines) == 1:
+                if include_leftmost_outline and include_rightmost_outline:
+                    finalized_outlines = prelim_outlines
+                    finalized_flags = prelim_flags
+                else:
+                    finalized_outlines = []
+                    finalized_flags = []
+            else:
+                finalized_outlines = prelim_outlines[1:-1]
+                finalized_flags = prelim_flags[1:-1]
+                if include_leftmost_outline:
+                    finalized_outlines.insert(0, prelim_outlines[0])
+                    finalized_flags.insert(0, prelim_flags[0])
+                if include_rightmost_outline:
+                    finalized_outlines.append(prelim_outlines[-1])
+                    finalized_flags.append(prelim_flags[-1])
+
+            for melodic_outline, followup_flag in zip(
+                finalized_outlines, finalized_flags
+            ):
+                if len(melodic_outline) > 2 and not self.is_valid_outline(
+                    melodic_outline, followup_flag
+                ):
+                    return False
+        return True
+
+    @staticmethod
+    def is_valid_outline(
+        melodic_outline: list[theory.SpecificPitch],
+        followup_is_stepewise: bool,
+    ) -> bool:
+        first_pitch = melodic_outline[0]
+        last_pitch = melodic_outline[-1]
+        voice_distance = theory.SpecificPitch.get_interval_distance(
+            first_pitch, last_pitch
+        )
+        if voice_distance > 7:
+            return False
+
+        current_direction = theory.SpecificPitch.get_direction(first_pitch, last_pitch)
+        augmented_interval = theory.Interval.get("A4")
+        diminished_interval = theory.Interval.get("d5")
+
+        if current_direction == -1:
+            augmented_interval, diminished_interval = (
+                diminished_interval,
+                augmented_interval,
+            )
+        if first_pitch.has_interval_shift(last_pitch, (str(augmented_interval),)):
+            return False
+        if first_pitch.has_interval_shift(last_pitch, (str(diminished_interval),)):
+            if len(melodic_outline) != 5:
+                return False
+            return followup_is_stepewise
+        return True
+
+    @classmethod
+    def checked_melodic_activity(
+        cls,
+        first_measure_stack: theory.FullMeasureStack,
+        second_measure_stack: theory.FullMeasureStack,
+        third_measure_stack: theory.FullMeasureStack,
+    ) -> bool:
+        voice_index = -1
+        for first_voice_measure, second_voice_measure, third_voice_measure in zip(
+            first_measure_stack, second_measure_stack, third_measure_stack
+        ):
+            voice_index += 1
+            if voice_index in cls.inner_voice_indices:
+                continue
+            note_section = itertools.chain(
+                first_voice_measure, second_voice_measure, third_voice_measure
+            )
+            pitch_sequence = [
+                current_note.specific_pitch for current_note in note_section
+            ]
+            min_pitch = min(pitch_sequence)
+            max_pitch = max(pitch_sequence)
+            voice_distance = theory.SpecificPitch.get_interval_distance(
+                min_pitch, max_pitch
+            )
+            if voice_distance < 2:
+                return False
         return True
 
 

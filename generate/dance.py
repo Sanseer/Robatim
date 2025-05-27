@@ -666,9 +666,10 @@ def valid_dotted_duo(
     return True
 
 
-def quarter_breaks_parallel(
+def valid_broken_parallels(
     lower_voice_measure: theory.FullVoiceMeasure,
     upper_voice_measure: theory.FullVoiceMeasure,
+    consonant_ids: tuple[str, ...],
 ) -> bool:
     lower_voice_iter = iter(lower_voice_measure)
     upper_voice_iter = iter(upper_voice_measure)
@@ -719,7 +720,7 @@ def quarter_breaks_parallel(
                     remaining_measure_duration -= intersect_duration
 
             if not remaining_measure_duration:
-                return False
+                return True
             elif only_quarters_inbetween:
                 if not lower_duration:
                     lower_note = next(lower_voice_iter)
@@ -737,7 +738,7 @@ def quarter_breaks_parallel(
                     second_lower_pitch,
                     second_upper_pitch,
                 ):
-                    return True
+                    return False
                 first_lower_pitch = second_lower_pitch
                 first_upper_pitch = second_upper_pitch
         else:
@@ -746,6 +747,33 @@ def quarter_breaks_parallel(
             upper_duration -= intersect_duration
             remaining_measure_duration -= intersect_duration
 
+    return True
+
+
+def valid_quarter_parallels(
+    lower_voice_measure: theory.FullVoiceMeasure,
+    upper_voice_measure: theory.FullVoiceMeasure,
+    consonant_ids: tuple[str, ...],
+) -> bool:
+    if not (len(lower_voice_measure) == len(upper_voice_measure) == 4):
+        return True
+    previous_lower_pitch = lower_voice_measure[0].specific_pitch
+    previous_upper_pitch = upper_voice_measure[0].specific_pitch
+
+    for lower_note, upper_note in zip(lower_voice_measure, upper_voice_measure):
+        current_lower_pitch = lower_note.specific_pitch
+        current_upper_pitch = upper_note.specific_pitch
+        lower_direction = theory.SpecificPitch.get_direction(
+            previous_lower_pitch, current_lower_pitch
+        )
+        upper_direction = theory.SpecificPitch.get_direction(
+            previous_upper_pitch, current_upper_pitch
+        )
+        if lower_direction != upper_direction:
+            return True
+
+        previous_lower_pitch = current_lower_pitch
+        previous_upper_pitch = current_upper_pitch
     return False
 
 
@@ -796,16 +824,17 @@ def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bo
             previous_lower_note = current_lower_note
             previous_upper_note = current_upper_note
 
-        if not valid_diminished_duo(
-            lower_voice_measure, upper_voice_measure, consonant_ids
-        ):
-            return False
-        if not valid_dotted_duo(
-            lower_voice_measure, upper_voice_measure, consonant_ids
-        ):
-            return False
-        if quarter_breaks_parallel(lower_voice_measure, upper_voice_measure):
-            return False
+        measure_validators = [
+            valid_quarter_parallels,
+            valid_diminished_duo,
+            valid_dotted_duo,
+            valid_broken_parallels,
+        ]
+        for measure_validator in measure_validators:
+            if not measure_validator(
+                lower_voice_measure, upper_voice_measure, consonant_ids
+            ):
+                return False
     return True
 
 
@@ -911,18 +940,21 @@ def valid_dotted_trio(
     middle_voice_measure: theory.FullVoiceMeasure,
     highest_voice_measure: theory.FullVoiceMeasure,
 ) -> bool:
-    lower_is_dotted = middle_voice_measure[0].duration == Fraction("3/4")
-    upper_is_dotted = highest_voice_measure[0].duration == Fraction("3/4")
-    lower_needs_consonance = check_third_quarter(middle_voice_measure)
-    upper_needs_consonance = check_third_quarter(highest_voice_measure)
+    lowest_is_dotted = lowest_voice_measure[0].duration == Fraction("3/4")
+    middle_is_dotted = middle_voice_measure[0].duration == Fraction("3/4")
+    highest_is_dotted = highest_voice_measure[0].duration == Fraction("3/4")
+    if lowest_is_dotted and middle_is_dotted and highest_is_dotted:
+        return False
+    middle_needs_consonance = check_third_quarter(middle_voice_measure)
+    highest_needs_consonance = check_third_quarter(highest_voice_measure)
 
     if (
-        lower_is_dotted
-        and upper_needs_consonance
-        or lower_needs_consonance
-        and upper_is_dotted
+        middle_is_dotted
+        and highest_needs_consonance
+        or middle_needs_consonance
+        and highest_is_dotted
     ):
-        if lower_is_dotted:
+        if middle_is_dotted:
             middle_pitch = middle_voice_measure[0].specific_pitch
             highest_pitch = rules.find_pitch(highest_voice_measure)
             dotted_measure, undotted_measure = (
@@ -955,7 +987,7 @@ def valid_dotted_trio(
             ):
                 return False
 
-            if lower_is_dotted:
+            if middle_is_dotted:
                 lower_resolve_pitch = second_patient_pitch
                 upper_resolve_pitch = highest_pitch
             else:
@@ -1396,8 +1428,17 @@ def are_cadential_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -
             previous_lower_note = current_lower_note
             previous_upper_note = current_upper_note
 
-        if quarter_breaks_parallel(lower_voice_measure, upper_voice_measure):
-            return False
+        measure_validators = [
+            valid_quarter_parallels,
+            valid_diminished_duo,
+            valid_dotted_duo,
+            valid_broken_parallels,
+        ]
+        for measure_validator in measure_validators:
+            if not measure_validator(
+                lower_voice_measure, upper_voice_measure, consonant_ids
+            ):
+                return False
     return True
 
 
@@ -1444,7 +1485,13 @@ def has_cadential_fourths(
         previous_middle_pitch = current_middle_pitch
         previous_highest_pitch = current_highest_pitch
 
-    return True
+    if not valid_diminished_trio(
+        lowest_voice_measure, middle_voice_measure, highest_voice_measure
+    ):
+        return False
+    return valid_dotted_trio(
+        lowest_voice_measure, middle_voice_measure, highest_voice_measure
+    )
 
 
 def fill_prospects(

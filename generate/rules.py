@@ -40,29 +40,41 @@ def checked_solo_transition(
             return False
 
         leap_direction = theory.SpecificPitch.get_direction(first_pitch, second_pitch)
-        if voice_distance == 7:
-            if len(second_voice_measure) > 1:
-                resolving_pitch = second_voice_measure[1].specific_pitch
-                resolving_direction = theory.SpecificPitch.get_direction(
-                    second_pitch, resolving_pitch
-                )
-                if leap_direction == resolving_direction:
+        if len(second_voice_measure) > 1:
+            resolving_pitch = second_voice_measure[1].specific_pitch
+            resolving_direction = theory.SpecificPitch.get_direction(
+                second_pitch, resolving_pitch
+            )
+            if voice_distance == 7 and leap_direction == resolving_direction:
+                return False
+            if (
+                second_voice_measure[0].duration == Fraction("1/4")
+                and voice_distance > 1
+            ):
+                if len(second_voice_measure) != 4:
                     return False
-        elif voice_distance == 5:
+                if resolving_direction != -leap_direction:
+                    return False
+                previous_pitch = resolving_pitch
+                for current_note in second_voice_measure.sequence[2:]:
+                    current_pitch = current_note.specific_pitch
+                    current_direction = theory.SpecificPitch.get_direction(
+                        previous_pitch, current_pitch
+                    )
+                    if current_direction != resolving_direction:
+                        return False
+                    previous_pitch = current_pitch
+        if voice_distance == 5:
             if second_pitch != first_pitch + theory.Interval.get("m6"):
                 return False
             if len(second_voice_measure) == 1:
                 return False
 
-            resolving_pitch = second_voice_measure[1].specific_pitch
             resolving_distance = theory.SpecificPitch.get_interval_distance(
                 second_pitch, resolving_pitch
             )
             if resolving_distance != 1:
                 return False
-            resolving_direction = theory.SpecificPitch.get_direction(
-                second_pitch, resolving_pitch
-            )
             if leap_direction == resolving_direction:
                 return False
         if first_voice_measure[-1].duration <= Fraction("1/4"):
@@ -74,8 +86,7 @@ def checked_solo_transition(
             ):
                 return False
 
-        if second_voice_measure[0].duration == Fraction("1/4") and voice_distance > 1:
-            return False
+        # prevents stepwise ascent to picardy third with Phrygian
         if first_pitch.has_interval_shift(second_pitch, ("A2", "A4", "d5")):
             return False
 
@@ -1103,6 +1114,21 @@ def checked_broken_parallels(
     return True
 
 
+def checked_dotted_adjacent(
+    first_measure_stack: theory.FullMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
+) -> bool:
+    for first_voice_measure, second_voice_measure in zip(
+        first_measure_stack, second_measure_stack
+    ):
+        if first_voice_measure[0].duration != Fraction("3/4"):
+            continue
+        if second_voice_measure[0].duration != Fraction("3/4"):
+            continue
+        return False
+    return True
+
+
 def filter_prospects(
     index_prospects: list, has_prospect_succeeded: partial[bool]
 ) -> list:
@@ -1130,6 +1156,7 @@ def has_branle_simple_propagated(
             return False
 
     final_index = score_sequence.final_index
+    previous_index = propagate_index - 1
     if propagate_index != final_index:
         next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
@@ -1159,6 +1186,7 @@ def has_branle_simple_propagated(
             ),
             partial(checked_dissonant_pass, current_measure_stack),
             partial(checked_broken_parallels, current_measure_stack),
+            partial(checked_dotted_adjacent, current_measure_stack),
             partial(
                 score_sequence.checked_consecutive_durations,
                 next_index,
@@ -1172,6 +1200,7 @@ def has_branle_simple_propagated(
                 next_index,
             ),
             partial(score_sequence.checked_melodic_bounds, next_index),
+            partial(score_sequence.checked_melodic_outline, next_index),
         ]
         if is_cadence:
             prospect_validators.insert(
@@ -1194,12 +1223,21 @@ def has_branle_simple_propagated(
                     allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
                 )
             )
+        if propagate_index != 0 and (
+            previous_measure_stack := score_sequence[previous_index]
+        ):
+            prospect_validators.append(
+                partial(
+                    score_sequence.checked_melodic_activity,
+                    previous_measure_stack,
+                    current_measure_stack,
+                )
+            )
         for prospect_validator in prospect_validators:
             if not filter_prospects(next_prospects, prospect_validator):
                 return False
 
     if propagate_index != 0:
-        previous_index = propagate_index - 1
         previous_prospects = sequence_prospects[previous_index]
         if is_antecedent:
             is_cadence = propagate_index == 5
@@ -1237,6 +1275,10 @@ def has_branle_simple_propagated(
                 second_measure_stack=current_measure_stack,
             ),
             partial(
+                checked_dotted_adjacent,
+                second_measure_stack=current_measure_stack,
+            ),
+            partial(
                 score_sequence.checked_consecutive_durations,
                 previous_index,
             ),
@@ -1249,6 +1291,7 @@ def has_branle_simple_propagated(
                 previous_index,
             ),
             partial(score_sequence.checked_melodic_bounds, previous_index),
+            partial(score_sequence.checked_melodic_outline, previous_index),
         ]
         if is_cadence:
             prospect_validators.insert(
@@ -1275,10 +1318,42 @@ def has_branle_simple_propagated(
                     allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
                 )
             )
+        if propagate_index != final_index and (
+            next_measure_stack := score_sequence[next_index]
+        ):
+            prospect_validators.append(
+                partial(
+                    score_sequence.checked_melodic_activity,
+                    second_measure_stack=current_measure_stack,
+                    third_measure_stack=next_measure_stack,
+                )
+            )
         for prospect_validator in prospect_validators:
             if not filter_prospects(previous_prospects, prospect_validator):
                 return False
 
+    if propagate_index + 2 <= final_index and (
+        next_measure_stack := score_sequence[next_index]
+    ):
+        next_next_prospects = sequence_prospects[propagate_index + 2]
+        prospect_validator = partial(
+            score_sequence.checked_melodic_activity,
+            current_measure_stack,
+            next_measure_stack,
+        )
+        if not filter_prospects(next_next_prospects, prospect_validator):
+            return False
+    if propagate_index - 2 >= 0 and (
+        previous_measure_stack := score_sequence[previous_index]
+    ):
+        previous_previous_prospects = sequence_prospects[propagate_index - 2]
+        prospect_validator = partial(
+            score_sequence.checked_melodic_activity,
+            second_measure_stack=previous_measure_stack,
+            third_measure_stack=current_measure_stack,
+        )
+        if not filter_prospects(previous_previous_prospects, prospect_validator):
+            return False
     return True
 
 
@@ -1296,6 +1371,7 @@ def has_basse_danse_propagated(
             return False
 
     final_index = score_sequence.final_index
+    previous_index = propagate_index - 1
     if propagate_index != final_index:
         next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
@@ -1305,7 +1381,7 @@ def has_basse_danse_propagated(
             partial(
                 checked_duo_transition,
                 current_measure_stack,
-                allowed_downbeat_unison=next_index == final_index,
+                allowed_downbeat_unison=next_index == final_index or next_index == 1,
                 check_bass_suspension=is_authentic_cadence,
             ),
             partial(
@@ -1326,6 +1402,7 @@ def has_basse_danse_propagated(
                 next_index,
             ),
             partial(score_sequence.checked_melodic_bounds, next_index),
+            partial(score_sequence.checked_melodic_outline, next_index),
         ]
         if propagate_index == 0:
             prospect_validators.insert(
@@ -1350,8 +1427,19 @@ def has_basse_danse_propagated(
                     partial(are_measure_stacks_unique, current_measure_stack),
                     partial(checked_dissonant_pass, current_measure_stack),
                     partial(checked_broken_parallels, current_measure_stack),
+                    partial(checked_dotted_adjacent, current_measure_stack),
                 ]
             )
+            if previous_index != 0 and (
+                previous_measure_stack := score_sequence[previous_index]
+            ):
+                prospect_validators.append(
+                    partial(
+                        score_sequence.checked_melodic_activity,
+                        previous_measure_stack,
+                        current_measure_stack,
+                    )
+                )
         if is_authentic_cadence:
             prospect_validators.insert(
                 0,
@@ -1378,7 +1466,6 @@ def has_basse_danse_propagated(
                 return False
 
     if propagate_index != 0:
-        previous_index = propagate_index - 1
         previous_prospects = sequence_prospects[previous_index]
         is_authentic_cadence = propagate_index == final_index - 1
 
@@ -1386,7 +1473,8 @@ def has_basse_danse_propagated(
             partial(
                 checked_duo_transition,
                 second_measure_stack=current_measure_stack,
-                allowed_downbeat_unison=propagate_index == final_index,
+                allowed_downbeat_unison=propagate_index == final_index
+                or propagate_index == 1,
                 check_bass_suspension=is_authentic_cadence,
             ),
             partial(
@@ -1407,6 +1495,7 @@ def has_basse_danse_propagated(
                 previous_index,
             ),
             partial(score_sequence.checked_melodic_bounds, previous_index),
+            partial(score_sequence.checked_melodic_outline, previous_index),
         ]
         if previous_index == 0:
             prospect_validators.insert(
@@ -1440,8 +1529,22 @@ def has_basse_danse_propagated(
                         checked_broken_parallels,
                         second_measure_stack=current_measure_stack,
                     ),
+                    partial(
+                        checked_dotted_adjacent,
+                        second_measure_stack=current_measure_stack,
+                    ),
                 ]
             )
+            if propagate_index != final_index and (
+                next_measure_stack := score_sequence[next_index]
+            ):
+                prospect_validators.append(
+                    partial(
+                        score_sequence.checked_melodic_activity,
+                        second_measure_stack=current_measure_stack,
+                        third_measure_stack=next_measure_stack,
+                    )
+                )
         if is_authentic_cadence:
             prospect_validators.insert(
                 0,
@@ -1470,5 +1573,26 @@ def has_basse_danse_propagated(
         for prospect_validator in prospect_validators:
             if not filter_prospects(previous_prospects, prospect_validator):
                 return False
-
+    if 1 <= propagate_index <= final_index - 2 and (
+        next_measure_stack := score_sequence[next_index]
+    ):
+        next_next_prospects = sequence_prospects[propagate_index + 2]
+        prospect_validator = partial(
+            score_sequence.checked_melodic_activity,
+            current_measure_stack,
+            next_measure_stack,
+        )
+        if not filter_prospects(next_next_prospects, prospect_validator):
+            return False
+    if propagate_index - 2 >= 1 and (
+        previous_measure_stack := score_sequence[previous_index]
+    ):
+        previous_previous_prospects = sequence_prospects[propagate_index - 2]
+        prospect_validator = partial(
+            score_sequence.checked_melodic_activity,
+            second_measure_stack=previous_measure_stack,
+            third_measure_stack=current_measure_stack,
+        )
+        if not filter_prospects(previous_previous_prospects, prospect_validator):
+            return False
     return True
