@@ -1,5 +1,6 @@
 from functools import partial
 from fractions import Fraction
+import itertools
 from typing import Iterator
 
 from generate import theory, limits
@@ -27,6 +28,8 @@ def checked_solo_transition(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
     flattened_pitch: theory.GenericPitch,
+    allowed_fifth_endpoints: set[str],
+    allowed_fourth_endpoints: set[str],
 ) -> bool:
     for first_voice_measure, second_voice_measure in zip(
         first_measure_stack, second_measure_stack
@@ -64,6 +67,11 @@ def checked_solo_transition(
                     if current_direction != resolving_direction:
                         return False
                     previous_pitch = current_pitch
+
+        current_pitch_endpoints = {
+            first_pitch.generic_pitch,
+            second_pitch.generic_pitch,
+        }
         if voice_distance == 5:
             if second_pitch != first_pitch + theory.Interval.get("m6"):
                 return False
@@ -76,6 +84,15 @@ def checked_solo_transition(
             if resolving_distance != 1:
                 return False
             if leap_direction == resolving_direction:
+                return False
+        elif voice_distance == 7:
+            if not current_pitch_endpoints & allowed_fifth_endpoints:
+                return False
+        elif voice_distance == 4:
+            if not current_pitch_endpoints & allowed_fifth_endpoints:
+                return False
+        elif voice_distance == 3:
+            if not current_pitch_endpoints & allowed_fourth_endpoints:
                 return False
         if first_voice_measure[-1].duration <= Fraction("1/4"):
             if voice_distance != 1:
@@ -236,6 +253,8 @@ def checked_solo_partial_transition(
     first_measure_stack: theory.HalfMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
     flattened_pitch: theory.GenericPitch,
+    allowed_fifth_endpoints: set[str],
+    allowed_fourth_endpoints: set[str],
 ) -> bool:
     for first_voice_measure, second_voice_measure in zip(
         first_measure_stack, second_measure_stack
@@ -249,6 +268,10 @@ def checked_solo_partial_transition(
             return False
 
         leap_direction = theory.SpecificPitch.get_direction(first_pitch, second_pitch)
+        current_pitch_endpoints = {
+            first_pitch.generic_pitch,
+            second_pitch.generic_pitch,
+        }
         if voice_distance == 7:
             if len(second_voice_measure) > 1:
                 resolving_pitch = second_voice_measure[1].specific_pitch
@@ -257,6 +280,8 @@ def checked_solo_partial_transition(
                 )
                 if leap_direction == resolving_direction:
                     return False
+            if not current_pitch_endpoints & allowed_fifth_endpoints:
+                return False
         elif voice_distance == 5:
             if second_pitch != first_pitch + theory.Interval.get("m6"):
                 return False
@@ -273,6 +298,12 @@ def checked_solo_partial_transition(
                 second_pitch, resolving_pitch
             )
             if leap_direction == resolving_direction:
+                return False
+        elif voice_distance == 4:
+            if not current_pitch_endpoints & allowed_fifth_endpoints:
+                return False
+        elif voice_distance == 3:
+            if not current_pitch_endpoints & allowed_fourth_endpoints:
                 return False
 
         if second_voice_measure[0].duration == Fraction("1/4") and voice_distance > 1:
@@ -453,6 +484,7 @@ def is_cadential_duo_valid(
     second_lower_note: theory.SpecificNote,
     second_upper_note: theory.SpecificNote,
     consonant_ids: tuple[str, ...],
+    is_prelim_check: bool,
 ) -> bool:
     first_lower_pitch = first_lower_note.specific_pitch
     first_upper_pitch = first_upper_note.specific_pitch
@@ -470,7 +502,9 @@ def is_cadential_duo_valid(
             return False
         if second_upper_pitch <= first_lower_pitch:
             return False
-        if not is_duo_consonant(second_lower_pitch, second_upper_pitch, consonant_ids):
+        if is_prelim_check and not is_duo_consonant(
+            second_lower_pitch, second_upper_pitch, consonant_ids
+        ):
             return False
 
         lower_voice_direction = theory.SpecificPitch.get_direction(
@@ -1129,6 +1163,35 @@ def checked_dotted_adjacent(
     return True
 
 
+inner_voice_indices = {1, 2}
+
+
+def checked_melodic_activity(
+    first_measure_stack: theory.FullMeasureStack,
+    second_measure_stack: theory.FullMeasureStack,
+    third_measure_stack: theory.FullMeasureStack,
+) -> bool:
+    voice_index = -1
+    for first_voice_measure, second_voice_measure, third_voice_measure in zip(
+        first_measure_stack, second_measure_stack, third_measure_stack
+    ):
+        voice_index += 1
+        if voice_index in inner_voice_indices:
+            continue
+        note_section = itertools.chain(
+            first_voice_measure, second_voice_measure, third_voice_measure
+        )
+        pitch_sequence = [current_note.specific_pitch for current_note in note_section]
+        min_pitch = min(pitch_sequence)
+        max_pitch = max(pitch_sequence)
+        voice_distance = theory.SpecificPitch.get_interval_distance(
+            min_pitch, max_pitch
+        )
+        if voice_distance < 2:
+            return False
+    return True
+
+
 def filter_prospects(
     index_prospects: list, has_prospect_succeeded: partial[bool]
 ) -> list:
@@ -1157,6 +1220,8 @@ def has_branle_simple_propagated(
 
     final_index = score_sequence.final_index
     previous_index = propagate_index - 1
+    allowed_fifth_endpoints = score_sequence.allowed_fifth_endpoints
+    allowed_fourth_endpoints = score_sequence.allowed_fourth_endpoints
     if propagate_index != final_index:
         next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
@@ -1171,6 +1236,8 @@ def has_branle_simple_propagated(
                 checked_solo_transition,
                 current_measure_stack,
                 flattened_pitch=flattened_pitch,
+                allowed_fifth_endpoints=allowed_fifth_endpoints,
+                allowed_fourth_endpoints=allowed_fourth_endpoints,
             ),
             partial(
                 checked_duo_transition,
@@ -1228,7 +1295,7 @@ def has_branle_simple_propagated(
         ):
             prospect_validators.append(
                 partial(
-                    score_sequence.checked_melodic_activity,
+                    checked_melodic_activity,
                     previous_measure_stack,
                     current_measure_stack,
                 )
@@ -1253,6 +1320,8 @@ def has_branle_simple_propagated(
                 checked_solo_transition,
                 second_measure_stack=current_measure_stack,
                 flattened_pitch=flattened_pitch,
+                allowed_fifth_endpoints=allowed_fifth_endpoints,
+                allowed_fourth_endpoints=allowed_fourth_endpoints,
             ),
             partial(
                 checked_duo_transition,
@@ -1323,7 +1392,7 @@ def has_branle_simple_propagated(
         ):
             prospect_validators.append(
                 partial(
-                    score_sequence.checked_melodic_activity,
+                    checked_melodic_activity,
                     second_measure_stack=current_measure_stack,
                     third_measure_stack=next_measure_stack,
                 )
@@ -1337,7 +1406,7 @@ def has_branle_simple_propagated(
     ):
         next_next_prospects = sequence_prospects[propagate_index + 2]
         prospect_validator = partial(
-            score_sequence.checked_melodic_activity,
+            checked_melodic_activity,
             current_measure_stack,
             next_measure_stack,
         )
@@ -1348,7 +1417,7 @@ def has_branle_simple_propagated(
     ):
         previous_previous_prospects = sequence_prospects[propagate_index - 2]
         prospect_validator = partial(
-            score_sequence.checked_melodic_activity,
+            checked_melodic_activity,
             second_measure_stack=previous_measure_stack,
             third_measure_stack=current_measure_stack,
         )
@@ -1372,6 +1441,8 @@ def has_basse_danse_propagated(
 
     final_index = score_sequence.final_index
     previous_index = propagate_index - 1
+    allowed_fifth_endpoints = score_sequence.allowed_fifth_endpoints
+    allowed_fourth_endpoints = score_sequence.allowed_fourth_endpoints
     if propagate_index != final_index:
         next_index = propagate_index + 1
         next_prospects = sequence_prospects[next_index]
@@ -1411,6 +1482,8 @@ def has_basse_danse_propagated(
                     checked_solo_partial_transition,
                     current_measure_stack,
                     flattened_pitch=flattened_pitch,
+                    allowed_fifth_endpoints=allowed_fifth_endpoints,
+                    allowed_fourth_endpoints=allowed_fourth_endpoints,
                 ),
             )
         else:
@@ -1420,6 +1493,8 @@ def has_basse_danse_propagated(
                     checked_solo_transition,
                     current_measure_stack,
                     flattened_pitch=flattened_pitch,
+                    allowed_fifth_endpoints=allowed_fifth_endpoints,
+                    allowed_fourth_endpoints=allowed_fourth_endpoints,
                 ),
             )
             prospect_validators.extend(
@@ -1435,7 +1510,7 @@ def has_basse_danse_propagated(
             ):
                 prospect_validators.append(
                     partial(
-                        score_sequence.checked_melodic_activity,
+                        checked_melodic_activity,
                         previous_measure_stack,
                         current_measure_stack,
                     )
@@ -1504,6 +1579,8 @@ def has_basse_danse_propagated(
                     checked_solo_partial_transition,
                     second_measure_stack=current_measure_stack,
                     flattened_pitch=flattened_pitch,
+                    allowed_fifth_endpoints=allowed_fifth_endpoints,
+                    allowed_fourth_endpoints=allowed_fourth_endpoints,
                 ),
             )
         else:
@@ -1513,6 +1590,8 @@ def has_basse_danse_propagated(
                     checked_solo_transition,
                     second_measure_stack=current_measure_stack,
                     flattened_pitch=flattened_pitch,
+                    allowed_fifth_endpoints=allowed_fifth_endpoints,
+                    allowed_fourth_endpoints=allowed_fourth_endpoints,
                 ),
             )
             prospect_validators.extend(
@@ -1540,7 +1619,7 @@ def has_basse_danse_propagated(
             ):
                 prospect_validators.append(
                     partial(
-                        score_sequence.checked_melodic_activity,
+                        checked_melodic_activity,
                         second_measure_stack=current_measure_stack,
                         third_measure_stack=next_measure_stack,
                     )
@@ -1578,7 +1657,7 @@ def has_basse_danse_propagated(
     ):
         next_next_prospects = sequence_prospects[propagate_index + 2]
         prospect_validator = partial(
-            score_sequence.checked_melodic_activity,
+            checked_melodic_activity,
             current_measure_stack,
             next_measure_stack,
         )
@@ -1589,7 +1668,7 @@ def has_basse_danse_propagated(
     ):
         previous_previous_prospects = sequence_prospects[propagate_index - 2]
         prospect_validator = partial(
-            score_sequence.checked_melodic_activity,
+            checked_melodic_activity,
             second_measure_stack=previous_measure_stack,
             third_measure_stack=current_measure_stack,
         )

@@ -5,6 +5,7 @@ from fractions import Fraction
 from functools import partial
 import itertools
 import random
+import time
 from typing import Generic, Iterator, TypeVar
 
 from generate import theory
@@ -52,12 +53,12 @@ class CompositionError(Exception):
 
 class SequencePartial(Generic[GenericStack]):
     known_uniques = {0: 3, 1: 4, 2: 5}
-    inner_voice_indices = {1, 2}
 
     def __init__(
         self,
         sequence_prospects: list[list[GenericStack]],
         has_propagated: partial[bool],
+        chosen_modes: list[theory.ModalScale],
     ) -> None:
         self.length = len(sequence_prospects)
         self.final_index = self.length - 1
@@ -75,7 +76,16 @@ class SequencePartial(Generic[GenericStack]):
         self.sequence_prospects = copy.deepcopy(sequence_prospects)
         self.has_propagated = has_propagated
         self.realizer = self.collapse(self.sequence_prospects)
+
         self.dotted_counts = [0, 0, 0, 0]
+        self.allowed_fifth_endpoints = {
+            str(chosen_mode[0]) for chosen_mode in chosen_modes
+        }
+        self.allowed_fourth_endpoints = {
+            str(chosen_mode[4]) for chosen_mode in chosen_modes
+        }
+        self.allowed_fourth_endpoints |= self.allowed_fifth_endpoints
+        self.start_time = time.time()
 
     def __iter__(self) -> Iterator[GenericStack | None]:
         return iter(self.sequence)
@@ -102,6 +112,7 @@ class SequencePartial(Generic[GenericStack]):
 
     def realize(self) -> list[GenericStack]:
         try:
+            self.start_time = time.time()
             return next(self.realizer)
         except StopIteration:
             raise CompositionError("Propagation exhausted.")
@@ -137,6 +148,8 @@ class SequencePartial(Generic[GenericStack]):
 
             slot_options.remove(chosen_item)
             self[chosen_index] = None
+        if time.time() - self.start_time > 600:
+            raise CompositionError("Time limit elapsed.")
 
     def find_lowest_entropy(
         self, sequence_prospects: list[list[GenericStack]]
@@ -705,8 +718,8 @@ class SequencePartial(Generic[GenericStack]):
                     return False
         return True
 
-    @staticmethod
     def is_valid_outline(
+        self,
         melodic_outline: list[theory.SpecificPitch],
         followup_is_stepewise: bool,
     ) -> bool:
@@ -715,8 +728,14 @@ class SequencePartial(Generic[GenericStack]):
         voice_distance = theory.SpecificPitch.get_interval_distance(
             first_pitch, last_pitch
         )
-        if voice_distance > 7:
+        if voice_distance > 7 or voice_distance == 6:
             return False
+        current_pitch_endpoints = {
+            first_pitch.generic_pitch,
+            last_pitch.generic_pitch,
+        }
+        if voice_distance == 7:
+            return bool(current_pitch_endpoints & self.allowed_fifth_endpoints)
 
         current_direction = theory.SpecificPitch.get_direction(first_pitch, last_pitch)
         augmented_interval = theory.Interval.get("A4")
@@ -733,35 +752,9 @@ class SequencePartial(Generic[GenericStack]):
             if len(melodic_outline) != 5:
                 return False
             return followup_is_stepewise
-        return True
 
-    @classmethod
-    def checked_melodic_activity(
-        cls,
-        first_measure_stack: theory.FullMeasureStack,
-        second_measure_stack: theory.FullMeasureStack,
-        third_measure_stack: theory.FullMeasureStack,
-    ) -> bool:
-        voice_index = -1
-        for first_voice_measure, second_voice_measure, third_voice_measure in zip(
-            first_measure_stack, second_measure_stack, third_measure_stack
-        ):
-            voice_index += 1
-            if voice_index in cls.inner_voice_indices:
-                continue
-            note_section = itertools.chain(
-                first_voice_measure, second_voice_measure, third_voice_measure
-            )
-            pitch_sequence = [
-                current_note.specific_pitch for current_note in note_section
-            ]
-            min_pitch = min(pitch_sequence)
-            max_pitch = max(pitch_sequence)
-            voice_distance = theory.SpecificPitch.get_interval_distance(
-                min_pitch, max_pitch
-            )
-            if voice_distance < 2:
-                return False
+        if voice_distance == 4:
+            return bool(current_pitch_endpoints & self.allowed_fifth_endpoints)
         return True
 
 
@@ -798,13 +791,13 @@ TwoDimensionStack = (
 class DanceScore:
     def __init__(
         self,
-        chosen_scale: theory.ModalScale,
+        chosen_mode: theory.ModalScale,
         clef_group: list[str],
         score_sequences: TwoDimensionStack,
         chosen_instruemnt: theory.MidiInstrument,
         tempo: int,
     ) -> None:
-        self.scale = chosen_scale
+        self.scale = chosen_mode
         print(f"Using {chosen_instruemnt}")
         self.instrument = chosen_instruemnt
         """You can have two parts with the same clef 
