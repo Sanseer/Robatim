@@ -405,8 +405,8 @@ def is_duo_motion_valid(
     second_lower_note: theory.SpecificNote,
     second_upper_note: theory.SpecificNote,
     consonant_ids: tuple[str, ...],
-    is_prelim_check: bool,
-    allowed_downbeat_unison: bool,
+    attack_requires_consonance: bool,
+    allowed_unison: bool,
 ) -> bool:
     first_lower_pitch = first_lower_note.specific_pitch
     first_upper_pitch = first_upper_note.specific_pitch
@@ -428,16 +428,6 @@ def is_duo_motion_valid(
             return False
         if second_upper_pitch <= first_lower_pitch:
             return False
-        if preceded_by_dissonance:
-            if lower_voice_distance > 1 or upper_voice_distance > 1:
-                return False
-        if is_prelim_check:
-            if not is_duo_consonant(
-                second_lower_pitch, second_upper_pitch, consonant_ids
-            ):
-                return False
-        elif not allowed_downbeat_unison and second_lower_pitch == second_upper_pitch:
-            return False
 
         lower_voice_direction = theory.SpecificPitch.get_direction(
             first_lower_pitch, second_lower_pitch
@@ -445,6 +435,17 @@ def is_duo_motion_valid(
         upper_voice_direction = theory.SpecificPitch.get_direction(
             first_upper_pitch, second_upper_pitch
         )
+        if preceded_by_dissonance:
+            if lower_voice_distance > 1 or upper_voice_distance > 1:
+                return False
+            if lower_voice_direction == upper_voice_direction:
+                return False
+        if attack_requires_consonance and not is_duo_consonant(
+            second_lower_pitch, second_upper_pitch, consonant_ids
+        ):
+            return False
+        if not allowed_unison and second_lower_pitch == second_upper_pitch:
+            return False
 
         if lower_voice_direction == upper_voice_direction:
             if second_lower_pitch.has_interval_shift(second_upper_pitch):
@@ -459,11 +460,11 @@ def is_duo_motion_valid(
     elif lower_voice_distance > 1 or upper_voice_distance > 1:
         if preceded_by_dissonance:
             return False
-        if is_prelim_check and not is_duo_consonant(
+        if attack_requires_consonance and not is_duo_consonant(
             second_lower_pitch, second_upper_pitch, consonant_ids
         ):
             return False
-    elif not allowed_downbeat_unison and second_lower_pitch == second_upper_pitch:
+    elif not allowed_unison and second_lower_pitch == second_upper_pitch:
         return False
     if (
         first_lower_pitch.letter == second_upper_pitch.letter
@@ -484,12 +485,14 @@ def is_cadential_duo_valid(
     second_lower_note: theory.SpecificNote,
     second_upper_note: theory.SpecificNote,
     consonant_ids: tuple[str, ...],
-    is_prelim_check: bool,
+    attack_requires_consonance: bool,
 ) -> bool:
     first_lower_pitch = first_lower_note.specific_pitch
     first_upper_pitch = first_upper_note.specific_pitch
     second_lower_pitch = second_lower_note.specific_pitch
     second_upper_pitch = second_upper_note.specific_pitch
+    if second_lower_pitch == second_upper_pitch:
+        return False
 
     lower_voice_distance = theory.SpecificPitch.get_interval_distance(
         first_lower_pitch, second_lower_pitch
@@ -502,7 +505,7 @@ def is_cadential_duo_valid(
             return False
         if second_upper_pitch <= first_lower_pitch:
             return False
-        if is_prelim_check and not is_duo_consonant(
+        if attack_requires_consonance and not is_duo_consonant(
             second_lower_pitch, second_upper_pitch, consonant_ids
         ):
             return False
@@ -639,7 +642,7 @@ def is_trio_motion_valid(
     second_lowest_pitch: theory.SpecificPitch,
     second_middle_pitch: theory.SpecificPitch,
     second_highest_pitch: theory.SpecificPitch,
-    is_prelim_check: bool,
+    attack_requires_consonance: bool,
 ) -> bool:
     middle_voice_distance = theory.SpecificPitch.get_interval_distance(
         first_middle_pitch, second_middle_pitch
@@ -655,14 +658,14 @@ def is_trio_motion_valid(
         if preceded_by_dissonance:
             if middle_voice_distance > 1 or highest_voice_distance > 1:
                 return False
-        if is_prelim_check and not is_perfect_fourth_consonant(
+        if attack_requires_consonance and not is_perfect_fourth_consonant(
             second_lowest_pitch, second_middle_pitch, second_highest_pitch
         ):
             return False
     elif middle_voice_distance > 1 or highest_voice_distance > 1:
         if preceded_by_dissonance:
             return False
-        if is_prelim_check and not is_perfect_fourth_consonant(
+        if attack_requires_consonance and not is_perfect_fourth_consonant(
             second_lowest_pitch, second_middle_pitch, second_highest_pitch
         ):
             return False
@@ -893,7 +896,8 @@ def get_species_role(
             is_real_cantus = False
             is_diminished_cantus = first_note.duration == Fraction("1/2")
 
-        is_diminished_counter = False
+        # The dot should be thought of as a strong quarter in third species.
+        is_diminished_counter = first_note.duration == Fraction("3/4")
         if first_note.duration == Fraction("1/2"):
             interval_distance = theory.SpecificPitch.get_interval_distance(
                 first_note.specific_pitch, second_note.specific_pitch

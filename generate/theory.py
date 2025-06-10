@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 # allows use of an annotation before function definition (Python 3.7+)
-import random
-from fractions import Fraction
-from dataclasses import dataclass
 from collections import defaultdict, deque
-from typing import Generic, Iterator, TypeVar
-import copy
+from dataclasses import dataclass
+from fractions import Fraction
+import random
+from typing import ClassVar, Generic, Iterator, TypeVar
 
 
 def split_by_characters(
@@ -1046,12 +1045,27 @@ class MelodyPack:
 
 
 @dataclass
-class FullVoiceMeasure:
+class BaseVoiceMeasure:
+    id_count = 0
+
+    def __post_init__(self) -> None:
+        self.id = BaseVoiceMeasure.id_count
+        BaseVoiceMeasure.id_count += 1
+
+
+@dataclass
+class FullVoiceMeasure(BaseVoiceMeasure):
     sequence: list[SpecificNote]
     left_bound: MeasureBound
     right_bound: MeasureBound
     is_rhythm_continuous: bool
     is_skip_continuous: bool
+    instance_cache: ClassVar[dict[str, FullVoiceMeasure]] = {}
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        notation = self.derive_notation(self.sequence)
+        self.__class__.instance_cache[notation] = self
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, FullVoiceMeasure):
@@ -1066,6 +1080,28 @@ class FullVoiceMeasure:
 
     def __len__(self) -> int:
         return len(self.sequence)
+
+    @staticmethod
+    def derive_notation(sequence: list[SpecificNote]) -> str:
+        return "+".join(
+            f"{current_note.specific_pitch}{current_note.duration}"
+            for current_note in sequence
+        )
+
+    @classmethod
+    def get(
+        cls,
+        sequence: list[SpecificNote],
+        left_bound: MeasureBound,
+        right_bound: MeasureBound,
+        is_rhythm_continuous: bool,
+        is_skip_continuous: bool,
+    ) -> FullVoiceMeasure:
+        if (notation := cls.derive_notation(sequence)) in cls.instance_cache:
+            return cls.instance_cache[notation]
+        return cls(
+            sequence, left_bound, right_bound, is_rhythm_continuous, is_skip_continuous
+        )
 
 
 GenericMeasure = TypeVar("GenericMeasure")
@@ -1102,15 +1138,18 @@ half_rest = RestNote(half_duration)
 
 
 @dataclass
-class HalfVoiceMeasure:
+class HalfVoiceMeasure(BaseVoiceMeasure):
     pitch: SpecificPitch
     left_bound = MeasureBound(RhythmBound(Fraction("0"), 0), SkipBound(0))
     right_bound = MeasureBound(RhythmBound(Fraction("1/2"), 1), SkipBound(0))
     is_rhythm_continuous = False
     is_skip_continuous = False
+    instance_cache: ClassVar[dict[str, HalfVoiceMeasure]] = {}
 
     def __post_init__(self) -> None:
         self.sequence = (half_rest, SpecificNote(self.pitch, half_duration))
+        super().__post_init__()
+        self.__class__.instance_cache[str(self.pitch)] = self
 
     def __iter__(self) -> Iterator:
         return iter(self.sequence)
@@ -1122,6 +1161,12 @@ class HalfVoiceMeasure:
 
     def __len__(self) -> int:
         return 1
+
+    @classmethod
+    def get(cls, chosen_pitch: SpecificPitch) -> HalfVoiceMeasure:
+        if (notation := str(chosen_pitch)) in cls.instance_cache:
+            return cls.instance_cache[notation]
+        return cls(chosen_pitch)
 
 
 class HalfMeasureStack(BaseMeasureStack[HalfVoiceMeasure]):
