@@ -34,8 +34,7 @@ if __name__ == "__main__":
     print(f"Using {dance_constructor.__name__}")
     while True:
         try:
-            mode_settings = random.choice(mode_group)
-            tonic_pitch_str, chosen_mode_str = mode_settings
+            tonic_pitch_str, chosen_mode_str = random.choice(mode_group)
             primary_mode = theory.scale_type_map[chosen_mode_str](tonic_pitch_str)
             dance_score = dance_constructor(
                 clef_group,
@@ -49,7 +48,8 @@ if __name__ == "__main__":
             print(f"{err} Reattempting.\n")
         except dance.CadentialError as err:
             print(f"{err} Reattempting.\n")
-            mode_group.remove(mode_settings)
+            _, tonic_pitch_str, chosen_mode_str = err.args
+            mode_group.remove([tonic_pitch_str, chosen_mode_str])
 
     export.LilypondFactory.export_dance_score(dance_score)
     export.export_dance_midi(dance_score)

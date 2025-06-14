@@ -777,6 +777,65 @@ def checked_trio_transition(
     return True
 
 
+def checked_quartet_transition(
+    first_measure_stack: theory.VariantStack,
+    second_measure_stack: theory.FullMeasureStack,
+) -> bool:
+    bassus_pair = (
+        first_measure_stack[0][-1].specific_pitch,
+        second_measure_stack[0][0].specific_pitch,
+    )
+    tenor_pair = (
+        first_measure_stack[1][-1].specific_pitch,
+        second_measure_stack[1][0].specific_pitch,
+    )
+    contratenor_pair = (
+        first_measure_stack[2][-1].specific_pitch,
+        second_measure_stack[2][0].specific_pitch,
+    )
+    superius_pair = (
+        first_measure_stack[3][-1].specific_pitch,
+        second_measure_stack[3][0].specific_pitch,
+    )
+
+    return checked_quartet_motion(
+        bassus_pair, tenor_pair, contratenor_pair, superius_pair
+    )
+
+
+def checked_quartet_motion(
+    bassus_pair: tuple[theory.SpecificPitch, theory.SpecificPitch],
+    tenor_pair: tuple[theory.SpecificPitch, theory.SpecificPitch],
+    contratenor_pair: tuple[theory.SpecificPitch, theory.SpecificPitch],
+    superius_pair: tuple[theory.SpecificPitch, theory.SpecificPitch],
+) -> bool:
+    voice_directions = set()
+    bassus_direction = theory.SpecificPitch.get_direction(*bassus_pair)
+    if not bassus_direction:
+        return True
+    voice_directions.add(bassus_direction)
+
+    tenor_direction = theory.SpecificPitch.get_direction(*tenor_pair)
+    if not tenor_direction:
+        return True
+    voice_directions.add(tenor_direction)
+    if len(voice_directions) > 1:
+        return True
+
+    contratenor_direction = theory.SpecificPitch.get_direction(*contratenor_pair)
+    if not contratenor_direction:
+        return True
+    voice_directions.add(contratenor_direction)
+    if len(voice_directions) > 1:
+        return True
+
+    superius_direction = theory.SpecificPitch.get_direction(*superius_pair)
+    if not superius_direction:
+        return True
+    voice_directions.add(superius_direction)
+    return len(voice_directions) > 1
+
+
 def checked_dissonant_pass(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
@@ -1000,7 +1059,7 @@ def checked_superius_transition(
 
 
 valid_cadential_motions = {
-    0: {-1, -3, 3, -4, 4},
+    0: {-1, 1, -3, 3, -4, 4},
     1: {0, -1, 1},
     2: {0, -1, 1, -2},
     3: {-1, 1},
@@ -1258,6 +1317,7 @@ def has_branle_simple_propagated(
             partial(checked_dissonant_pass, current_measure_stack),
             partial(checked_broken_parallels, current_measure_stack),
             partial(checked_dotted_adjacent, current_measure_stack),
+            partial(checked_quartet_transition, current_measure_stack),
             partial(
                 score_sequence.checked_consecutive_durations,
                 next_index,
@@ -1349,6 +1409,10 @@ def has_branle_simple_propagated(
             ),
             partial(
                 checked_dotted_adjacent,
+                second_measure_stack=current_measure_stack,
+            ),
+            partial(
+                checked_quartet_transition,
                 second_measure_stack=current_measure_stack,
             ),
             partial(
@@ -1464,6 +1528,7 @@ def has_basse_danse_propagated(
                 current_measure_stack,
                 check_upper_suspension=is_authentic_cadence,
             ),
+            partial(checked_quartet_transition, current_measure_stack),
             partial(
                 score_sequence.checked_consecutive_durations,
                 next_index,
@@ -1560,6 +1625,10 @@ def has_basse_danse_propagated(
                 checked_trio_transition,
                 second_measure_stack=current_measure_stack,
                 check_upper_suspension=is_authentic_cadence,
+            ),
+            partial(
+                checked_quartet_transition,
+                second_measure_stack=current_measure_stack,
             ),
             partial(
                 score_sequence.checked_consecutive_durations,
