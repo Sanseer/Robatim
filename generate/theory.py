@@ -1046,31 +1046,16 @@ class MelodyPack:
 
 @dataclass
 class BaseVoiceMeasure:
-    id_count = 0
-
-    def __post_init__(self) -> None:
-        self.id = BaseVoiceMeasure.id_count
-        BaseVoiceMeasure.id_count += 1
-
-
-@dataclass
-class FullVoiceMeasure(BaseVoiceMeasure):
     sequence: list[SpecificNote]
     left_bound: MeasureBound
     right_bound: MeasureBound
     is_rhythm_continuous: bool
     is_skip_continuous: bool
-    instance_cache: ClassVar[dict[str, FullVoiceMeasure]] = {}
+    id_count = 0
 
     def __post_init__(self) -> None:
-        super().__post_init__()
-        notation = self.derive_notation(self.sequence)
-        self.__class__.instance_cache[notation] = self
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, FullVoiceMeasure):
-            return NotImplemented
-        return str(self.sequence) == str(other.sequence)
+        self.id = BaseVoiceMeasure.id_count
+        BaseVoiceMeasure.id_count += 1
 
     def __iter__(self) -> Iterator[SpecificNote]:
         return iter(self.sequence)
@@ -1080,6 +1065,16 @@ class FullVoiceMeasure(BaseVoiceMeasure):
 
     def __len__(self) -> int:
         return len(self.sequence)
+
+
+@dataclass
+class FullVoiceMeasure(BaseVoiceMeasure):
+    instance_cache: ClassVar[dict[str, FullVoiceMeasure]] = {}
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FullVoiceMeasure):
+            return NotImplemented
+        return str(self.sequence) == str(other.sequence)
 
     @staticmethod
     def derive_notation(sequence: list[SpecificNote]) -> str:
@@ -1099,15 +1094,57 @@ class FullVoiceMeasure(BaseVoiceMeasure):
     ) -> FullVoiceMeasure:
         if (notation := cls.derive_notation(sequence)) in cls.instance_cache:
             return cls.instance_cache[notation]
-        return cls(
+        new_measure = cls(
             sequence, left_bound, right_bound, is_rhythm_continuous, is_skip_continuous
         )
+        cls.instance_cache[notation] = new_measure
+        return new_measure
+
+
+half_duration = Fraction("1/2")
+half_rest = RestNote(half_duration)
+
+
+@dataclass
+class HalfVoiceMeasure(BaseVoiceMeasure):
+    left_bound: MeasureBound = MeasureBound(RhythmBound(Fraction("0"), 0), SkipBound(0))
+    right_bound: MeasureBound = MeasureBound(
+        RhythmBound(Fraction("1/2"), 1), SkipBound(0)
+    )
+    is_rhythm_continuous: bool = False
+    is_skip_continuous: bool = False
+    instance_cache: ClassVar[dict[str, HalfVoiceMeasure]] = {}
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.pitch = self.sequence[-1].specific_pitch
+
+    def __iter__(self) -> Iterator:
+        yield half_rest
+        for current_note in self.sequence:
+            yield current_note
+
+    def __getitem__(self, index: int) -> SpecificNote:
+        if index != -1 and index != 1:
+            raise ValueError
+        return self.sequence[-1]
+
+    @classmethod
+    def get(cls, chosen_pitch: SpecificPitch) -> HalfVoiceMeasure:
+        if (notation := str(chosen_pitch)) in cls.instance_cache:
+            return cls.instance_cache[notation]
+        new_measure = cls([SpecificNote(chosen_pitch, half_duration)])
+        cls.instance_cache[notation] = new_measure
+        return new_measure
 
 
 GenericMeasure = TypeVar("GenericMeasure")
 
 
 class BaseMeasureStack(Generic[GenericMeasure]):
+    id_count = 0
+    obj_cache: dict[int, VariantStack] = {}
+
     def __init__(
         self,
         bassus_measure: GenericMeasure,
@@ -1121,6 +1158,8 @@ class BaseMeasureStack(Generic[GenericMeasure]):
             contratenor_measure,
             superius_measure,
         )
+        self.id = BaseMeasureStack.id_count
+        BaseMeasureStack.id_count += 1
 
     def __iter__(self) -> Iterator[GenericMeasure]:
         return iter(self.stack)
@@ -1130,47 +1169,55 @@ class BaseMeasureStack(Generic[GenericMeasure]):
 
 
 class FullMeasureStack(BaseMeasureStack[FullVoiceMeasure]):
-    pass
-
-
-half_duration = Fraction("1/2")
-half_rest = RestNote(half_duration)
-
-
-@dataclass
-class HalfVoiceMeasure(BaseVoiceMeasure):
-    pitch: SpecificPitch
-    left_bound = MeasureBound(RhythmBound(Fraction("0"), 0), SkipBound(0))
-    right_bound = MeasureBound(RhythmBound(Fraction("1/2"), 1), SkipBound(0))
-    is_rhythm_continuous = False
-    is_skip_continuous = False
-    instance_cache: ClassVar[dict[str, HalfVoiceMeasure]] = {}
-
-    def __post_init__(self) -> None:
-        self.sequence = (half_rest, SpecificNote(self.pitch, half_duration))
-        super().__post_init__()
-        self.__class__.instance_cache[str(self.pitch)] = self
-
-    def __iter__(self) -> Iterator:
-        return iter(self.sequence)
-
-    def __getitem__(self, index: int) -> SpecificNote:
-        if index != -1 and index != 1:
-            raise ValueError
-        return self.sequence[-1]
-
-    def __len__(self) -> int:
-        return 1
+    instance_cache: dict[str, FullMeasureStack] = {}
 
     @classmethod
-    def get(cls, chosen_pitch: SpecificPitch) -> HalfVoiceMeasure:
-        if (notation := str(chosen_pitch)) in cls.instance_cache:
+    def get(
+        cls,
+        bassus_measure: FullVoiceMeasure,
+        tenor_measure: FullVoiceMeasure,
+        contratenor_measure: FullVoiceMeasure,
+        superius_measure: FullVoiceMeasure,
+    ) -> FullMeasureStack:
+        notation = (
+            f"{bassus_measure.id}+{tenor_measure.id}+"
+            f"{contratenor_measure.id}+{superius_measure.id}"
+        )
+        if notation in cls.instance_cache:
             return cls.instance_cache[notation]
-        return cls(chosen_pitch)
+
+        new_stack = cls(
+            bassus_measure, tenor_measure, contratenor_measure, superius_measure
+        )
+        cls.instance_cache[notation] = new_stack
+        BaseMeasureStack.obj_cache[new_stack.id] = new_stack
+        return new_stack
 
 
 class HalfMeasureStack(BaseMeasureStack[HalfVoiceMeasure]):
-    pass
+    instance_cache: dict[str, HalfMeasureStack] = {}
+
+    @classmethod
+    def get(
+        cls,
+        bassus_measure: HalfVoiceMeasure,
+        tenor_measure: HalfVoiceMeasure,
+        contratenor_measure: HalfVoiceMeasure,
+        superius_measure: HalfVoiceMeasure,
+    ) -> HalfMeasureStack:
+        notation = (
+            f"{bassus_measure.id}+{tenor_measure.id}+"
+            f"{contratenor_measure.id}+{superius_measure.id}"
+        )
+        if notation in cls.instance_cache:
+            return cls.instance_cache[notation]
+
+        new_stack = cls(
+            bassus_measure, tenor_measure, contratenor_measure, superius_measure
+        )
+        cls.instance_cache[notation] = new_stack
+        BaseMeasureStack.obj_cache[new_stack.id] = new_stack
+        return new_stack
 
 
 VariantVoiceMeasure = HalfVoiceMeasure | FullVoiceMeasure

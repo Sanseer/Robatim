@@ -99,15 +99,7 @@ def get_branle_simple(
     )
 
     print_prospect_counts(sequence_prospects)
-    propagator = partial(
-        rules.has_branle_simple_propagated,
-        flattened_pitch=flattened_pitch,
-        is_antecedent=False,
-        is_intermediate_sequence=False,
-    )
-    dance_partial2 = limits.BranleSimplePartial(
-        sequence_prospects, propagator, chosen_modes
-    )
+    dance_partial2 = limits.BranleSimplePartial(sequence_prospects, chosen_modes)
     measure_sequence2 = dance_partial2.realize()
 
     sequence_prospects = [[] for _ in range(6)]
@@ -164,14 +156,11 @@ def get_branle_simple(
     add_duplicates(sequence_prospects, measure_sequence2, modified_full_voice_measures)
     print_prospect_counts(sequence_prospects)
 
-    propagator = partial(
-        rules.has_branle_simple_propagated,
-        flattened_pitch=flattened_pitch,
+    dance_partial1 = limits.BranleSimplePartial(
+        sequence_prospects,
+        sequence1_modes,
         is_antecedent=is_antecedent,
         is_intermediate_sequence=True,
-    )
-    dance_partial1 = limits.BranleSimplePartial(
-        sequence_prospects, propagator, sequence1_modes
     )
     measure_sequence1 = dance_partial1.realize()
 
@@ -204,14 +193,9 @@ def get_branle_simple(
     )
 
     print_prospect_counts(sequence_prospects)
-    propagator = partial(
-        rules.has_branle_simple_propagated,
-        flattened_pitch=flattened_pitch,
-        is_antecedent=False,
-        is_intermediate_sequence=False,
-    )
     dance_partial3 = limits.BranleSimplePartial(
-        sequence_prospects, propagator, [secondary_mode]
+        sequence_prospects,
+        [secondary_mode],
     )
     measure_sequence3 = dance_partial3.realize()
 
@@ -311,13 +295,7 @@ def get_dance_sequence(
     )
 
     print_prospect_counts(sequence_prospects)
-    propagator = partial(
-        rules.has_basse_danse_propagated,
-        flattened_pitch=flattened_pitch,
-    )
-    dance_partial = limits.BasseDansePartial(
-        sequence_prospects, propagator, [chosen_mode]
-    )
+    dance_partial = limits.BasseDansePartial(sequence_prospects, [chosen_mode])
     return dance_partial.realize()
 
 
@@ -374,7 +352,7 @@ def get_full_measure_sequences(
                         )
                         previous_pitch = current_pitch
                     else:
-                        voice_measure = theory.FullVoiceMeasure(
+                        voice_measure = theory.FullVoiceMeasure.get(
                             pitch_sequence,
                             theory.MeasureBound(
                                 melody_pack.left_rhythm_bound,
@@ -445,7 +423,7 @@ def get_full_measure_sequences(
                         previous_pitch = current_pitch
                     else:
                         if is_contour_relevant:
-                            voice_measure = theory.FullVoiceMeasure(
+                            voice_measure = theory.FullVoiceMeasure.get(
                                 pitch_sequence,
                                 theory.MeasureBound(
                                     melody_pack.left_rhythm_bound,
@@ -584,7 +562,7 @@ def get_half_measure_stacks(
                         continue
                     superius_measure = theory.HalfVoiceMeasure.get(superius_pitch)
 
-                    half_measure_stack = theory.HalfMeasureStack(
+                    half_measure_stack = theory.HalfMeasureStack.get(
                         bassus_measure,
                         tenor_measure,
                         contratenor_measure,
@@ -908,7 +886,7 @@ def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bo
             return False
 
         elapsed_duration = Fraction("0")
-        duo_iter = limits.get_note_duo(lower_voice_measure, upper_voice_measure)
+        duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
         for current_lower_note, current_upper_note in duo_iter:
             for additional_test in additional_tests:
                 if not additional_test(
@@ -1413,15 +1391,22 @@ def set_final_prospects(
 
     for voice_name, voice_formulae in idioms[cadence_id].items():
         voice_tessitura = voice_tessituras[voice_name]
-        ultimate_formulae = set()
+        ultimate_formulas = set()
+        penultimate_formulas = set()
         for voice_formula in voice_formulae:
             *penultimate_formula, ultimate_formula = voice_formula
+            converted_formula = tuple(
+                tuple(formula_part) for formula_part in penultimate_formula
+            )
+            penultimate_formulas.add(converted_formula)
+            ultimate_formulas.add(tuple(ultimate_formula))
+
+        for penultimate_formula in penultimate_formulas:
             voice_measures = get_penultimate_voice_measures(
                 chosen_mode, penultimate_formula, voice_tessitura
             )
             penultimate_sequences[voice_name].extend(voice_measures)
-            ultimate_formulae.add(tuple(ultimate_formula))
-        for ultimate_formula in ultimate_formulae:
+        for ultimate_formula in ultimate_formulas:
             voice_measures = get_ultimate_voice_measures(
                 chosen_mode, ultimate_formula, voice_tessitura, modify_chordal_third
             )
@@ -1615,7 +1600,7 @@ def are_cadential_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -
                 return False
 
         elapsed_duration = Fraction("0")
-        duo_iter = limits.get_note_duo(lower_voice_measure, upper_voice_measure)
+        duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
         for current_lower_note, current_upper_note in duo_iter:
             for additional_test in additional_tests:
                 if not additional_test(
@@ -2094,7 +2079,7 @@ class VoiceMeasureStacker:
                             superius_measure,
                         ):
                             continue
-                        possible_measure_stack = theory.FullMeasureStack(
+                        possible_measure_stack = theory.FullMeasureStack.get(
                             bassus_measure,
                             tenor_measure,
                             contratenor_measure,

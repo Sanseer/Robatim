@@ -92,7 +92,7 @@ class LilypondFactory:
 
     @staticmethod
     def is_power_of_two(integer: int) -> bool:
-        return math.log(integer, 2).is_integer()
+        return math.log2(integer).is_integer()
 
     @classmethod
     def revert_duration(cls, input_repr: str, /) -> Fraction:

@@ -1,9 +1,10 @@
-from functools import partial
+from collections import defaultdict, deque
 from fractions import Fraction
+from functools import wraps
 import itertools
-from typing import Iterator
+from typing import Callable, Iterator
 
-from generate import theory, limits
+from generate import theory
 
 
 def is_lowest_duo_good(
@@ -24,10 +25,192 @@ def is_upper_duo_good(
     return upper_voice_pitch <= second_voice_boundary
 
 
+absolute_failures = defaultdict(set)
+conditional_successes: dict[str, dict[int, set[int]]] = defaultdict(
+    lambda: defaultdict(set)
+)
+
+"""Will not use functools.lru_cache; decorator applies to multiple mandatory tests.   
+Caller of function needs to know ahead of time if any of the tests will fail 
+(via absolute_failures), so they can discard a prospect without testing."""
+
+
+def cache_variant_to_full_stack(
+    func: Callable[[theory.VariantStack, theory.FullMeasureStack], bool]
+) -> Callable[[theory.VariantStack, theory.FullMeasureStack], bool]:
+    @wraps(func)
+    def wrapper(
+        first_measure_stack: theory.VariantStack,
+        second_measure_stack: theory.FullMeasureStack,
+    ) -> bool:
+        first_id, second_id = first_measure_stack.id, second_measure_stack.id
+        func_successes = conditional_successes[func.__name__]
+        if second_id in func_successes[first_id]:
+            return True
+        if verdict := func(first_measure_stack, second_measure_stack):
+            func_successes[first_id].add(second_id)
+        else:
+            absolute_failures[first_id].add(second_id)
+        return verdict
+
+    return wrapper
+
+
+def cache_full_to_full_stack(
+    func: Callable[[theory.FullMeasureStack, theory.FullMeasureStack], bool]
+) -> Callable[[theory.FullMeasureStack, theory.FullMeasureStack], bool]:
+    @wraps(func)
+    def wrapper(
+        first_measure_stack: theory.FullMeasureStack,
+        second_measure_stack: theory.FullMeasureStack,
+    ) -> bool:
+        first_id, second_id = first_measure_stack.id, second_measure_stack.id
+        func_successes = conditional_successes[func.__name__]
+        if second_id in func_successes[first_id]:
+            return True
+        if verdict := func(first_measure_stack, second_measure_stack):
+            func_successes[first_id].add(second_id)
+        else:
+            absolute_failures[first_id].add(second_id)
+        return verdict
+
+    return wrapper
+
+
+solo_transition_successes: dict[int, set[int]] = defaultdict(set)
+solo_transition_failures: dict[int, set[int]] = defaultdict(set)
+
+
 def checked_solo_transition(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
     flattened_pitch: theory.GenericPitch,
+) -> bool:
+    for first_voice_measure, second_voice_measure in zip(
+        first_measure_stack, second_measure_stack
+    ):
+        first_id, second_id = first_voice_measure.id, second_voice_measure.id
+        if second_id in solo_transition_successes[first_id]:
+            continue
+        if second_id in solo_transition_failures[first_id]:
+            return False
+
+        if checked_solo_motion(
+            first_voice_measure, second_voice_measure, flattened_pitch
+        ):
+            solo_transition_successes[first_id].add(second_id)
+        else:
+            solo_transition_failures[first_id].add(second_id)
+            return False
+    return True
+
+
+def checked_solo_motion(
+    first_voice_measure: theory.FullVoiceMeasure,
+    second_voice_measure: theory.FullVoiceMeasure,
+    flattened_pitch: theory.GenericPitch,
+) -> bool:
+    first_pitch = first_voice_measure[-1].specific_pitch
+    second_pitch = second_voice_measure[0].specific_pitch
+    voice_distance = theory.SpecificPitch.get_interval_distance(
+        first_pitch, second_pitch
+    )
+    if voice_distance > 7 or voice_distance == 6:
+        return False
+
+    leap_direction = theory.SpecificPitch.get_direction(first_pitch, second_pitch)
+    if len(second_voice_measure) > 1:
+        resolving_pitch = second_voice_measure[1].specific_pitch
+        resolving_direction = theory.SpecificPitch.get_direction(
+            second_pitch, resolving_pitch
+        )
+        if voice_distance == 7 and leap_direction == resolving_direction:
+            return False
+        if second_voice_measure[0].duration == Fraction("1/4") and voice_distance > 1:
+            if len(second_voice_measure) != 4:
+                return False
+            if resolving_direction != -leap_direction:
+                return False
+            previous_pitch = resolving_pitch
+            for current_note in second_voice_measure.sequence[2:]:
+                current_pitch = current_note.specific_pitch
+                current_direction = theory.SpecificPitch.get_direction(
+                    previous_pitch, current_pitch
+                )
+                if current_direction != resolving_direction:
+                    return False
+                previous_pitch = current_pitch
+
+    if voice_distance == 5:
+        if second_pitch != first_pitch + theory.Interval.get("m6"):
+            return False
+        if len(second_voice_measure) == 1:
+            return False
+
+        resolving_distance = theory.SpecificPitch.get_interval_distance(
+            second_pitch, resolving_pitch
+        )
+        if resolving_distance != 1:
+            return False
+        if leap_direction == resolving_direction:
+            return False
+    if first_voice_measure[-1].duration <= Fraction("1/4"):
+        if voice_distance != 1:
+            return False
+        if (
+            leap_direction == -1
+            and first_voice_measure[-2].specific_pitch < first_pitch
+        ):
+            return False
+
+    # prevents stepwise ascent to picardy third with Phrygian
+    if first_pitch.has_interval_shift(second_pitch, ("A2", "A4", "d5")):
+        return False
+
+    if len(first_voice_measure) > 1:
+        previous_pitch = first_voice_measure[-2].specific_pitch
+        if (
+            first_voice_measure[-1].duration == Fraction("1/4")
+            and first_voice_measure[-2].duration == Fraction("1/4")
+            and not check_chromatic_relation(previous_pitch, second_pitch)
+        ):
+            return False
+        if voice_distance:
+            if previous_pitch != first_pitch and not test_melodic_pyramid(
+                previous_pitch, first_pitch, second_pitch
+            ):
+                return False
+
+    if len(second_voice_measure) > 1:
+        next_pitch = second_voice_measure[1].specific_pitch
+        if (
+            second_voice_measure[0].duration == Fraction("1/4")
+            and second_voice_measure[1].duration == Fraction("1/4")
+            and not check_chromatic_relation(first_pitch, next_pitch)
+        ):
+            return False
+        if voice_distance:
+            if second_pitch != next_pitch and not test_melodic_pyramid(
+                first_pitch, second_pitch, next_pitch
+            ):
+                return False
+
+    if (
+        first_pitch.letter == second_pitch.letter
+        and first_pitch.generic_pitch != second_pitch.generic_pitch
+    ):
+        return False
+    if first_pitch.generic_pitch == flattened_pitch:
+        if leap_direction == 1:
+            return False
+        if voice_distance > 3:
+            return False
+    return True
+
+
+def checked_endpoints(
+    first_measure_stack: theory.VariantStack,
+    second_measure_stack: theory.FullMeasureStack,
     allowed_fifth_endpoints: set[str],
     allowed_fourth_endpoints: set[str],
 ) -> bool:
@@ -39,114 +222,18 @@ def checked_solo_transition(
         voice_distance = theory.SpecificPitch.get_interval_distance(
             first_pitch, second_pitch
         )
-        if voice_distance > 7 or voice_distance == 6:
-            return False
-
-        leap_direction = theory.SpecificPitch.get_direction(first_pitch, second_pitch)
-        if len(second_voice_measure) > 1:
-            resolving_pitch = second_voice_measure[1].specific_pitch
-            resolving_direction = theory.SpecificPitch.get_direction(
-                second_pitch, resolving_pitch
-            )
-            if voice_distance == 7 and leap_direction == resolving_direction:
-                return False
-            if (
-                second_voice_measure[0].duration == Fraction("1/4")
-                and voice_distance > 1
-            ):
-                if len(second_voice_measure) != 4:
-                    return False
-                if resolving_direction != -leap_direction:
-                    return False
-                previous_pitch = resolving_pitch
-                for current_note in second_voice_measure.sequence[2:]:
-                    current_pitch = current_note.specific_pitch
-                    current_direction = theory.SpecificPitch.get_direction(
-                        previous_pitch, current_pitch
-                    )
-                    if current_direction != resolving_direction:
-                        return False
-                    previous_pitch = current_pitch
 
         current_pitch_endpoints = {
             first_pitch.generic_pitch,
             second_pitch.generic_pitch,
         }
-        if voice_distance == 5:
-            if second_pitch != first_pitch + theory.Interval.get("m6"):
-                return False
-            if len(second_voice_measure) == 1:
-                return False
-
-            resolving_distance = theory.SpecificPitch.get_interval_distance(
-                second_pitch, resolving_pitch
-            )
-            if resolving_distance != 1:
-                return False
-            if leap_direction == resolving_direction:
-                return False
-        elif voice_distance == 7:
-            if not current_pitch_endpoints & allowed_fifth_endpoints:
-                return False
-        elif voice_distance == 4:
+        if voice_distance == 7 or voice_distance == 4:
             if not current_pitch_endpoints & allowed_fifth_endpoints:
                 return False
         elif voice_distance == 3:
             if not current_pitch_endpoints & allowed_fourth_endpoints:
                 return False
-        if first_voice_measure[-1].duration <= Fraction("1/4"):
-            if voice_distance != 1:
-                return False
-            if (
-                leap_direction == -1
-                and first_voice_measure[-2].specific_pitch < first_pitch
-            ):
-                return False
-
-        # prevents stepwise ascent to picardy third with Phrygian
-        if first_pitch.has_interval_shift(second_pitch, ("A2", "A4", "d5")):
-            return False
-
-        if len(first_voice_measure) > 1:
-            previous_pitch = first_voice_measure[-2].specific_pitch
-            if (
-                first_voice_measure[-1].duration == Fraction("1/4")
-                and first_voice_measure[-2].duration == Fraction("1/4")
-                and not check_chromatic_relation(previous_pitch, second_pitch)
-            ):
-                return False
-            if voice_distance:
-                if previous_pitch != first_pitch and not test_melodic_pyramid(
-                    previous_pitch, first_pitch, second_pitch
-                ):
-                    return False
-
-        if len(second_voice_measure) > 1:
-            next_pitch = second_voice_measure[1].specific_pitch
-            if (
-                second_voice_measure[0].duration == Fraction("1/4")
-                and second_voice_measure[1].duration == Fraction("1/4")
-                and not check_chromatic_relation(first_pitch, next_pitch)
-            ):
-                return False
-            if voice_distance:
-                if second_pitch != next_pitch and not test_melodic_pyramid(
-                    first_pitch, second_pitch, next_pitch
-                ):
-                    return False
-
-        if (
-            first_pitch.letter == second_pitch.letter
-            and first_pitch.generic_pitch != second_pitch.generic_pitch
-        ):
-            return False
-        if first_pitch.generic_pitch == flattened_pitch:
-            if leap_direction == 1:
-                return False
-            if voice_distance > 3:
-                return False
-
-    return check_cross_pitches(first_measure_stack, second_measure_stack)
+    return True
 
 
 def check_chromatic_relation(
@@ -155,6 +242,9 @@ def check_chromatic_relation(
     if first_pitch.letter == second_pitch.letter:
         return first_pitch.generic_pitch == second_pitch.generic_pitch
     return True
+
+
+all_voice_pairs = ((0, 1), (1, 2), (2, 3), (0, 2), (0, 3), (1, 3))
 
 
 def get_measure_quartets(
@@ -168,7 +258,7 @@ def get_measure_quartets(
         theory.FullVoiceMeasure,
     ]
 ]:
-    for first_voice_index, second_voice_index in limits.all_voice_pairs:
+    for first_voice_index, second_voice_index in all_voice_pairs:
         first_lower_measure = first_measure_stack[first_voice_index]
         first_upper_measure = first_measure_stack[second_voice_index]
         second_lower_measure = second_measure_stack[first_voice_index]
@@ -176,7 +266,8 @@ def get_measure_quartets(
         yield first_lower_measure, first_upper_measure, second_lower_measure, second_upper_measure
 
 
-def check_cross_pitches(
+@cache_full_to_full_stack
+def checked_cross_pitches(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
@@ -253,104 +344,110 @@ def checked_solo_partial_transition(
     first_measure_stack: theory.HalfMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
     flattened_pitch: theory.GenericPitch,
-    allowed_fifth_endpoints: set[str],
-    allowed_fourth_endpoints: set[str],
 ) -> bool:
     for first_voice_measure, second_voice_measure in zip(
         first_measure_stack, second_measure_stack
     ):
-        first_pitch = first_voice_measure[-1].specific_pitch
-        second_pitch = second_voice_measure[0].specific_pitch
-        voice_distance = theory.SpecificPitch.get_interval_distance(
-            first_pitch, second_pitch
-        )
-        if voice_distance > 7 or voice_distance == 6:
+        first_id, second_id = first_voice_measure.id, second_voice_measure.id
+        if second_id in solo_transition_successes[first_id]:
+            continue
+        if second_id in solo_transition_failures[first_id]:
             return False
 
-        leap_direction = theory.SpecificPitch.get_direction(first_pitch, second_pitch)
-        current_pitch_endpoints = {
-            first_pitch.generic_pitch,
-            second_pitch.generic_pitch,
-        }
-        if voice_distance == 7:
-            if len(second_voice_measure) > 1:
-                resolving_pitch = second_voice_measure[1].specific_pitch
-                resolving_direction = theory.SpecificPitch.get_direction(
-                    second_pitch, resolving_pitch
-                )
-                if leap_direction == resolving_direction:
-                    return False
-            if not current_pitch_endpoints & allowed_fifth_endpoints:
-                return False
-        elif voice_distance == 5:
-            if second_pitch != first_pitch + theory.Interval.get("m6"):
-                return False
-            if len(second_voice_measure) == 1:
-                return False
+        if checked_partial_solo_motion(
+            first_voice_measure, second_voice_measure, flattened_pitch
+        ):
+            solo_transition_successes[first_id].add(second_id)
+        else:
+            solo_transition_failures[first_id].add(second_id)
+            return False
+    return True
 
+
+def checked_partial_solo_motion(
+    first_voice_measure: theory.HalfVoiceMeasure,
+    second_voice_measure: theory.FullVoiceMeasure,
+    flattened_pitch: theory.GenericPitch,
+) -> bool:
+    first_pitch = first_voice_measure[-1].specific_pitch
+    second_pitch = second_voice_measure[0].specific_pitch
+    voice_distance = theory.SpecificPitch.get_interval_distance(
+        first_pitch, second_pitch
+    )
+    if voice_distance > 7 or voice_distance == 6:
+        return False
+
+    leap_direction = theory.SpecificPitch.get_direction(first_pitch, second_pitch)
+    if voice_distance == 7:
+        if len(second_voice_measure) > 1:
             resolving_pitch = second_voice_measure[1].specific_pitch
-            resolving_distance = theory.SpecificPitch.get_interval_distance(
-                second_pitch, resolving_pitch
-            )
-            if resolving_distance != 1:
-                return False
             resolving_direction = theory.SpecificPitch.get_direction(
                 second_pitch, resolving_pitch
             )
             if leap_direction == resolving_direction:
                 return False
-        elif voice_distance == 4:
-            if not current_pitch_endpoints & allowed_fifth_endpoints:
-                return False
-        elif voice_distance == 3:
-            if not current_pitch_endpoints & allowed_fourth_endpoints:
-                return False
-
-        if second_voice_measure[0].duration == Fraction("1/4") and voice_distance > 1:
+    elif voice_distance == 5:
+        if second_pitch != first_pitch + theory.Interval.get("m6"):
             return False
-        if first_pitch.has_interval_shift(second_pitch, ("A2", "A4", "d5")):
+        if len(second_voice_measure) == 1:
             return False
 
-        if len(second_voice_measure) > 1:
-            next_pitch = second_voice_measure[1].specific_pitch
-            if (
-                second_voice_measure[0].duration == Fraction("1/4")
-                and second_voice_measure[1].duration == Fraction("1/4")
-                and not check_chromatic_relation(first_pitch, next_pitch)
-            ):
-                return False
-            if voice_distance:
-                if second_pitch != next_pitch and not test_melodic_pyramid(
-                    first_pitch, second_pitch, next_pitch
-                ):
-                    return False
+        resolving_pitch = second_voice_measure[1].specific_pitch
+        resolving_distance = theory.SpecificPitch.get_interval_distance(
+            second_pitch, resolving_pitch
+        )
+        if resolving_distance != 1:
+            return False
+        resolving_direction = theory.SpecificPitch.get_direction(
+            second_pitch, resolving_pitch
+        )
+        if leap_direction == resolving_direction:
+            return False
 
+    if second_voice_measure[0].duration == Fraction("1/4") and voice_distance > 1:
+        return False
+    if first_pitch.has_interval_shift(second_pitch, ("A2", "A4", "d5")):
+        return False
+
+    if len(second_voice_measure) > 1:
+        next_pitch = second_voice_measure[1].specific_pitch
         if (
-            first_pitch.letter == second_pitch.letter
-            and first_pitch.generic_pitch != second_pitch.generic_pitch
+            second_voice_measure[0].duration == Fraction("1/4")
+            and second_voice_measure[1].duration == Fraction("1/4")
+            and not check_chromatic_relation(first_pitch, next_pitch)
         ):
             return False
-        if first_pitch.generic_pitch == flattened_pitch:
-            if leap_direction == 1:
-                return False
-            if voice_distance > 3:
+        if voice_distance:
+            if second_pitch != next_pitch and not test_melodic_pyramid(
+                first_pitch, second_pitch, next_pitch
+            ):
                 return False
 
-    return check_partial_cross_pitches(first_measure_stack, second_measure_stack)
+    if (
+        first_pitch.letter == second_pitch.letter
+        and first_pitch.generic_pitch != second_pitch.generic_pitch
+    ):
+        return False
+    if first_pitch.generic_pitch == flattened_pitch:
+        if leap_direction == 1:
+            return False
+        if voice_distance > 3:
+            return False
+    return True
 
 
 def get_partial_quartets(
-    first_measure_stack: theory.HalfMeasureStack,
+    first_measure_stack: theory.VariantStack,
     second_measure_stack: theory.FullMeasureStack,
 ) -> Iterator[
     tuple[
-        theory.HalfVoiceMeasure,
-        theory.HalfVoiceMeasure,
+        theory.VariantVoiceMeasure,
+        theory.VariantVoiceMeasure,
         theory.FullVoiceMeasure,
         theory.FullVoiceMeasure,
     ]
 ]:
-    for first_voice_index, second_voice_index in limits.all_voice_pairs:
+    for first_voice_index, second_voice_index in all_voice_pairs:
         first_lower_measure = first_measure_stack[first_voice_index]
         first_upper_measure = first_measure_stack[second_voice_index]
         second_lower_measure = second_measure_stack[first_voice_index]
@@ -358,8 +455,9 @@ def get_partial_quartets(
         yield first_lower_measure, first_upper_measure, second_lower_measure, second_upper_measure
 
 
-def check_partial_cross_pitches(
-    first_measure_stack: theory.HalfMeasureStack,
+@cache_variant_to_full_stack
+def checked_partial_cross_pitches(
+    first_measure_stack: theory.VariantStack,
     second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
     for (
@@ -580,7 +678,7 @@ def has_imperfect_resolution(measure_stack: theory.FullMeasureStack) -> bool:
         measure_stack[2][-1].specific_pitch,
         measure_stack[3][-1].specific_pitch,
     ]
-    for first_voice_index, second_voice_index in limits.all_voice_pairs:
+    for first_voice_index, second_voice_index in all_voice_pairs:
         lower_pitch = pitch_quartet[first_voice_index]
         upper_pitch = pitch_quartet[second_voice_index]
         if lower_pitch.has_interval_shift(upper_pitch, imperfect_consonances):
@@ -595,7 +693,7 @@ def checked_duo_transition(
     check_bass_suspension: bool,
 ) -> bool:
     consonant_ids: tuple[str, ...]
-    for first_voice_index, second_voice_index in limits.all_voice_pairs:
+    for first_voice_index, second_voice_index in all_voice_pairs:
         if first_voice_index == 0:
             consonant_ids = lower_voice_consonances
         else:
@@ -777,6 +875,7 @@ def checked_trio_transition(
     return True
 
 
+@cache_variant_to_full_stack
 def checked_quartet_transition(
     first_measure_stack: theory.VariantStack,
     second_measure_stack: theory.FullMeasureStack,
@@ -836,6 +935,7 @@ def checked_quartet_motion(
     return len(voice_directions) > 1
 
 
+@cache_full_to_full_stack
 def checked_dissonant_pass(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
@@ -1105,6 +1205,7 @@ def has_identical_starts(
     return starting_lower_pitch.generic_pitch == starting_upper_pitch.generic_pitch
 
 
+@cache_full_to_full_stack
 def are_measure_stacks_unique(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
@@ -1149,6 +1250,7 @@ def is_parallel_perfect(
     return False
 
 
+@cache_full_to_full_stack
 def checked_broken_parallels(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
@@ -1187,6 +1289,7 @@ def checked_broken_parallels(
                         second_upper_pitch,
                     ):
                         return False
+
                     lower_duration = lower_note.duration
                     if lower_duration != Fraction("1/4"):
                         break
@@ -1203,6 +1306,7 @@ def checked_broken_parallels(
                         second_upper_pitch,
                     ):
                         return False
+
                     upper_duration = upper_note.duration
                     if upper_duration != Fraction("1/4"):
                         break
@@ -1211,6 +1315,7 @@ def checked_broken_parallels(
     return True
 
 
+@cache_full_to_full_stack
 def checked_dotted_adjacent(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
@@ -1233,7 +1338,11 @@ def checked_melodic_activity(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
     third_measure_stack: theory.FullMeasureStack,
+    sequence_name: str,
+    attempted_index: int,
 ) -> bool:
+    if attempted_index == 0 and sequence_name == "BasseDansePartial":
+        return True
     voice_index = -1
     for first_voice_measure, second_voice_measure, third_voice_measure in zip(
         first_measure_stack, second_measure_stack, third_measure_stack
@@ -1255,496 +1364,425 @@ def checked_melodic_activity(
     return True
 
 
-def filter_prospects(
-    index_prospects: list, has_prospect_succeeded: partial[bool]
-) -> list:
-    index_prospects[:] = [
-        index_prospect
-        for index_prospect in index_prospects
-        if has_prospect_succeeded(index_prospect)
-    ]
-    return index_prospects
+def checked_consecutive_durations(current_path: deque[theory.VariantStack]) -> bool:
+    for voice_index, starting_voice_measure in enumerate(current_path[0]):
+        voice_measures_to_check = [starting_voice_measure]
+        previous_voice_measure = starting_voice_measure
 
+        for current_stack in itertools.islice(current_path, 1, len(current_path)):
+            if isinstance(current_stack, theory.HalfMeasureStack):
+                break
+            current_voice_measure = current_stack[voice_index]
+            if previous_voice_measure[-1].duration != current_voice_measure[0].duration:
+                break
 
-def has_branle_simple_propagated(
-    sequence_prospects: list[list[theory.FullMeasureStack]],
-    propagate_index: int,
-    score_sequence: limits.BranleSimplePartial,
-    current_measure_stack: theory.FullMeasureStack,
-    flattened_pitch: theory.GenericPitch,
-    is_antecedent: bool,
-    is_intermediate_sequence: bool,
-) -> bool:
-    prospect_validator = partial(are_measure_stacks_unique, current_measure_stack)
-    for unique_index in score_sequence.uniques[propagate_index]:
-        index_prospects = sequence_prospects[unique_index]
-        if not filter_prospects(index_prospects, prospect_validator):
-            return False
+            voice_measures_to_check.append(current_voice_measure)
+            if not current_voice_measure.is_rhythm_continuous:
+                break
+            previous_voice_measure = current_voice_measure
 
-    final_index = score_sequence.final_index
-    previous_index = propagate_index - 1
-    allowed_fifth_endpoints = score_sequence.allowed_fifth_endpoints
-    allowed_fourth_endpoints = score_sequence.allowed_fourth_endpoints
-    if propagate_index != final_index:
-        next_index = propagate_index + 1
-        next_prospects = sequence_prospects[next_index]
-        if is_antecedent:
-            is_cadence = next_index == 5
-        else:
-            is_cadence = next_index == 4
-
-        prospect_validators = [
-            partial(are_measure_stacks_unique, current_measure_stack),
-            partial(
-                checked_solo_transition,
-                current_measure_stack,
-                flattened_pitch=flattened_pitch,
-                allowed_fifth_endpoints=allowed_fifth_endpoints,
-                allowed_fourth_endpoints=allowed_fourth_endpoints,
-            ),
-            partial(
-                checked_duo_transition,
-                current_measure_stack,
-                allowed_downbeat_unison=next_index == final_index
-                and not is_intermediate_sequence,
-                check_bass_suspension=is_cadence,
-            ),
-            partial(
-                checked_trio_transition,
-                current_measure_stack,
-                check_upper_suspension=is_cadence,
-            ),
-            partial(checked_dissonant_pass, current_measure_stack),
-            partial(checked_broken_parallels, current_measure_stack),
-            partial(checked_dotted_adjacent, current_measure_stack),
-            partial(checked_quartet_transition, current_measure_stack),
-            partial(
-                score_sequence.checked_consecutive_durations,
-                next_index,
-            ),
-            partial(
-                score_sequence.checked_consecutive_skips,
-                next_index,
-            ),
-            partial(
-                score_sequence.checked_consecutive_intervals,
-                next_index,
-            ),
-            partial(score_sequence.checked_melodic_bounds, next_index),
-            partial(score_sequence.checked_melodic_outline, next_index),
-        ]
-        if is_cadence:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    current_measure_stack,
-                    allowed_vectors={0, -1},
-                ),
-            )
-        elif not is_antecedent and next_index == final_index:
-            prospect_validators.insert(
-                0, partial(checked_cadential_successor, current_measure_stack)
-            )
-        else:
-            prospect_validators.append(
-                partial(
-                    checked_superius_transition,
-                    current_measure_stack,
-                    allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
-                )
-            )
-        if propagate_index != 0 and (
-            previous_measure_stack := score_sequence[previous_index]
+        if len(voice_measures_to_check) > 1 and not has_valid_rhythm(
+            voice_measures_to_check
         ):
-            prospect_validators.append(
-                partial(
-                    checked_melodic_activity,
-                    previous_measure_stack,
-                    current_measure_stack,
-                )
-            )
-        for prospect_validator in prospect_validators:
-            if not filter_prospects(next_prospects, prospect_validator):
-                return False
-
-    if propagate_index != 0:
-        previous_prospects = sequence_prospects[previous_index]
-        if is_antecedent:
-            is_cadence = propagate_index == 5
-        else:
-            is_cadence = propagate_index == 4
-
-        prospect_validators = [
-            partial(
-                are_measure_stacks_unique,
-                second_measure_stack=current_measure_stack,
-            ),
-            partial(
-                checked_solo_transition,
-                second_measure_stack=current_measure_stack,
-                flattened_pitch=flattened_pitch,
-                allowed_fifth_endpoints=allowed_fifth_endpoints,
-                allowed_fourth_endpoints=allowed_fourth_endpoints,
-            ),
-            partial(
-                checked_duo_transition,
-                second_measure_stack=current_measure_stack,
-                allowed_downbeat_unison=propagate_index == final_index
-                and not is_intermediate_sequence,
-                check_bass_suspension=is_cadence,
-            ),
-            partial(
-                checked_trio_transition,
-                second_measure_stack=current_measure_stack,
-                check_upper_suspension=is_cadence,
-            ),
-            partial(
-                checked_dissonant_pass,
-                second_measure_stack=current_measure_stack,
-            ),
-            partial(
-                checked_broken_parallels,
-                second_measure_stack=current_measure_stack,
-            ),
-            partial(
-                checked_dotted_adjacent,
-                second_measure_stack=current_measure_stack,
-            ),
-            partial(
-                checked_quartet_transition,
-                second_measure_stack=current_measure_stack,
-            ),
-            partial(
-                score_sequence.checked_consecutive_durations,
-                previous_index,
-            ),
-            partial(
-                score_sequence.checked_consecutive_skips,
-                previous_index,
-            ),
-            partial(
-                score_sequence.checked_consecutive_intervals,
-                previous_index,
-            ),
-            partial(score_sequence.checked_melodic_bounds, previous_index),
-            partial(score_sequence.checked_melodic_outline, previous_index),
-        ]
-        if is_cadence:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    second_measure_stack=current_measure_stack,
-                    allowed_vectors={0, -1},
-                ),
-            )
-        elif not is_antecedent and propagate_index == final_index:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_cadential_successor,
-                    second_measure_stack=current_measure_stack,
-                ),
-            )
-        else:
-            prospect_validators.append(
-                partial(
-                    checked_superius_transition,
-                    second_measure_stack=current_measure_stack,
-                    allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
-                )
-            )
-        if propagate_index != final_index and (
-            next_measure_stack := score_sequence[next_index]
-        ):
-            prospect_validators.append(
-                partial(
-                    checked_melodic_activity,
-                    second_measure_stack=current_measure_stack,
-                    third_measure_stack=next_measure_stack,
-                )
-            )
-        for prospect_validator in prospect_validators:
-            if not filter_prospects(previous_prospects, prospect_validator):
-                return False
-
-    if propagate_index + 2 <= final_index and (
-        next_measure_stack := score_sequence[next_index]
-    ):
-        next_next_prospects = sequence_prospects[propagate_index + 2]
-        prospect_validator = partial(
-            checked_melodic_activity,
-            current_measure_stack,
-            next_measure_stack,
-        )
-        if not filter_prospects(next_next_prospects, prospect_validator):
-            return False
-    if propagate_index - 2 >= 0 and (
-        previous_measure_stack := score_sequence[previous_index]
-    ):
-        previous_previous_prospects = sequence_prospects[propagate_index - 2]
-        prospect_validator = partial(
-            checked_melodic_activity,
-            second_measure_stack=previous_measure_stack,
-            third_measure_stack=current_measure_stack,
-        )
-        if not filter_prospects(previous_previous_prospects, prospect_validator):
             return False
     return True
 
 
-def has_basse_danse_propagated(
-    sequence_prospects: list[list[theory.VariantStack]],
-    propagate_index: int,
-    score_sequence: limits.BasseDansePartial,
-    current_measure_stack: theory.VariantStack,
-    flattened_pitch: theory.GenericPitch,
+def has_valid_rhythm(
+    voice_measures_to_check: list[theory.BaseVoiceMeasure],
 ) -> bool:
-    prospect_validator = partial(are_measure_stacks_unique, current_measure_stack)
-    for unique_index in score_sequence.uniques[propagate_index]:
-        index_prospects = sequence_prospects[unique_index]
-        if not filter_prospects(index_prospects, prospect_validator):
+    current_duration = voice_measures_to_check[0].left_bound.rhythm.duration
+    duration_count = 0
+
+    for current_voice_measure in voice_measures_to_check:
+        if isinstance(current_voice_measure, theory.HalfVoiceMeasure):
+            current_duration = Fraction("1/2")
+            duration_count = 1
+            continue
+
+        first_duration_in_measure = current_voice_measure[0].duration
+        if current_duration != first_duration_in_measure:
+            current_duration = first_duration_in_measure
+            duration_count = 0
+
+        duration_count += current_voice_measure.left_bound.rhythm.count
+        if theory.RhythmBound.limits[current_duration] < duration_count:
             return False
+        if not current_voice_measure.is_rhythm_continuous:
+            current_duration = current_voice_measure.right_bound.rhythm.duration
+            duration_count = current_voice_measure.right_bound.rhythm.count
+    return True
 
-    final_index = score_sequence.final_index
-    previous_index = propagate_index - 1
-    allowed_fifth_endpoints = score_sequence.allowed_fifth_endpoints
-    allowed_fourth_endpoints = score_sequence.allowed_fourth_endpoints
-    if propagate_index != final_index:
-        next_index = propagate_index + 1
-        next_prospects = sequence_prospects[next_index]
-        is_authentic_cadence = next_index == final_index - 1
 
-        prospect_validators = [
-            partial(
-                checked_duo_transition,
-                current_measure_stack,
-                allowed_downbeat_unison=next_index == final_index or next_index == 1,
-                check_bass_suspension=is_authentic_cadence,
-            ),
-            partial(
-                checked_trio_transition,
-                current_measure_stack,
-                check_upper_suspension=is_authentic_cadence,
-            ),
-            partial(checked_quartet_transition, current_measure_stack),
-            partial(
-                score_sequence.checked_consecutive_durations,
-                next_index,
-            ),
-            partial(
-                score_sequence.checked_consecutive_skips,
-                next_index,
-            ),
-            partial(
-                score_sequence.checked_consecutive_intervals,
-                next_index,
-            ),
-            partial(score_sequence.checked_melodic_bounds, next_index),
-            partial(score_sequence.checked_melodic_outline, next_index),
-        ]
-        if propagate_index == 0:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_solo_partial_transition,
-                    current_measure_stack,
-                    flattened_pitch=flattened_pitch,
-                    allowed_fifth_endpoints=allowed_fifth_endpoints,
-                    allowed_fourth_endpoints=allowed_fourth_endpoints,
-                ),
-            )
-        else:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_solo_transition,
-                    current_measure_stack,
-                    flattened_pitch=flattened_pitch,
-                    allowed_fifth_endpoints=allowed_fifth_endpoints,
-                    allowed_fourth_endpoints=allowed_fourth_endpoints,
-                ),
-            )
-            prospect_validators.extend(
-                [
-                    partial(are_measure_stacks_unique, current_measure_stack),
-                    partial(checked_dissonant_pass, current_measure_stack),
-                    partial(checked_broken_parallels, current_measure_stack),
-                    partial(checked_dotted_adjacent, current_measure_stack),
-                ]
-            )
-            if previous_index != 0 and (
-                previous_measure_stack := score_sequence[previous_index]
-            ):
-                prospect_validators.append(
-                    partial(
-                        checked_melodic_activity,
-                        previous_measure_stack,
-                        current_measure_stack,
-                    )
-                )
-        if is_authentic_cadence:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    current_measure_stack,
-                    allowed_vectors={0, -1},
-                ),
-            )
-        elif next_index == final_index:
-            prospect_validators.insert(
-                0, partial(checked_cadential_successor, current_measure_stack)
-            )
-        else:
-            prospect_validators.append(
-                partial(
-                    checked_superius_transition,
-                    current_measure_stack,
-                    allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
-                )
-            )
-        for prospect_validator in prospect_validators:
-            if not filter_prospects(next_prospects, prospect_validator):
-                return False
+def checked_consecutive_skips(current_path: deque[theory.VariantStack]) -> bool:
+    for voice_index, starting_voice_measure in enumerate(current_path[0]):
+        voice_measures_to_check = [starting_voice_measure]
+        previous_voice_measure = starting_voice_measure
 
-    if propagate_index != 0:
-        previous_prospects = sequence_prospects[previous_index]
-        is_authentic_cadence = propagate_index == final_index - 1
+        for current_stack in itertools.islice(current_path, 1, len(current_path)):
+            if isinstance(current_stack, theory.HalfMeasureStack):
+                break
+            current_voice_measure = current_stack[voice_index]
+            if not boundary_creates_skip(previous_voice_measure, current_voice_measure):
+                break
 
-        prospect_validators = [
-            partial(
-                checked_duo_transition,
-                second_measure_stack=current_measure_stack,
-                allowed_downbeat_unison=propagate_index == final_index
-                or propagate_index == 1,
-                check_bass_suspension=is_authentic_cadence,
-            ),
-            partial(
-                checked_trio_transition,
-                second_measure_stack=current_measure_stack,
-                check_upper_suspension=is_authentic_cadence,
-            ),
-            partial(
-                checked_quartet_transition,
-                second_measure_stack=current_measure_stack,
-            ),
-            partial(
-                score_sequence.checked_consecutive_durations,
-                previous_index,
-            ),
-            partial(
-                score_sequence.checked_consecutive_skips,
-                previous_index,
-            ),
-            partial(
-                score_sequence.checked_consecutive_intervals,
-                previous_index,
-            ),
-            partial(score_sequence.checked_melodic_bounds, previous_index),
-            partial(score_sequence.checked_melodic_outline, previous_index),
-        ]
-        if previous_index == 0:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_solo_partial_transition,
-                    second_measure_stack=current_measure_stack,
-                    flattened_pitch=flattened_pitch,
-                    allowed_fifth_endpoints=allowed_fifth_endpoints,
-                    allowed_fourth_endpoints=allowed_fourth_endpoints,
-                ),
-            )
-        else:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_solo_transition,
-                    second_measure_stack=current_measure_stack,
-                    flattened_pitch=flattened_pitch,
-                    allowed_fifth_endpoints=allowed_fifth_endpoints,
-                    allowed_fourth_endpoints=allowed_fourth_endpoints,
-                ),
-            )
-            prospect_validators.extend(
-                [
-                    partial(
-                        are_measure_stacks_unique,
-                        second_measure_stack=current_measure_stack,
-                    ),
-                    partial(
-                        checked_dissonant_pass,
-                        second_measure_stack=current_measure_stack,
-                    ),
-                    partial(
-                        checked_broken_parallels,
-                        second_measure_stack=current_measure_stack,
-                    ),
-                    partial(
-                        checked_dotted_adjacent,
-                        second_measure_stack=current_measure_stack,
-                    ),
-                ]
-            )
-            if propagate_index != final_index and (
-                next_measure_stack := score_sequence[next_index]
-            ):
-                prospect_validators.append(
-                    partial(
-                        checked_melodic_activity,
-                        second_measure_stack=current_measure_stack,
-                        third_measure_stack=next_measure_stack,
-                    )
-                )
-        if is_authentic_cadence:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_superius_transition,
-                    second_measure_stack=current_measure_stack,
-                    allowed_vectors={0, -1},
-                ),
-            )
-        elif propagate_index == final_index:
-            prospect_validators.insert(
-                0,
-                partial(
-                    checked_cadential_successor,
-                    second_measure_stack=current_measure_stack,
-                ),
-            )
-        else:
-            prospect_validators.append(
-                partial(
-                    checked_superius_transition,
-                    second_measure_stack=current_measure_stack,
-                    allowed_vectors={0, -1, 1, -2, 2, -3, 3, -4, 4},
-                )
-            )
-        for prospect_validator in prospect_validators:
-            if not filter_prospects(previous_prospects, prospect_validator):
-                return False
-    if 1 <= propagate_index <= final_index - 2 and (
-        next_measure_stack := score_sequence[next_index]
-    ):
-        next_next_prospects = sequence_prospects[propagate_index + 2]
-        prospect_validator = partial(
-            checked_melodic_activity,
-            current_measure_stack,
-            next_measure_stack,
-        )
-        if not filter_prospects(next_next_prospects, prospect_validator):
-            return False
-    if propagate_index - 2 >= 1 and (
-        previous_measure_stack := score_sequence[previous_index]
-    ):
-        previous_previous_prospects = sequence_prospects[propagate_index - 2]
-        prospect_validator = partial(
-            checked_melodic_activity,
-            second_measure_stack=previous_measure_stack,
-            third_measure_stack=current_measure_stack,
-        )
-        if not filter_prospects(previous_previous_prospects, prospect_validator):
+            voice_measures_to_check.append(current_voice_measure)
+            if not current_voice_measure.is_skip_continuous:
+                break
+            previous_voice_measure = current_voice_measure
+
+        if len(voice_measures_to_check) > 1 and not has_valid_skips(
+            voice_measures_to_check, voice_index
+        ):
             return False
     return True
+
+
+def boundary_creates_skip(
+    first_voice_measure: theory.BaseVoiceMeasure,
+    second_voice_measure: theory.BaseVoiceMeasure,
+) -> bool:
+    before_transition_pitch = first_voice_measure[-1].specific_pitch
+    after_transition_pitch = second_voice_measure[0].specific_pitch
+    interval_distance = theory.SpecificPitch.get_interval_distance(
+        before_transition_pitch, after_transition_pitch
+    )
+    return interval_distance > 1
+
+
+def has_valid_skips(
+    voice_measures_to_check: list[theory.BaseVoiceMeasure],
+    voice_index: int,
+) -> bool:
+    skip_count = 0
+    previous_voice_measure = voice_measures_to_check[0]
+
+    for current_voice_measure in voice_measures_to_check:
+        if isinstance(current_voice_measure, theory.HalfVoiceMeasure):
+            skip_count = 0
+            previous_voice_measure = current_voice_measure
+            continue
+
+        if boundary_creates_skip(previous_voice_measure, current_voice_measure):
+            skip_count += 1
+            if theory.SkipBound.limits[voice_index] < skip_count:
+                return False
+        else:
+            skip_count = 0
+
+        skip_count += current_voice_measure.left_bound.skip.count
+        if theory.SkipBound.limits[voice_index] < skip_count:
+            return False
+        if not current_voice_measure.is_skip_continuous:
+            skip_count = current_voice_measure.right_bound.skip.count
+        previous_voice_measure = current_voice_measure
+    return True
+
+
+def checked_consecutive_intervals(current_path: deque[theory.VariantStack]) -> bool:
+    for first_voice_index, second_voice_index in all_voice_pairs:
+        lower_voice_measure = current_path[0][first_voice_index]
+        upper_voice_measure = current_path[0][second_voice_index]
+
+        lower_voice_sequence = lower_voice_measure.sequence[:]
+        last_lower_pitch = lower_voice_measure[-1].specific_pitch
+        upper_voice_sequence = upper_voice_measure.sequence[:]
+        last_upper_pitch = upper_voice_measure[-1].specific_pitch
+
+        if not last_lower_pitch.has_interval_shift(last_upper_pitch):
+            continue
+        lower_motion_count = 0
+        upper_motion_count = 0
+        previous_lower_pitch = last_lower_pitch
+        previous_upper_pitch = last_upper_pitch
+
+        for current_stack in itertools.islice(current_path, 1, len(current_path)):
+            if isinstance(current_stack, theory.HalfMeasureStack):
+                break
+
+            for current_note in current_stack[first_voice_index]:
+                current_lower_pitch = current_note.specific_pitch
+                if current_lower_pitch != previous_lower_pitch:
+                    lower_motion_count += 1
+                lower_voice_sequence.append(current_note)
+                previous_lower_pitch = current_lower_pitch
+
+            for current_note in current_stack[second_voice_index]:
+                current_upper_pitch = current_note.specific_pitch
+                if current_upper_pitch != previous_upper_pitch:
+                    upper_motion_count += 1
+                upper_voice_sequence.append(current_note)
+                previous_upper_pitch = current_upper_pitch
+
+            if max(lower_motion_count, upper_motion_count) >= 2:
+                break
+
+        if max(len(lower_voice_sequence), len(upper_voice_sequence)) < 3:
+            continue
+        if not checked_perfect_intervals(lower_voice_sequence, upper_voice_sequence):
+            return False
+    return True
+
+
+def get_note_duo(
+    lower_voice_measure: theory.FullVoiceMeasure | list[theory.SpecificNote],
+    upper_voice_measure: theory.FullVoiceMeasure | list[theory.SpecificNote],
+) -> Iterator[tuple[theory.SpecificNote, theory.SpecificNote]]:
+    lower_voice_iter = iter(lower_voice_measure)
+    upper_voice_iter = iter(upper_voice_measure)
+
+    lower_voice_note = next(lower_voice_iter)
+    upper_voice_note = next(upper_voice_iter)
+    lower_voice_duration = lower_voice_note.duration
+    upper_voice_duration = upper_voice_note.duration
+
+    while True:
+        yield lower_voice_note, upper_voice_note
+
+        intersect_duration = min(lower_voice_duration, upper_voice_duration)
+        lower_voice_duration -= intersect_duration
+        upper_voice_duration -= intersect_duration
+
+        try:
+            if not lower_voice_duration:
+                lower_voice_note = next(lower_voice_iter)
+                lower_voice_duration = lower_voice_note.duration
+            if not upper_voice_duration:
+                upper_voice_note = next(upper_voice_iter)
+                upper_voice_duration = upper_voice_note.duration
+        except StopIteration:
+            break
+
+
+def checked_perfect_intervals(
+    lower_voice_sequence: list[theory.SpecificNote],
+    upper_voice_sequence: list[theory.SpecificNote],
+) -> bool:
+    duo_iter = get_note_duo(lower_voice_sequence, upper_voice_sequence)
+    previous_lower_note, previous_upper_note = next(duo_iter)
+    previous_lower_pitch = previous_lower_note.specific_pitch
+    previous_upper_pitch = previous_upper_note.specific_pitch
+
+    if previous_lower_pitch.has_interval_shift(previous_upper_pitch):
+        perfect_interval_count = 1
+    else:
+        perfect_interval_count = 0
+
+    for current_lower_note, current_upper_note in duo_iter:
+        current_lower_pitch = current_lower_note.specific_pitch
+        current_upper_pitch = current_upper_note.specific_pitch
+        has_lower_voice_moved = previous_lower_pitch != current_lower_pitch
+        has_upper_voice_moved = previous_upper_pitch != current_upper_pitch
+
+        if has_lower_voice_moved or has_upper_voice_moved:
+            if current_lower_pitch.has_interval_shift(current_upper_pitch):
+                perfect_interval_count += 1
+                if perfect_interval_count > 2:
+                    return False
+            else:
+                perfect_interval_count = 0
+        previous_lower_pitch = current_lower_pitch
+        previous_upper_pitch = current_upper_pitch
+    return True
+
+
+def checked_melodic_outline(
+    current_path: deque[theory.VariantStack], allowed_fifth_endpoints: set[str]
+) -> bool:
+    path_length = len(current_path)
+    include_leftmost_outline = (
+        isinstance(current_path[0], theory.HalfMeasureStack) or path_length == 6
+    )
+
+    for voice_index, starting_voice_measure in enumerate(current_path[0]):
+        if isinstance(starting_voice_measure, theory.HalfVoiceMeasure):
+            pitch_sequence = [starting_voice_measure.pitch]
+        else:
+            pitch_sequence = [
+                current_note.specific_pitch for current_note in starting_voice_measure
+            ]
+
+        for current_stack in itertools.islice(current_path, 1, path_length):
+            if isinstance(current_stack, theory.HalfMeasureStack):
+                break
+            pitch_sequence.extend(
+                current_note.specific_pitch
+                for current_note in current_stack[voice_index]
+            )
+
+        previous_direction = 0
+        previous_pitch = pitch_sequence[0]
+        prelim_outlines = []
+        prelim_outline = [previous_pitch]
+        prelim_flags = []
+
+        for current_pitch in pitch_sequence[1:]:
+            current_direction = theory.SpecificPitch.get_direction(
+                previous_pitch, current_pitch
+            )
+            if current_direction:
+                if previous_direction:
+                    if previous_direction == current_direction:
+                        prelim_outline.append(current_pitch)
+                    else:
+                        prelim_outlines.append(prelim_outline)
+                        prelim_outline = [previous_pitch, current_pitch]
+                        interval_distance = theory.SpecificPitch.get_interval_distance(
+                            previous_pitch, current_pitch
+                        )
+                        prelim_flags.append(interval_distance == 1)
+                else:
+                    prelim_outline.append(current_pitch)
+                previous_direction = current_direction
+            previous_pitch = current_pitch
+        prelim_outlines.append(prelim_outline)
+        prelim_flags.append(True)
+
+        if len(prelim_outlines) == 1:
+            if include_leftmost_outline:
+                finalized_outlines = prelim_outlines
+                finalized_flags = prelim_flags
+            else:
+                continue
+        else:
+            finalized_outlines = prelim_outlines[1:]
+            finalized_flags = prelim_flags[1:]
+            if include_leftmost_outline:
+                finalized_outlines.insert(0, prelim_outlines[0])
+                finalized_flags.insert(0, prelim_flags[0])
+
+        for melodic_outline, followup_flag in zip(finalized_outlines, finalized_flags):
+            if len(melodic_outline) > 2 and not is_valid_outline(
+                melodic_outline, followup_flag, allowed_fifth_endpoints
+            ):
+                return False
+    return True
+
+
+def is_valid_outline(
+    melodic_outline: list[theory.SpecificPitch],
+    followup_is_stepewise: bool,
+    allowed_fifth_endpoints: set[str],
+) -> bool:
+    first_pitch, *_, last_pitch = melodic_outline
+    voice_distance = theory.SpecificPitch.get_interval_distance(first_pitch, last_pitch)
+
+    if voice_distance > 7:
+        return False
+    if voice_distance == 6 and len(melodic_outline) != 7:
+        return False
+    current_pitch_endpoints = {
+        first_pitch.generic_pitch,
+        last_pitch.generic_pitch,
+    }
+    if voice_distance == 7:
+        return bool(current_pitch_endpoints & allowed_fifth_endpoints)
+
+    current_direction = theory.SpecificPitch.get_direction(first_pitch, last_pitch)
+    augmented_interval = theory.Interval.get("A4")
+    diminished_interval = theory.Interval.get("d5")
+
+    if current_direction == -1:
+        augmented_interval, diminished_interval = (
+            diminished_interval,
+            augmented_interval,
+        )
+    if first_pitch.has_interval_shift(last_pitch, (str(augmented_interval),)):
+        return False
+    if first_pitch.has_interval_shift(last_pitch, (str(diminished_interval),)):
+        if len(melodic_outline) != 5:
+            return False
+        return followup_is_stepewise
+
+    if voice_distance == 4:
+        return bool(current_pitch_endpoints & allowed_fifth_endpoints)
+    return True
+
+
+def checked_melodic_bounds(
+    current_path: deque[theory.VariantStack],
+) -> bool:
+    current_superius_measure = current_path[0][-1]
+    current_sequence = current_superius_measure.sequence[:]
+
+    for current_stack in itertools.islice(current_path, 1, len(current_path)):
+        if isinstance(current_stack, theory.HalfMeasureStack):
+            break
+        current_sequence.extend(current_stack[-1])
+
+    # if 3 boundaries is the limit, you need at least 6 notes to exceed it
+    if len(current_sequence) < 6:
+        return True
+
+    normalized_sequence = [current_sequence[0]]
+
+    for current_note in current_sequence[1:]:
+        current_duration = current_note.duration
+
+        once_before_note = normalized_sequence[-1]
+        previous_duration = once_before_note.duration
+        current_direction = theory.SpecificPitch.get_direction(
+            once_before_note.specific_pitch, current_note.specific_pitch
+        )
+
+        while len(normalized_sequence) > 1:
+            twice_before_note = normalized_sequence[-2]
+            previous_direction = theory.SpecificPitch.get_direction(
+                twice_before_note.specific_pitch, once_before_note.specific_pitch
+            )
+            if (
+                previous_direction * current_direction
+            ) < 0 and previous_duration <= Fraction("1/4"):
+                normalized_sequence.pop()
+                once_before_note = normalized_sequence[-1]
+                previous_duration = once_before_note.duration
+                current_direction = theory.SpecificPitch.get_direction(
+                    once_before_note.specific_pitch, current_note.specific_pitch
+                )
+            else:
+                break
+        if (
+            current_note.specific_pitch == once_before_note.specific_pitch
+            and current_duration == previous_duration == Fraction("1/4")
+        ):
+            normalized_sequence[-1] = theory.SpecificNote(
+                current_note.specific_pitch, Fraction("1/2")
+            )
+        else:
+            normalized_sequence.append(current_note)
+
+    if len(normalized_sequence) < 6:
+        return True
+    return test_pitch_boundaries(normalized_sequence)
+
+
+def test_pitch_boundaries(normalized_sequence: list[theory.SpecificNote]) -> bool:
+    previous_note = normalized_sequence[0]
+    previous_vector = 0
+    pitch_boundary_count = 0
+    pitch_boundaries = set()
+
+    for current_note in normalized_sequence[1:]:
+        previous_pitch = previous_note.specific_pitch
+        current_pitch = current_note.specific_pitch
+        current_vector = theory.SpecificPitch.get_interval_vector(
+            previous_pitch, current_pitch
+        )
+        if (previous_vector * current_vector) < 0:
+            pitch_boundary_count += 1
+            if pitch_boundary_count > 3:
+                return False
+            if abs(current_vector) > 1 and abs(previous_vector) > 1:
+                return False
+
+            if (bound_repr := str(previous_pitch)) in pitch_boundaries:
+                return False
+            pitch_boundaries.add(bound_repr)
+
+        previous_note = current_note
+        if current_vector:
+            previous_vector = current_vector
+
+    if current_note.duration != Fraction("1"):
+        return True
+    return str(current_pitch) not in pitch_boundaries
