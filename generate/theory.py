@@ -1066,15 +1066,15 @@ class BaseVoiceMeasure:
     def __len__(self) -> int:
         return len(self.sequence)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, BaseVoiceMeasure):
+            return False
+        return self.id == other.id
+
 
 @dataclass
 class FullVoiceMeasure(BaseVoiceMeasure):
     instance_cache: ClassVar[dict[str, FullVoiceMeasure]] = {}
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, FullVoiceMeasure):
-            return NotImplemented
-        return str(self.sequence) == str(other.sequence)
 
     @staticmethod
     def derive_notation(sequence: list[SpecificNote]) -> str:

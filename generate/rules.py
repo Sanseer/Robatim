@@ -141,6 +141,19 @@ def checked_solo_motion(
                     return False
                 previous_pitch = current_pitch
 
+        if (
+            second_voice_measure[0].duration == Fraction("1/4")
+            and second_voice_measure[1].duration == Fraction("1/4")
+            and not checked_chromatic_relation(first_pitch, resolving_pitch)
+        ):
+            return False
+        if (
+            voice_distance
+            and resolving_direction
+            and not test_melodic_pyramid(first_pitch, second_pitch, resolving_pitch)
+        ):
+            return False
+
     if voice_distance == 5:
         if second_pitch != first_pitch + theory.Interval.get("m6"):
             return False
@@ -154,14 +167,6 @@ def checked_solo_motion(
             return False
         if leap_direction == resolving_direction:
             return False
-    if first_voice_measure[-1].duration <= Fraction("1/4"):
-        if voice_distance != 1:
-            return False
-        if (
-            leap_direction == -1
-            and first_voice_measure[-2].specific_pitch < first_pitch
-        ):
-            return False
 
     # prevents stepwise ascent to picardy third with Phrygian
     if first_pitch.has_interval_shift(second_pitch, ("A2", "A4", "d5")):
@@ -169,43 +174,45 @@ def checked_solo_motion(
 
     if len(first_voice_measure) > 1:
         previous_pitch = first_voice_measure[-2].specific_pitch
+        previous_direction = theory.SpecificPitch.get_direction(
+            previous_pitch, first_pitch
+        )
         if (
-            first_voice_measure[-1].duration == Fraction("1/4")
-            and first_voice_measure[-2].duration == Fraction("1/4")
-            and not check_chromatic_relation(previous_pitch, second_pitch)
+            voice_distance
+            and previous_direction
+            and not test_melodic_pyramid(previous_pitch, first_pitch, second_pitch)
         ):
             return False
-        if voice_distance:
-            if previous_pitch != first_pitch and not test_melodic_pyramid(
-                previous_pitch, first_pitch, second_pitch
-            ):
+        if first_voice_measure[-1].duration == Fraction("1/4"):
+            if voice_distance != 1:
+                return False
+            if leap_direction == -1 and previous_direction == 1:
                 return False
 
-    if len(second_voice_measure) > 1:
-        next_pitch = second_voice_measure[1].specific_pitch
-        if (
-            second_voice_measure[0].duration == Fraction("1/4")
-            and second_voice_measure[1].duration == Fraction("1/4")
-            and not check_chromatic_relation(first_pitch, next_pitch)
-        ):
-            return False
-        if voice_distance:
-            if second_pitch != next_pitch and not test_melodic_pyramid(
-                first_pitch, second_pitch, next_pitch
-            ):
-                return False
-
-    if (
-        first_pitch.letter == second_pitch.letter
-        and first_pitch.generic_pitch != second_pitch.generic_pitch
-    ):
+            if first_voice_measure[-2].duration == Fraction("1/4"):
+                if not checked_chromatic_relation(previous_pitch, second_pitch):
+                    return False
+                # Do not use the same neighbor figure twice in a row
+                if (
+                    second_voice_measure[0].duration == Fraction("1/4")
+                    and second_voice_measure[1].duration == Fraction("1/4")
+                    and previous_direction == -1
+                    and leap_direction == 1
+                    and resolving_direction == -1
+                ):
+                    next_next_direction = theory.SpecificPitch.get_direction(
+                        resolving_pitch, second_voice_measure[2].specific_pitch
+                    )
+                    if next_next_direction == 1:
+                        return False
+    if is_agogic_combo(first_voice_measure, second_voice_measure):
         return False
     if first_pitch.generic_pitch == flattened_pitch:
         if leap_direction == 1:
             return False
         if voice_distance > 3:
             return False
-    return True
+    return checked_chromatic_relation(first_pitch, second_pitch)
 
 
 def checked_endpoints(
@@ -236,7 +243,7 @@ def checked_endpoints(
     return True
 
 
-def check_chromatic_relation(
+def checked_chromatic_relation(
     first_pitch: theory.SpecificPitch, second_pitch: theory.SpecificPitch
 ) -> bool:
     if first_pitch.letter == second_pitch.letter:
@@ -266,8 +273,44 @@ def get_measure_quartets(
         yield first_lower_measure, first_upper_measure, second_lower_measure, second_upper_measure
 
 
+agogic_directions: dict[int, int] = {}
+
+
+def get_agogic_direction(chosen_voice_measure: theory.FullVoiceMeasure) -> int:
+    if len(chosen_voice_measure) != 3:
+        return 0
+
+    first_pitch = chosen_voice_measure[0].specific_pitch
+    second_pitch = chosen_voice_measure[1].specific_pitch
+    third_pitch = chosen_voice_measure[2].specific_pitch
+    first_direction = theory.SpecificPitch.get_direction(first_pitch, second_pitch)
+    second_direction = theory.SpecificPitch.get_direction(second_pitch, third_pitch)
+
+    if first_direction != second_direction:
+        return 0
+    return first_direction
+
+
+def is_agogic_combo(
+    first_voice_measure: theory.FullVoiceMeasure,
+    second_voice_measure: theory.FullVoiceMeasure,
+) -> bool:
+    if (chosen_id := first_voice_measure.id) not in agogic_directions:
+        agogic_directions[chosen_id] = get_agogic_direction(first_voice_measure)
+    if not (first_direction := agogic_directions[chosen_id]):
+        return False
+    if (chosen_id := second_voice_measure.id) not in agogic_directions:
+        agogic_directions[chosen_id] = get_agogic_direction(second_voice_measure)
+    if not (second_direction := agogic_directions[chosen_id]):
+        return False
+
+    if first_direction != second_direction:
+        return False
+    return first_voice_measure[0].duration == second_voice_measure[0].duration
+
+
 @cache_full_to_full_stack
-def checked_cross_pitches(
+def checked_cross_measures(
     first_measure_stack: theory.FullMeasureStack,
     second_measure_stack: theory.FullMeasureStack,
 ) -> bool:
@@ -277,12 +320,16 @@ def checked_cross_pitches(
         second_lower_measure,
         second_upper_measure,
     ) in get_measure_quartets(first_measure_stack, second_measure_stack):
+        if is_agogic_combo(first_lower_measure, second_upper_measure):
+            return False
+        if is_agogic_combo(first_upper_measure, second_lower_measure):
+            return False
         if (
             len(first_lower_measure) > 1
             and first_lower_measure[-1].duration == Fraction("1/4")
             and first_lower_measure[-2].duration == Fraction("1/4")
         ):
-            if not check_chromatic_relation(
+            if not checked_chromatic_relation(
                 first_lower_measure[-2].specific_pitch,
                 second_upper_measure[0].specific_pitch,
             ):
@@ -292,7 +339,7 @@ def checked_cross_pitches(
             and first_upper_measure[-1].duration == Fraction("1/4")
             and first_upper_measure[-2].duration == Fraction("1/4")
         ):
-            if not check_chromatic_relation(
+            if not checked_chromatic_relation(
                 first_upper_measure[-2].specific_pitch,
                 second_lower_measure[0].specific_pitch,
             ):
@@ -303,7 +350,7 @@ def checked_cross_pitches(
             and second_lower_measure[0].duration == Fraction("1/4")
             and second_lower_measure[1].duration == Fraction("1/4")
         ):
-            if not check_chromatic_relation(
+            if not checked_chromatic_relation(
                 first_upper_measure[-1].specific_pitch,
                 second_lower_measure[1].specific_pitch,
             ):
@@ -313,7 +360,7 @@ def checked_cross_pitches(
             and second_upper_measure[0].duration == Fraction("1/4")
             and second_upper_measure[1].duration == Fraction("1/4")
         ):
-            if not check_chromatic_relation(
+            if not checked_chromatic_relation(
                 first_lower_measure[-1].specific_pitch,
                 second_upper_measure[1].specific_pitch,
             ):
@@ -414,7 +461,7 @@ def checked_partial_solo_motion(
         if (
             second_voice_measure[0].duration == Fraction("1/4")
             and second_voice_measure[1].duration == Fraction("1/4")
-            and not check_chromatic_relation(first_pitch, next_pitch)
+            and not checked_chromatic_relation(first_pitch, next_pitch)
         ):
             return False
         if voice_distance:
@@ -471,7 +518,7 @@ def checked_partial_cross_pitches(
             and second_lower_measure[0].duration == Fraction("1/4")
             and second_lower_measure[1].duration == Fraction("1/4")
         ):
-            if not check_chromatic_relation(
+            if not checked_chromatic_relation(
                 first_upper_measure[-1].specific_pitch,
                 second_lower_measure[1].specific_pitch,
             ):
@@ -481,7 +528,7 @@ def checked_partial_cross_pitches(
             and second_upper_measure[0].duration == Fraction("1/4")
             and second_upper_measure[1].duration == Fraction("1/4")
         ):
-            if not check_chromatic_relation(
+            if not checked_chromatic_relation(
                 first_lower_measure[-1].specific_pitch,
                 second_upper_measure[1].specific_pitch,
             ):

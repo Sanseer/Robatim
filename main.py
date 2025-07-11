@@ -24,9 +24,8 @@ if __name__ == "__main__":
     mode_group = random.choice(idioms["available_keys"])
     tonic_pitch_str, chosen_mode_str = mode_group[0]
     proxy_mode = theory.scale_type_map[chosen_mode_str](tonic_pitch_str)
-    flattened_pitch = proxy_mode.flattened_pitch
     all_full_voice_measures = dance.get_full_measure_sequences(
-        proxy_mode, voice_tessituras, flattened_pitch.letter
+        proxy_mode, voice_tessituras
     )
 
     dance_constructors = [dance.get_branle_simple, dance.get_basse_danse]
@@ -40,7 +39,6 @@ if __name__ == "__main__":
                 clef_group,
                 voice_tessituras,
                 primary_mode,
-                flattened_pitch,
                 all_full_voice_measures,
             )
             break

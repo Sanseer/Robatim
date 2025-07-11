@@ -253,7 +253,7 @@ class BasseDansePartial(SequencePartial[theory.VariantStack]):
             partial(rules.checked_dissonant_pass),
             partial(rules.checked_broken_parallels),
             partial(rules.checked_dotted_adjacent),
-            partial(rules.checked_cross_pitches),
+            partial(rules.checked_cross_measures),
             partial(rules.checked_quartet_transition),
             partial(
                 rules.checked_endpoints,
@@ -345,7 +345,7 @@ class BranleSimplePartial(SequencePartial[theory.FullMeasureStack]):
             partial(rules.checked_dissonant_pass),
             partial(rules.checked_broken_parallels),
             partial(rules.checked_dotted_adjacent),
-            partial(rules.checked_cross_pitches),
+            partial(rules.checked_cross_measures),
             partial(rules.checked_quartet_transition),
             partial(
                 rules.checked_endpoints,
