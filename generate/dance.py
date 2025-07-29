@@ -5,7 +5,7 @@ from functools import partial
 import random
 from typing import Iterator, Callable
 
-from generate import export, limits, rules, source, theory
+from generate import export, limits, pure, rules, screen, source, theory
 
 idioms = source.idioms
 revert_duration = export.LilypondFactory.revert_duration
@@ -565,8 +565,8 @@ def get_half_measure_stacks(
                 (
                     bassus_pitch,
                     tenor_pitch,
-                    (rules.is_lowest_duo_good,),
-                    rules.lower_voice_consonances,
+                    (pure.is_lowest_duo_good,),
+                    pure.lower_voice_consonances,
                 ),
             )
             if not are_half_duos_valid(half_duos_to_check):
@@ -578,13 +578,13 @@ def get_half_measure_stacks(
                         bassus_pitch,
                         contratenor_pitch,
                         tuple(),
-                        rules.lower_voice_consonances,
+                        pure.lower_voice_consonances,
                     ),
                     (
                         tenor_pitch,
                         contratenor_pitch,
-                        (rules.is_upper_duo_good,),
-                        rules.upper_voice_consonances,
+                        (pure.is_upper_duo_good,),
+                        pure.upper_voice_consonances,
                     ),
                 )
                 if not are_half_duos_valid(half_duos_to_check):
@@ -598,19 +598,19 @@ def get_half_measure_stacks(
                             bassus_pitch,
                             superius_pitch,
                             tuple(),
-                            rules.lower_voice_consonances,
+                            pure.lower_voice_consonances,
                         ),
                         (
                             tenor_pitch,
                             superius_pitch,
                             tuple(),
-                            rules.upper_voice_consonances,
+                            pure.upper_voice_consonances,
                         ),
                         (
                             contratenor_pitch,
                             superius_pitch,
-                            (rules.is_upper_duo_good,),
-                            rules.upper_voice_consonances,
+                            (pure.is_upper_duo_good,),
+                            pure.upper_voice_consonances,
                         ),
                     )
                     if not are_half_duos_valid(half_duos_to_check):
@@ -662,12 +662,8 @@ def filter_by_transition(
         partial(
             rules.checked_duo_transition,
             allowed_downbeat_unison=True,
-            check_bass_suspension=False,
         ),
-        partial(
-            rules.checked_trio_transition,
-            check_upper_suspension=False,
-        ),
+        partial(rules.checked_trio_transition),
     )
 
     filtered_prospects = []
@@ -686,282 +682,6 @@ def filter_by_transition(
     return filtered_prospects
 
 
-def valid_diminished_duo(
-    lower_voice_measure: theory.FullVoiceMeasure,
-    upper_voice_measure: theory.FullVoiceMeasure,
-    consonant_ids: tuple[str, ...],
-) -> bool:
-    lower_is_diminished_cantus, lower_is_diminished_counter = get_species_role(
-        lower_voice_measure
-    )
-    upper_is_diminished_cantus, upper_is_diminished_counter = get_species_role(
-        upper_voice_measure
-    )
-    if (
-        lower_is_diminished_cantus
-        and upper_is_diminished_counter
-        or lower_is_diminished_counter
-        and upper_is_diminished_cantus
-    ):
-        if lower_is_diminished_cantus:
-            lower_pitch = lower_voice_measure[0].specific_pitch
-            upper_pitch = upper_voice_measure[1].specific_pitch
-        else:
-            lower_pitch = lower_voice_measure[1].specific_pitch
-            upper_pitch = upper_voice_measure[0].specific_pitch
-        if not rules.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
-            if upper_is_diminished_counter:
-                if not rules.has_passing_figure(
-                    upper_voice_measure[0].specific_pitch,
-                    upper_voice_measure[1].specific_pitch,
-                    upper_voice_measure[2].specific_pitch,
-                ):
-                    return False
-            elif not rules.has_passing_figure(
-                lower_voice_measure[0].specific_pitch,
-                lower_voice_measure[1].specific_pitch,
-                lower_voice_measure[2].specific_pitch,
-            ):
-                return False
-    return True
-
-
-def valid_dotted_duo(
-    lower_voice_measure: theory.FullVoiceMeasure,
-    upper_voice_measure: theory.FullVoiceMeasure,
-    consonant_ids: tuple[str, ...],
-) -> bool:
-    lower_is_dotted = lower_voice_measure[0].duration == Fraction("3/4")
-    upper_is_dotted = upper_voice_measure[0].duration == Fraction("3/4")
-    if lower_is_dotted ^ upper_is_dotted:
-        if lower_is_dotted:
-            lower_pitch = lower_voice_measure[0].specific_pitch
-            upper_pitch = rules.find_pitch(upper_voice_measure)
-            dotted_measure, undotted_measure = (
-                lower_voice_measure,
-                upper_voice_measure,
-            )
-        else:
-            lower_pitch = rules.find_pitch(lower_voice_measure)
-            upper_pitch = upper_voice_measure[0].specific_pitch
-            dotted_measure, undotted_measure = (
-                upper_voice_measure,
-                lower_voice_measure,
-            )
-
-        if not rules.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
-            if len(undotted_measure) != 2:
-                return False
-            if lower_is_dotted and lower_pitch.has_interval_shift(upper_pitch, ("d5",)):
-                return False
-            first_patient_pitch = dotted_measure[0].specific_pitch
-            second_patient_pitch = dotted_measure[1].specific_pitch
-            if (
-                theory.SpecificPitch.get_interval_vector(
-                    first_patient_pitch, second_patient_pitch
-                )
-                != -1
-            ):
-                return False
-
-            if lower_is_dotted:
-                lower_resolve_pitch = second_patient_pitch
-                upper_resolve_pitch = upper_pitch
-            else:
-                lower_resolve_pitch = lower_pitch
-                upper_resolve_pitch = second_patient_pitch
-            if not lower_resolve_pitch.has_interval_shift(
-                upper_resolve_pitch, consonant_ids
-            ):
-                return False
-    return True
-
-
-def valid_broken_parallels(
-    lower_voice_measure: theory.FullVoiceMeasure,
-    upper_voice_measure: theory.FullVoiceMeasure,
-    consonant_ids: tuple[str, ...],
-) -> bool:
-    lower_voice_iter = iter(lower_voice_measure)
-    upper_voice_iter = iter(upper_voice_measure)
-    lower_duration = Fraction("0")
-    upper_duration = Fraction("0")
-    remaining_measure_duration = Fraction("1")
-
-    while remaining_measure_duration:
-        if not lower_duration:
-            lower_note = next(lower_voice_iter)
-            lower_duration = lower_note.duration
-            first_lower_pitch = lower_note.specific_pitch
-        if not upper_duration:
-            upper_note = next(upper_voice_iter)
-            upper_duration = upper_note.duration
-            first_upper_pitch = upper_note.specific_pitch
-
-        if lower_duration != upper_duration and first_lower_pitch.has_interval_shift(
-            first_upper_pitch
-        ):
-            only_quarters_inbetween = True
-            intersect_duration = min(lower_duration, upper_duration)
-            if lower_duration > upper_duration:
-                lower_duration -= intersect_duration
-                remaining_measure_duration -= intersect_duration
-                while lower_duration:
-                    upper_note = next(upper_voice_iter)
-                    upper_duration = upper_note.duration
-                    if upper_duration != Fraction("1/4"):
-                        only_quarters_inbetween = False
-
-                    intersect_duration = min(lower_duration, upper_duration)
-                    lower_duration -= intersect_duration
-                    upper_duration -= intersect_duration
-                    remaining_measure_duration -= intersect_duration
-            else:
-                upper_duration -= intersect_duration
-                remaining_measure_duration -= intersect_duration
-                while upper_duration:
-                    lower_note = next(lower_voice_iter)
-                    lower_duration = lower_note.duration
-                    if lower_duration != Fraction("1/4"):
-                        only_quarters_inbetween = False
-
-                    intersect_duration = min(lower_duration, upper_duration)
-                    lower_duration -= intersect_duration
-                    upper_duration -= intersect_duration
-                    remaining_measure_duration -= intersect_duration
-
-            if not remaining_measure_duration:
-                return True
-            elif only_quarters_inbetween:
-                if not lower_duration:
-                    lower_note = next(lower_voice_iter)
-                    lower_duration = lower_note.duration
-                second_lower_pitch = lower_note.specific_pitch
-
-                if not upper_duration:
-                    upper_note = next(upper_voice_iter)
-                    upper_duration = upper_note.duration
-                second_upper_pitch = upper_note.specific_pitch
-
-                if rules.is_parallel_perfect(
-                    first_lower_pitch,
-                    first_upper_pitch,
-                    second_lower_pitch,
-                    second_upper_pitch,
-                ):
-                    return False
-                first_lower_pitch = second_lower_pitch
-                first_upper_pitch = second_upper_pitch
-        else:
-            intersect_duration = min(lower_duration, upper_duration)
-            lower_duration -= intersect_duration
-            upper_duration -= intersect_duration
-            remaining_measure_duration -= intersect_duration
-
-    return True
-
-
-def valid_quarter_parallels(
-    lower_voice_measure: theory.FullVoiceMeasure,
-    upper_voice_measure: theory.FullVoiceMeasure,
-    consonant_ids: tuple[str, ...],
-) -> bool:
-    if not (len(lower_voice_measure) == len(upper_voice_measure) == 4):
-        return True
-    previous_lower_pitch = lower_voice_measure[0].specific_pitch
-    previous_upper_pitch = upper_voice_measure[0].specific_pitch
-    lower_voice_sequence = lower_voice_measure.sequence[1:]
-    upper_voice_sequence = upper_voice_measure.sequence[1:]
-
-    for lower_note, upper_note in zip(lower_voice_sequence, upper_voice_sequence):
-        current_lower_pitch = lower_note.specific_pitch
-        current_upper_pitch = upper_note.specific_pitch
-        lower_direction = theory.SpecificPitch.get_direction(
-            previous_lower_pitch, current_lower_pitch
-        )
-        upper_direction = theory.SpecificPitch.get_direction(
-            previous_upper_pitch, current_upper_pitch
-        )
-        if lower_direction != upper_direction:
-            return True
-
-        previous_lower_pitch = current_lower_pitch
-        previous_upper_pitch = current_upper_pitch
-    return False
-
-
-def valid_third_quarter_duo(
-    lower_voice_measure: theory.FullVoiceMeasure,
-    upper_voice_measure: theory.FullVoiceMeasure,
-    consonant_ids: tuple[str, ...],
-) -> bool:
-    lower_is_whole = measure_is_whole(lower_voice_measure)
-    upper_is_whole = measure_is_whole(upper_voice_measure)
-
-    if lower_is_whole ^ upper_is_whole:
-        if lower_is_whole:
-            counter_measure = upper_voice_measure
-            lower_pitch = lower_voice_measure[0].specific_pitch
-            upper_pitch = rules.find_pitch(upper_voice_measure)
-        else:
-            counter_measure = lower_voice_measure
-            lower_pitch = rules.find_pitch(lower_voice_measure)
-            upper_pitch = upper_voice_measure[0].specific_pitch
-
-        if len(counter_measure) == 2:
-            return True
-        if not rules.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
-            if counter_measure[-1].duration == Fraction("1/2"):
-                return False
-            return is_complete_descent(counter_measure)
-    return True
-
-
-def measure_is_whole(voice_measure: theory.FullVoiceMeasure) -> bool:
-    if len(voice_measure) > 2:
-        return False
-    return voice_measure[0].specific_pitch == voice_measure[-1].specific_pitch
-
-
-def is_dissonant_idiom(
-    lower_voice_measure: theory.FullVoiceMeasure,
-    upper_voice_measure: theory.FullVoiceMeasure,
-) -> bool:
-    lower_is_cantus = lower_voice_measure[-1].duration >= Fraction("1/2")
-    upper_is_cantus = upper_voice_measure[-1].duration >= Fraction("1/2")
-
-    if lower_is_cantus ^ upper_is_cantus:
-        if lower_is_cantus:
-            counter_measure = upper_voice_measure
-        else:
-            counter_measure = lower_voice_measure
-        if len(counter_measure) == 2:
-            return False
-        return is_complete_descent(counter_measure)
-    return False
-
-
-def is_complete_descent(chosen_voice_measure: theory.FullVoiceMeasure) -> bool:
-    previous_pitch = chosen_voice_measure[0].specific_pitch
-    for current_note in chosen_voice_measure.sequence[1:]:
-        current_pitch = current_note.specific_pitch
-        current_direction = theory.SpecificPitch.get_direction(
-            previous_pitch, current_pitch
-        )
-        if current_direction != -1:
-            return False
-        previous_pitch = current_pitch
-    return True
-
-
-def valid_agogic(
-    lower_voice_measure: theory.FullVoiceMeasure,
-    upper_voice_measure: theory.FullVoiceMeasure,
-    consonant_ids: tuple[str, ...],
-) -> bool:
-    return not rules.is_agogic_combo(lower_voice_measure, upper_voice_measure)
-
-
 DuoMeasureTest = tuple[
     theory.FullVoiceMeasure,
     theory.FullVoiceMeasure,
@@ -973,7 +693,7 @@ regular_duo_successes: dict[int, set[int]] = defaultdict(set)
 regular_duo_failures: dict[int, set[int]] = defaultdict(set)
 
 
-def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
+def are_regular_duos_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
     for (
         lower_voice_measure,
         upper_voice_measure,
@@ -985,72 +705,85 @@ def are_pitch_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bo
             continue
         if upper_id in regular_duo_failures[lower_id]:
             return False
-        previous_lower_note = lower_voice_measure[0]
-        previous_upper_note = upper_voice_measure[0]
 
-        if not rules.is_duo_consonant(
-            previous_lower_note.specific_pitch,
-            previous_upper_note.specific_pitch,
-            consonant_ids,
+        if checked_regular_duo(
+            lower_voice_measure, upper_voice_measure, additional_tests, consonant_ids
         ):
+            regular_duo_successes[lower_id].add(upper_id)
+        else:
             regular_duo_failures[lower_id].add(upper_id)
             return False
+    return True
 
-        elapsed_duration = Fraction("0")
-        duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
-        for current_lower_note, current_upper_note in duo_iter:
-            for additional_test in additional_tests:
-                if not additional_test(
-                    current_lower_note.specific_pitch,
-                    current_upper_note.specific_pitch,
-                ):
-                    regular_duo_failures[lower_id].add(upper_id)
-                    return False
 
-            allowed_unison = (
-                current_lower_note.specific_pitch == previous_lower_note.specific_pitch
-                and current_upper_note.specific_pitch
-                == previous_upper_note.specific_pitch
-            )
-            if elapsed_duration == Fraction("3/4"):
-                attack_requires_consonance = not is_dissonant_idiom(
-                    lower_voice_measure, upper_voice_measure
-                )
-            else:
-                attack_requires_consonance = True
-            if not rules.is_duo_motion_valid(
-                previous_lower_note,
-                previous_upper_note,
-                current_lower_note,
-                current_upper_note,
-                consonant_ids,
-                attack_requires_consonance,
-                allowed_unison,
+def checked_regular_duo(
+    lower_voice_measure: theory.FullVoiceMeasure,
+    upper_voice_measure: theory.FullVoiceMeasure,
+    additional_tests: tuple[
+        Callable[[theory.SpecificPitch, theory.SpecificPitch], bool], ...
+    ],
+    consonant_ids: tuple[str, ...],
+) -> bool:
+    previous_lower_note = lower_voice_measure[0]
+    previous_upper_note = upper_voice_measure[0]
+
+    if not pure.is_duo_consonant(
+        previous_lower_note.specific_pitch,
+        previous_upper_note.specific_pitch,
+        consonant_ids,
+    ):
+        return False
+
+    elapsed_duration = Fraction("0")
+    duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
+    for current_lower_note, current_upper_note in duo_iter:
+        for additional_test in additional_tests:
+            if not additional_test(
+                current_lower_note.specific_pitch,
+                current_upper_note.specific_pitch,
             ):
-                regular_duo_failures[lower_id].add(upper_id)
                 return False
 
-            elapsed_duration += min(
-                current_lower_note.duration, current_upper_note.duration
+        allowed_unison = (
+            current_lower_note.specific_pitch == previous_lower_note.specific_pitch
+            and current_upper_note.specific_pitch == previous_upper_note.specific_pitch
+        )
+        if elapsed_duration == Fraction("3/4"):
+            attack_requires_consonance = not screen.is_dissonant_idiom(
+                lower_voice_measure, upper_voice_measure
             )
-            previous_lower_note = current_lower_note
-            previous_upper_note = current_upper_note
+        else:
+            attack_requires_consonance = True
+        if not pure.valid_regular_duo_motion(
+            previous_lower_note,
+            previous_upper_note,
+            current_lower_note,
+            current_upper_note,
+            consonant_ids,
+            attack_requires_consonance,
+            allowed_unison,
+        ):
+            return False
 
-        measure_validators = [
-            valid_quarter_parallels,
-            valid_diminished_duo,
-            valid_dotted_duo,
-            valid_broken_parallels,
-            valid_third_quarter_duo,
-            valid_agogic,
-        ]
-        for measure_validator in measure_validators:
-            if not measure_validator(
-                lower_voice_measure, upper_voice_measure, consonant_ids
-            ):
-                regular_duo_failures[lower_id].add(upper_id)
-                return False
-        regular_duo_successes[lower_id].add(upper_id)
+        elapsed_duration += min(
+            current_lower_note.duration, current_upper_note.duration
+        )
+        previous_lower_note = current_lower_note
+        previous_upper_note = current_upper_note
+
+    measure_validators = [
+        screen.valid_quarter_parallels,
+        screen.valid_diminished_duo,
+        screen.valid_dotted_duo,
+        screen.valid_broken_parallels,
+        screen.valid_third_quarter_duo,
+        screen.valid_agogic,
+    ]
+    for measure_validator in measure_validators:
+        if not measure_validator(
+            lower_voice_measure, upper_voice_measure, consonant_ids
+        ):
+            return False
     return True
 
 
@@ -1102,180 +835,9 @@ def is_duo_idiom_present(
         else:
             lower_pitch = counter_measure[2].specific_pitch
             upper_pitch = upper_voice_measure[-1].specific_pitch
-        if not rules.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
-            return is_complete_descent(counter_measure)
+        if not pure.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
+            return pure.is_complete_descent(counter_measure)
     return False
-
-
-def get_species_role(voice_measure: theory.FullVoiceMeasure) -> tuple[bool, bool]:
-    if len(voice_measure) == 1:
-        is_diminished_cantus = False
-        is_diminished_counter = False
-
-    elif len(voice_measure) > 2:
-        first_note, second_note, *_ = voice_measure
-        is_diminished_cantus = first_note.duration == Fraction("1/2")
-
-        if first_note.duration != Fraction("1/4"):
-            is_diminished_counter = False
-        elif second_note.duration != Fraction("1/4"):
-            is_diminished_counter = False
-        else:
-            interval_distance = theory.SpecificPitch.get_interval_distance(
-                first_note.specific_pitch, second_note.specific_pitch
-            )
-            is_diminished_counter = interval_distance == 1
-    else:
-        first_note, second_note = voice_measure
-        if first_note.specific_pitch == second_note.specific_pitch:
-            is_diminished_cantus = False
-        else:
-            is_diminished_cantus = first_note.duration == Fraction("1/2")
-
-        is_diminished_counter = False
-
-    return is_diminished_cantus, is_diminished_counter
-
-
-def valid_diminished_trio(
-    lowest_voice_measure: theory.FullVoiceMeasure,
-    middle_voice_measure: theory.FullVoiceMeasure,
-    highest_voice_measure: theory.FullVoiceMeasure,
-) -> bool:
-    lower_is_diminished_cantus, lower_is_diminished_counter = get_species_role(
-        middle_voice_measure
-    )
-    upper_is_diminished_cantus, upper_is_diminished_counter = get_species_role(
-        highest_voice_measure
-    )
-
-    if (
-        lower_is_diminished_cantus
-        and upper_is_diminished_counter
-        or lower_is_diminished_counter
-        and upper_is_diminished_cantus
-    ):
-        if lower_is_diminished_cantus:
-            middle_pitch = middle_voice_measure[0].specific_pitch
-            highest_pitch = highest_voice_measure[1].specific_pitch
-        else:
-            middle_pitch = middle_voice_measure[1].specific_pitch
-            highest_pitch = highest_voice_measure[0].specific_pitch
-        lowest_pitch = rules.find_pitch(lowest_voice_measure, "1/2")
-        if not rules.is_perfect_fourth_consonant(
-            lowest_pitch, middle_pitch, highest_pitch
-        ):
-            if upper_is_diminished_counter:
-                if not rules.has_passing_figure(
-                    highest_voice_measure[0].specific_pitch,
-                    highest_voice_measure[1].specific_pitch,
-                    highest_voice_measure[2].specific_pitch,
-                ):
-                    return False
-            elif not rules.has_passing_figure(
-                middle_voice_measure[0].specific_pitch,
-                middle_voice_measure[1].specific_pitch,
-                middle_voice_measure[2].specific_pitch,
-            ):
-                return False
-    return True
-
-
-def get_dotted_status(
-    lowest_voice_measure: theory.FullVoiceMeasure,
-    middle_voice_measure: theory.FullVoiceMeasure,
-    highest_voice_measure: theory.FullVoiceMeasure,
-) -> tuple[bool, bool, bool]:
-    lowest_is_dotted = lowest_voice_measure[0].duration == Fraction("3/4")
-    middle_is_dotted = middle_voice_measure[0].duration == Fraction("3/4")
-    highest_is_dotted = highest_voice_measure[0].duration == Fraction("3/4")
-    return lowest_is_dotted, middle_is_dotted, highest_is_dotted
-
-
-def valid_dotted_trio(
-    lowest_voice_measure: theory.FullVoiceMeasure,
-    middle_voice_measure: theory.FullVoiceMeasure,
-    highest_voice_measure: theory.FullVoiceMeasure,
-) -> bool:
-    lowest_is_dotted, middle_is_dotted, highest_is_dotted = get_dotted_status(
-        lowest_voice_measure, middle_voice_measure, highest_voice_measure
-    )
-    if lowest_is_dotted and middle_is_dotted and highest_is_dotted:
-        return False
-
-    if middle_is_dotted ^ highest_is_dotted:
-        if middle_is_dotted:
-            middle_pitch = middle_voice_measure[0].specific_pitch
-            highest_pitch = rules.find_pitch(highest_voice_measure)
-            dotted_measure, undotted_measure = (
-                middle_voice_measure,
-                highest_voice_measure,
-            )
-        else:
-            middle_pitch = rules.find_pitch(middle_voice_measure)
-            highest_pitch = highest_voice_measure[0].specific_pitch
-            dotted_measure, undotted_measure = (
-                highest_voice_measure,
-                middle_voice_measure,
-            )
-        lowest_pitch = rules.find_pitch(lowest_voice_measure)
-
-        if not rules.is_perfect_fourth_consonant(
-            lowest_pitch, middle_pitch, highest_pitch
-        ):
-            if len(undotted_measure) != 2:
-                return False
-            first_patient_pitch = dotted_measure[0].specific_pitch
-            second_patient_pitch = dotted_measure[1].specific_pitch
-            if (
-                theory.SpecificPitch.get_interval_vector(
-                    first_patient_pitch, second_patient_pitch
-                )
-                != -1
-            ):
-                return False
-
-            if middle_is_dotted:
-                lower_resolve_pitch = second_patient_pitch
-                upper_resolve_pitch = highest_pitch
-            else:
-                lower_resolve_pitch = middle_pitch
-                upper_resolve_pitch = second_patient_pitch
-            return lower_resolve_pitch.has_interval_shift(
-                upper_resolve_pitch, ("M3", "m3")
-            )
-    return True
-
-
-def valid_third_quarter_trio(
-    lowest_voice_measure: theory.FullVoiceMeasure,
-    middle_voice_measure: theory.FullVoiceMeasure,
-    highest_voice_measure: theory.FullVoiceMeasure,
-) -> bool:
-    middle_is_whole = measure_is_whole(middle_voice_measure)
-    highest_is_whole = measure_is_whole(highest_voice_measure)
-
-    if middle_is_whole ^ highest_is_whole:
-        if middle_is_whole:
-            counter_measure = highest_voice_measure
-            middle_pitch = middle_voice_measure[0].specific_pitch
-            highest_pitch = rules.find_pitch(highest_voice_measure)
-        else:
-            counter_measure = middle_voice_measure
-            middle_pitch = rules.find_pitch(middle_voice_measure)
-            highest_pitch = highest_voice_measure[0].specific_pitch
-
-        if len(counter_measure) == 2:
-            return True
-        lowest_pitch = rules.find_pitch(lowest_voice_measure)
-
-        if not rules.is_perfect_fourth_consonant(
-            lowest_pitch, middle_pitch, highest_pitch
-        ):
-            if counter_measure[-1].duration == Fraction("1/2"):
-                return False
-            return is_complete_descent(counter_measure)
-    return True
 
 
 def get_trio_id(
@@ -1297,7 +859,7 @@ regular_trio_successes = set()
 regular_trio_failures = set()
 
 
-def has_valid_fourths(trio_measure_tests: tuple[TrioMeasureTest, ...]) -> bool:
+def are_regular_trios_valid(trio_measure_tests: tuple[TrioMeasureTest, ...]) -> bool:
     for (
         lowest_voice_measure,
         middle_voice_measure,
@@ -1333,7 +895,7 @@ def checked_regular_trio(
     previous_middle_pitch = middle_voice_measure[0].specific_pitch
     previous_highest_pitch = highest_voice_measure[0].specific_pitch
 
-    if not rules.is_perfect_fourth_consonant(
+    if not pure.is_perfect_fourth_consonant(
         previous_lowest_pitch, previous_middle_pitch, previous_highest_pitch
     ):
         return False
@@ -1345,13 +907,13 @@ def checked_regular_trio(
         current_highest_pitch = current_highest_note.specific_pitch
 
         if elapsed_duration == Fraction("3/4"):
-            attack_requires_consonance = not is_dissonant_idiom(
+            attack_requires_consonance = not screen.is_dissonant_idiom(
                 middle_voice_measure, highest_voice_measure
             )
         else:
             attack_requires_consonance = True
 
-        if not rules.is_trio_motion_valid(
+        if not pure.valid_regular_trio_motion(
             previous_lowest_pitch,
             previous_middle_pitch,
             previous_highest_pitch,
@@ -1372,9 +934,9 @@ def checked_regular_trio(
         previous_highest_pitch = current_highest_pitch
 
     measure_validators = [
-        valid_diminished_trio,
-        valid_dotted_trio,
-        valid_third_quarter_trio,
+        screen.valid_diminished_trio,
+        screen.valid_dotted_trio,
+        screen.valid_third_quarter_trio,
     ]
     for measure_validator in measure_validators:
         if not measure_validator(
@@ -1434,17 +996,17 @@ def is_trio_idiom_present(
             middle_pitch = counter_measure[2].specific_pitch
             highest_pitch = highest_voice_measure[-1].specific_pitch
 
-        lowest_pitch = rules.find_pitch(lowest_voice_measure)
-        if not rules.is_perfect_fourth_consonant(
+        lowest_pitch = pure.find_pitch(lowest_voice_measure)
+        if not pure.is_perfect_fourth_consonant(
             lowest_pitch, middle_pitch, highest_pitch
         ):
-            return is_complete_descent(counter_measure)
+            return pure.is_complete_descent(counter_measure)
     return False
 
 
 def are_half_duos_valid(half_duo_tests: tuple[HalfDuoTest, ...]) -> bool:
     for lower_pitch, upper_pitch, additional_tests, consonant_ids in half_duo_tests:
-        if not rules.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
+        if not pure.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
             return False
         for additional_test in additional_tests:
             if not additional_test(lower_pitch, upper_pitch):
@@ -1457,7 +1019,7 @@ def is_half_trio_valid(
     middle_pitch: theory.SpecificPitch,
     highest_pitch: theory.SpecificPitch,
 ) -> bool:
-    return rules.is_perfect_fourth_consonant(lowest_pitch, middle_pitch, highest_pitch)
+    return pure.is_perfect_fourth_consonant(lowest_pitch, middle_pitch, highest_pitch)
 
 
 def get_note_trio(
@@ -1645,8 +1207,8 @@ def set_final_prospects(
 
     voice_measure_stacker = VoiceMeasureStacker(
         penultimate_sequences,
-        are_cadential_columns_valid,
-        has_cadential_fourths,
+        are_cadential_duos_valid,
+        are_cadential_trios_valid,
     )
     measure_stack_groups = next(iter(voice_measure_stacker))
 
@@ -1788,7 +1350,7 @@ cadential_duo_successes: dict[int, set[int]] = defaultdict(set)
 cadential_duo_failures: dict[int, set[int]] = defaultdict(set)
 
 
-def are_cadential_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
+def are_cadential_duos_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
     for (
         lower_voice_measure,
         upper_voice_measure,
@@ -1800,79 +1362,114 @@ def are_cadential_columns_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -
             continue
         if upper_id in cadential_duo_failures[lower_id]:
             return False
-        previous_lower_note = lower_voice_measure[0]
-        previous_upper_note = upper_voice_measure[0]
 
-        if not rules.is_duo_consonant(
-            previous_lower_note.specific_pitch,
-            previous_upper_note.specific_pitch,
+        if checked_cadential_duo(
+            lower_voice_measure, upper_voice_measure, additional_tests, consonant_ids
+        ):
+            cadential_duo_successes[lower_id].add(upper_id)
+        else:
+            cadential_duo_failures[lower_id].add(upper_id)
+            return False
+    return True
+
+
+def checked_cadential_duo(
+    lower_voice_measure: theory.FullVoiceMeasure,
+    upper_voice_measure: theory.FullVoiceMeasure,
+    additional_tests: tuple[
+        Callable[[theory.SpecificPitch, theory.SpecificPitch], bool], ...
+    ],
+    consonant_ids: tuple[str, ...],
+) -> bool:
+    previous_lower_note = lower_voice_measure[0]
+    previous_upper_note = upper_voice_measure[0]
+
+    if not pure.is_duo_consonant(
+        previous_lower_pitch := previous_lower_note.specific_pitch,
+        previous_upper_pitch := previous_upper_note.specific_pitch,
+        consonant_ids,
+    ):
+        lower_is_whole = pure.is_measure_whole(lower_voice_measure)
+        upper_is_whole = pure.is_measure_whole(upper_voice_measure)
+        if lower_is_whole ^ upper_is_whole:
+            if lower_is_whole:
+                if previous_lower_pitch.has_interval_shift(
+                    previous_upper_pitch, ("m2",)
+                ):
+                    return False
+                agent_measure = lower_voice_measure
+                patient_measure = upper_voice_measure
+            else:
+                if previous_lower_pitch.has_interval_shift(
+                    previous_upper_pitch, ("d5",)
+                ):
+                    return False
+                agent_measure = upper_voice_measure
+                patient_measure = lower_voice_measure
+        else:
+            return False
+
+        if len(patient_measure) != 2:
+            return False
+        if patient_measure[0].duration != Fraction("1/2"):
+            return False
+        resolution_vector = theory.SpecificPitch.get_interval_vector(
+            patient_measure[0].specific_pitch,
+            patient_measure[1].specific_pitch,
+        )
+        if resolution_vector != -1:
+            return False
+        if not pure.is_duo_consonant(
+            lower_voice_measure[-1].specific_pitch,
+            upper_voice_measure[-1].specific_pitch,
             consonant_ids,
         ):
-            if len(upper_voice_measure) != 2:
-                cadential_duo_failures[lower_id].add(upper_id)
-                return False
-            if len(lower_voice_measure) != 1:
-                cadential_duo_failures[lower_id].add(upper_id)
-                return False
-            if previous_upper_note.duration != Fraction("1/2"):
-                cadential_duo_failures[lower_id].add(upper_id)
-                return False
-            resolution_vector = theory.SpecificPitch.get_interval_vector(
-                previous_upper_note.specific_pitch,
-                upper_voice_measure[1].specific_pitch,
-            )
-            if resolution_vector != -1:
-                cadential_duo_failures[lower_id].add(upper_id)
-                return False
+            return False
 
-        elapsed_duration = Fraction("0")
-        duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
-        for current_lower_note, current_upper_note in duo_iter:
-            for additional_test in additional_tests:
-                if not additional_test(
-                    current_lower_note.specific_pitch,
-                    current_upper_note.specific_pitch,
-                ):
-                    cadential_duo_failures[lower_id].add(upper_id)
-                    return False
-
-            if elapsed_duration == Fraction("3/4"):
-                attack_requires_consonance = not is_dissonant_idiom(
-                    lower_voice_measure, upper_voice_measure
-                )
-            else:
-                attack_requires_consonance = True
-            if not rules.is_cadential_duo_valid(
-                previous_lower_note,
-                previous_upper_note,
-                current_lower_note,
-                current_upper_note,
-                consonant_ids,
-                attack_requires_consonance,
+    elapsed_duration = Fraction("0")
+    duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
+    for current_lower_note, current_upper_note in duo_iter:
+        for additional_test in additional_tests:
+            if not additional_test(
+                current_lower_note.specific_pitch,
+                current_upper_note.specific_pitch,
             ):
-                cadential_duo_failures[lower_id].add(upper_id)
                 return False
 
-            elapsed_duration += min(
-                current_lower_note.duration, current_upper_note.duration
+        if elapsed_duration == Fraction("3/4"):
+            attack_requires_consonance = not screen.is_dissonant_idiom(
+                lower_voice_measure, upper_voice_measure
             )
-            previous_lower_note = current_lower_note
-            previous_upper_note = current_upper_note
+        else:
+            attack_requires_consonance = True
+        if not pure.valid_cadential_duo_motion(
+            previous_lower_note,
+            previous_upper_note,
+            current_lower_note,
+            current_upper_note,
+            consonant_ids,
+            attack_requires_consonance,
+        ):
+            return False
 
-        measure_validators = [
-            valid_quarter_parallels,
-            valid_diminished_duo,
-            valid_dotted_duo,
-            valid_broken_parallels,
-            # valid_third_quarter_duo does not apply because of double neigbor cadence
-        ]
-        for measure_validator in measure_validators:
-            if not measure_validator(
-                lower_voice_measure, upper_voice_measure, consonant_ids
-            ):
-                cadential_duo_failures[lower_id].add(upper_id)
-                return False
-        cadential_duo_successes[lower_id].add(upper_id)
+        elapsed_duration += min(
+            current_lower_note.duration, current_upper_note.duration
+        )
+        previous_lower_note = current_lower_note
+        previous_upper_note = current_upper_note
+
+    measure_validators = [
+        screen.valid_quarter_parallels,
+        screen.valid_diminished_duo,
+        screen.valid_dotted_duo,
+        screen.valid_broken_parallels,
+        # valid_third_quarter_duo does not apply because of double neigbor cadence
+    ]
+    for measure_validator in measure_validators:
+        if not measure_validator(
+            lower_voice_measure, upper_voice_measure, consonant_ids
+        ):
+            return False
     return True
 
 
@@ -1880,7 +1477,7 @@ cadential_trio_successes = set()
 cadential_trio_failures = set()
 
 
-def has_cadential_fourths(trio_measure_tests: tuple[TrioMeasureTest, ...]) -> bool:
+def are_cadential_trios_valid(trio_measure_tests: tuple[TrioMeasureTest, ...]) -> bool:
     for (
         lowest_voice_measure,
         middle_voice_measure,
@@ -1916,20 +1513,36 @@ def checked_cadential_trio(
     previous_middle_pitch = middle_voice_measure[0].specific_pitch
     previous_highest_pitch = highest_voice_measure[0].specific_pitch
 
-    if not rules.is_perfect_fourth_consonant(
+    if not pure.is_perfect_fourth_consonant(
         previous_lowest_pitch, previous_middle_pitch, previous_highest_pitch
     ):
-        if len(highest_voice_measure) != 2:
+        middle_is_whole = pure.is_measure_whole(middle_voice_measure)
+        highest_is_whole = pure.is_measure_whole(highest_voice_measure)
+        if middle_is_whole ^ highest_is_whole:
+            if middle_is_whole:
+                agent_measure = middle_voice_measure
+                patient_measure = highest_voice_measure
+            else:
+                agent_measure = highest_voice_measure
+                patient_measure = middle_voice_measure
+        else:
             return False
-        if len(middle_voice_measure) != 1:
+
+        if len(patient_measure) != 2:
             return False
-        if highest_voice_measure[0].duration != Fraction("1/2"):
+        if patient_measure[0].duration != Fraction("1/2"):
             return False
         resolution_vector = theory.SpecificPitch.get_interval_vector(
-            previous_highest_pitch,
-            highest_voice_measure[1].specific_pitch,
+            patient_measure[0].specific_pitch,
+            patient_measure[1].specific_pitch,
         )
         if resolution_vector != -1:
+            return False
+        if not pure.is_duo_consonant(
+            middle_voice_measure[-1].specific_pitch,
+            highest_voice_measure[-1].specific_pitch,
+            pure.lower_voice_consonances,
+        ):
             return False
 
     elapsed_duration = Fraction("0")
@@ -1939,12 +1552,12 @@ def checked_cadential_trio(
         current_highest_pitch = current_highest_note.specific_pitch
 
         if elapsed_duration == Fraction("3/4"):
-            attack_requires_consonance = not is_dissonant_idiom(
+            attack_requires_consonance = not screen.is_dissonant_idiom(
                 middle_voice_measure, highest_voice_measure
             )
         else:
             attack_requires_consonance = True
-        if attack_requires_consonance and not rules.is_cadential_trio_valid(
+        if attack_requires_consonance and not pure.valid_cadential_trio_motion(
             previous_lowest_pitch,
             previous_middle_pitch,
             previous_highest_pitch,
@@ -1964,8 +1577,8 @@ def checked_cadential_trio(
         previous_highest_pitch = current_highest_pitch
 
     measure_validators = [
-        valid_diminished_trio,
-        valid_dotted_trio,
+        screen.valid_diminished_trio,
+        screen.valid_dotted_trio,
         # valid_third_quarter_trio does not apply because of double neigbor cadence
     ]
     for measure_validator in measure_validators:
@@ -1987,76 +1600,6 @@ def fill_prospects(
                 sequence_prospects[prospect_index].append(measure_stack)
 
 
-def get_pitch_quartet(
-    bassus_measure: theory.FullVoiceMeasure,
-    tenor_measure: theory.FullVoiceMeasure,
-    contratenor_measure: theory.FullVoiceMeasure,
-    superius_measure: theory.FullVoiceMeasure,
-) -> Iterator[
-    tuple[
-        tuple[theory.SpecificPitch, theory.SpecificPitch],
-        tuple[theory.SpecificPitch, theory.SpecificPitch],
-        tuple[theory.SpecificPitch, theory.SpecificPitch],
-        tuple[theory.SpecificPitch, theory.SpecificPitch],
-    ]
-]:
-    bassus_iter = iter(bassus_measure)
-    tenor_iter = iter(tenor_measure)
-    contratenor_iter = iter(contratenor_measure)
-    superius_iter = iter(superius_measure)
-
-    bassus_duration = Fraction("0")
-    tenor_duration = Fraction("0")
-    contratenor_duration = Fraction("0")
-    superius_duration = Fraction("0")
-    remaining_measure_duration = Fraction("1")
-
-    previous_bassus_pitch = bassus_measure[0].specific_pitch
-    previous_tenor_pitch = tenor_measure[0].specific_pitch
-    previous_contratenor_pitch = contratenor_measure[0].specific_pitch
-    previous_superius_pitch = superius_measure[0].specific_pitch
-
-    while remaining_measure_duration:
-        if not bassus_duration:
-            bassus_note = next(bassus_iter)
-            bassus_duration = bassus_note.duration
-        if not tenor_duration:
-            tenor_note = next(tenor_iter)
-            tenor_duration = tenor_note.duration
-        if not contratenor_duration:
-            contratenor_note = next(contratenor_iter)
-            contratenor_duration = contratenor_note.duration
-        if not superius_duration:
-            superius_note = next(superius_iter)
-            superius_duration = superius_note.duration
-
-        current_bassus_pitch = bassus_note.specific_pitch
-        current_tenor_pitch = tenor_note.specific_pitch
-        current_contratenor_pitch = contratenor_note.specific_pitch
-        current_superius_pitch = superius_note.specific_pitch
-
-        yield (
-            (previous_bassus_pitch, current_bassus_pitch),
-            (previous_tenor_pitch, current_tenor_pitch),
-            (previous_contratenor_pitch, current_contratenor_pitch),
-            (previous_superius_pitch, current_superius_pitch),
-        )
-
-        intersect_duration = min(
-            bassus_duration, tenor_duration, contratenor_duration, superius_duration
-        )
-        bassus_duration -= intersect_duration
-        tenor_duration -= intersect_duration
-        contratenor_duration -= intersect_duration
-        superius_duration -= intersect_duration
-        remaining_measure_duration -= intersect_duration
-
-        previous_bassus_pitch = current_bassus_pitch
-        previous_tenor_pitch = current_tenor_pitch
-        previous_contratenor_pitch = current_contratenor_pitch
-        previous_superius_pitch = current_superius_pitch
-
-
 quartet_tests: dict[str, bool] = {}
 
 
@@ -2073,70 +1616,18 @@ def is_quartet_valid(
         superius_measure,
     )
     test_id = "+".join(str(voice_measure.id) for voice_measure in measure_quartet)
-
     if test_id in quartet_tests:
         return quartet_tests[test_id]
 
-    patient_indices = []
-    agent_indices = []
-    for voice_index, voice_measure in enumerate(measure_quartet):
-        if voice_measure[0].duration == Fraction("3/4"):
-            patient_indices.append(voice_index)
-        elif voice_measure[-1].duration == Fraction("1/2"):
-            agent_indices.append(voice_index)
-
-    if patient_indices and agent_indices:
-        is_diminished_fourth_species = False
-        has_imperfect_resolution = False
-        lowest_pitch = rules.find_pitch(bassus_measure)
-
-        for patient_index in patient_indices:
-            for agent_index in agent_indices:
-                if patient_index > agent_index:
-                    lower_index = agent_index
-                    upper_index = patient_index
-                else:
-                    lower_index = patient_index
-                    upper_index = agent_index
-
-                lower_voice_measure = measure_quartet[lower_index]
-                upper_voice_measure = measure_quartet[upper_index]
-
-                if not is_diminished_fourth_species:
-                    lower_pitch = rules.find_pitch(lower_voice_measure)
-                    upper_pitch = rules.find_pitch(upper_voice_measure)
-                    if lower_index == 0:
-                        is_diminished_fourth_species = not rules.is_duo_consonant(
-                            lower_pitch, upper_pitch, rules.lower_voice_consonances
-                        )
-                    else:
-                        is_diminished_fourth_species = not rules.is_trio_consonant(
-                            lowest_pitch, lower_pitch, upper_pitch
-                        )
-
-                if not has_imperfect_resolution:
-                    lower_pitch = lower_voice_measure[-1].specific_pitch
-                    upper_pitch = upper_voice_measure[-1].specific_pitch
-                    has_imperfect_resolution = lower_pitch.has_interval_shift(
-                        upper_pitch, rules.imperfect_consonances
-                    )
-
-        if is_diminished_fourth_species and not has_imperfect_resolution:
+    measure_validators = [
+        screen.valid_diminished_fourth_species,
+        screen.valid_regular_fourth_species,
+        screen.valid_quartet_motion,
+    ]
+    for measure_validator in measure_validators:
+        if not measure_validator(measure_quartet):
             quartet_tests[test_id] = False
             return False
-
-    if any(measure_is_whole(voice_measure) for voice_measure in measure_quartet):
-        quartet_tests[test_id] = True
-        return True
-
-    quartet_iter = get_pitch_quartet(*measure_quartet)
-    for bassus_pair, tenor_pair, contratenor_pair, superius_pair in quartet_iter:
-        if not rules.checked_quartet_motion(
-            bassus_pair, tenor_pair, contratenor_pair, superius_pair
-        ):
-            quartet_tests[test_id] = False
-            return False
-
     quartet_tests[test_id] = True
     return True
 
@@ -2148,8 +1639,8 @@ TrioValidator = Callable[[tuple[TrioMeasureTest, ...]], bool]
 @dataclass
 class VoiceMeasureStacker:
     pitch_sequences: dict[str, list[theory.FullVoiceMeasure]]
-    is_duo_valid: DuoValidator = are_pitch_columns_valid
-    is_trio_valid: TrioValidator = has_valid_fourths
+    are_duos_valid: DuoValidator = are_regular_duos_valid
+    are_trios_valid: TrioValidator = are_regular_trios_valid
     result_min_count: int = 7_000
     result_filter_threshold: int = 4_000
     allow_chanson_idiom: bool = False
@@ -2235,11 +1726,11 @@ class VoiceMeasureStacker:
                     (
                         bassus_measure,
                         tenor_measure,
-                        (rules.is_lowest_duo_good,),
-                        rules.lower_voice_consonances,
+                        (pure.is_lowest_duo_good,),
+                        pure.lower_voice_consonances,
                     ),
                 )
-                if not self.is_duo_valid(duos_to_check):
+                if not self.are_duos_valid(duos_to_check):
                     continue
                 if not self.allow_chanson_idiom and has_chanson_duo(duos_to_check):
                     continue
@@ -2249,23 +1740,23 @@ class VoiceMeasureStacker:
                             bassus_measure,
                             contratenor_measure,
                             tuple(),
-                            rules.lower_voice_consonances,
+                            pure.lower_voice_consonances,
                         ),
                         (
                             tenor_measure,
                             contratenor_measure,
-                            (rules.is_upper_duo_good,),
-                            rules.upper_voice_consonances,
+                            (pure.is_upper_duo_good,),
+                            pure.upper_voice_consonances,
                         ),
                     )
-                    if not self.is_duo_valid(duos_to_check):
+                    if not self.are_duos_valid(duos_to_check):
                         continue
                     if not self.allow_chanson_idiom and has_chanson_duo(duos_to_check):
                         continue
                     trios_to_check = (
                         (bassus_measure, tenor_measure, contratenor_measure),
                     )
-                    if not self.is_trio_valid(trios_to_check):
+                    if not self.are_trios_valid(trios_to_check):
                         continue
                     if not self.allow_chanson_idiom and has_chanson_trio(
                         trios_to_check
@@ -2277,22 +1768,22 @@ class VoiceMeasureStacker:
                                 bassus_measure,
                                 superius_measure,
                                 tuple(),
-                                rules.lower_voice_consonances,
+                                pure.lower_voice_consonances,
                             ),
                             (
                                 tenor_measure,
                                 superius_measure,
                                 tuple(),
-                                rules.upper_voice_consonances,
+                                pure.upper_voice_consonances,
                             ),
                             (
                                 contratenor_measure,
                                 superius_measure,
-                                (rules.is_upper_duo_good,),
-                                rules.upper_voice_consonances,
+                                (pure.is_upper_duo_good,),
+                                pure.upper_voice_consonances,
                             ),
                         )
-                        if not self.is_duo_valid(duos_to_check):
+                        if not self.are_duos_valid(duos_to_check):
                             continue
                         if not self.allow_chanson_idiom and has_chanson_duo(
                             duos_to_check
@@ -2302,14 +1793,14 @@ class VoiceMeasureStacker:
                             (bassus_measure, tenor_measure, superius_measure),
                             (bassus_measure, contratenor_measure, superius_measure),
                         )
-                        if not self.is_trio_valid(trios_to_check):
+                        if not self.are_trios_valid(trios_to_check):
                             continue
                         if not self.allow_chanson_idiom and has_chanson_trio(
                             trios_to_check
                         ):
                             continue
                         if all(
-                            get_dotted_status(
+                            screen.get_dotted_status(
                                 tenor_measure, contratenor_measure, superius_measure
                             )
                         ):

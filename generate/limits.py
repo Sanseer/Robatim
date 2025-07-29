@@ -270,7 +270,11 @@ class BasseDansePartial(SequencePartial[theory.VariantStack]):
         ]
 
         for transition_index in range(5):
-            is_authentic_cadence = transition_index == 3
+            if is_authentic_cadence := transition_index == 3:
+                test_suites[transition_index][-1:-1] = [
+                    partial(rules.checked_bass_suspension),
+                    partial(rules.checked_upper_suspension),
+                ]
             if transition_index == 4:
                 test_suites[transition_index].append(
                     partial(rules.checked_cadential_successor)
@@ -293,12 +297,8 @@ class BasseDansePartial(SequencePartial[theory.VariantStack]):
                     partial(
                         rules.checked_duo_transition,
                         allowed_downbeat_unison=allowed_downbeat_unison,
-                        check_bass_suspension=is_authentic_cadence,
                     ),
-                    partial(
-                        rules.checked_trio_transition,
-                        check_upper_suspension=is_authentic_cadence,
-                    ),
+                    partial(rules.checked_trio_transition),
                 ]
             )
         return self.prune(test_suites)
@@ -366,6 +366,11 @@ class BranleSimplePartial(SequencePartial[theory.FullMeasureStack]):
                 is_cadence = transition_index == 4
             else:
                 is_cadence = transition_index == 3
+            if is_cadence:
+                test_suites[transition_index][-1:-1] = [
+                    partial(rules.checked_bass_suspension),
+                    partial(rules.checked_upper_suspension),
+                ]
 
             if transition_index == 4 and not self.is_antecedent:
                 test_suites[transition_index].append(
@@ -391,12 +396,8 @@ class BranleSimplePartial(SequencePartial[theory.FullMeasureStack]):
                     partial(
                         rules.checked_duo_transition,
                         allowed_downbeat_unison=allowed_downbeat_unison,
-                        check_bass_suspension=is_cadence,
                     ),
-                    partial(
-                        rules.checked_trio_transition,
-                        check_upper_suspension=is_cadence,
-                    ),
+                    partial(rules.checked_trio_transition),
                 ]
             )
         return self.prune(test_suites)
