@@ -204,6 +204,21 @@ def checked_chromatic_relation(
     return True
 
 
+def has_direct_relation(
+    first_voice_measure: theory.BaseVoiceMeasure,
+    second_voice_measure: theory.BaseVoiceMeasure,
+    flattened_pitch: theory.GenericPitch,
+) -> bool:
+    concerning_pitch_reprs = set()
+    concerning_letter = flattened_pitch.letter
+    for current_voice_measure in (first_voice_measure, second_voice_measure):
+        for current_note in current_voice_measure.sequence:
+            current_specific_pitch = current_note.specific_pitch
+            if current_specific_pitch.letter == concerning_letter:
+                concerning_pitch_reprs.add(current_specific_pitch.generic_pitch)
+    return len(concerning_pitch_reprs) >= 2
+
+
 def valid_regular_duo_motion(
     first_lower_note: theory.SpecificNote,
     first_upper_note: theory.SpecificNote,

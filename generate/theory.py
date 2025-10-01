@@ -458,7 +458,7 @@ class GenericScale(StringDefinedEntity):
             self.letter = symbol[0]
             self.accidental = Accidental(symbol[1:])
 
-        tonic_pitch = GenericPitch(str(self))
+        tonic_pitch = GenericPitch(f"{self.letter}{self.accidental}")
         print(f"{self.__class__.__name__} chosen: {tonic_pitch}")
 
         self._members = [
@@ -1066,6 +1066,7 @@ class BaseVoiceMeasure:
     def __len__(self) -> int:
         return len(self.sequence)
 
+    # subclasses of dataclass do not inherit custom equality check!
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, BaseVoiceMeasure):
             return False
@@ -1075,6 +1076,21 @@ class BaseVoiceMeasure:
 @dataclass
 class FullVoiceMeasure(BaseVoiceMeasure):
     instance_cache: ClassVar[dict[str, FullVoiceMeasure]] = {}
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, BaseVoiceMeasure):
+            return False
+        if self.id == other.id:
+            return True
+        # Explicit attribute is compatible with HalfVoiceMeasure
+        sole_pitch = self.sequence[0].specific_pitch
+        for current_note in other.sequence:
+            if current_note.specific_pitch != sole_pitch:
+                return False
+        for current_note in self.sequence[1:]:
+            if current_note.specific_pitch != sole_pitch:
+                return False
+        return True
 
     @staticmethod
     def derive_notation(sequence: list[SpecificNote]) -> str:
@@ -1138,7 +1154,7 @@ class HalfVoiceMeasure(BaseVoiceMeasure):
         return new_measure
 
 
-GenericMeasure = TypeVar("GenericMeasure")
+GenericMeasure = TypeVar("GenericMeasure", bound=BaseVoiceMeasure)
 
 
 class BaseMeasureStack(Generic[GenericMeasure]):
@@ -1160,6 +1176,10 @@ class BaseMeasureStack(Generic[GenericMeasure]):
         )
         self.id = BaseMeasureStack.id_count
         BaseMeasureStack.id_count += 1
+
+    def __repr__(self) -> str:
+        sequences = [voice_measure.sequence for voice_measure in self.stack]
+        return f"{self.__class__.__name__}{tuple(sequences)}"
 
     def __iter__(self) -> Iterator[GenericMeasure]:
         return iter(self.stack)
@@ -1220,7 +1240,6 @@ class HalfMeasureStack(BaseMeasureStack[HalfVoiceMeasure]):
         return new_stack
 
 
-VariantVoiceMeasure = HalfVoiceMeasure | FullVoiceMeasure
 VariantStack = HalfMeasureStack | FullMeasureStack
 
 

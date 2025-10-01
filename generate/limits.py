@@ -1,17 +1,11 @@
 from collections import defaultdict, deque
-import copy
-from dataclasses import dataclass
 from fractions import Fraction
 from functools import partial
-import itertools
 import random
 import time
-from typing import Generic, Iterator, TypeVar
+from typing import Iterator
 
 from generate import rules, theory
-
-
-GenericStack = TypeVar("GenericStack", bound=theory.VariantStack)
 
 
 class CompositionError(Exception):
@@ -19,26 +13,31 @@ class CompositionError(Exception):
         return f"Composition failed: {self.args[0]}"
 
 
-class SequencePartial(Generic[GenericStack]):
+class ImprobableError(Exception):
+    def __str__(self) -> str:
+        return f"Unpromising path: {self.args[0]}"
+
+
+class SequencePartial:
     known_uniques = {0: 3, 1: 4, 2: 5}
 
     def __init__(
         self,
-        sequence_prospects: list[list[GenericStack]],
+        sequence_prospects: list[list[theory.VariantStack]],
         chosen_modes: list[theory.ModalScale],
+        is_antecedent: bool,
+        is_intermediate_sequence: bool,
     ) -> None:
         self.final_index = len(sequence_prospects) - 1
         self.uniques = defaultdict(set)
-
         for k, v in self.known_uniques.items():
             self.uniques[k].add(v)
             self.uniques[v].add(k)
 
-        for propagate_index, index_prospects in enumerate(sequence_prospects):
-            if not index_prospects:
+        for propagate_index, prospect_stacks in enumerate(sequence_prospects):
+            if not prospect_stacks:
                 raise CompositionError(f"No prospects at index {propagate_index}.")
-
-        self.sequence_prospects = copy.deepcopy(sequence_prospects)
+        self.sequence_prospects = sequence_prospects
 
         self.dotted_counts = [0, 0, 0, 0]
         self.flattened_pitch = chosen_modes[0].flattened_pitch
@@ -54,10 +53,38 @@ class SequencePartial(Generic[GenericStack]):
         self.backtrack_adjacencies: list[dict[int, set[int]]] = [
             defaultdict(set) for _ in range(6)
         ]
+        self.is_antecedent = is_antecedent
+        self.is_intermediate_sequence = is_intermediate_sequence
+        self.test_suites: list[list[partial[bool]]]
+        self.create_test_suite()
 
-    def prune(
-        self, test_suites: list[list[partial[bool]]]
-    ) -> list[theory.VariantStack]:
+    def create_test_suite(self) -> None:
+        full_to_full = (
+            partial(
+                rules.checked_solo_transition,
+                flattened_pitch=self.flattened_pitch,
+            ),
+            partial(rules.are_measure_stacks_unique),
+            partial(rules.checked_dissonant_pass),
+            partial(rules.checked_broken_parallels),
+            partial(rules.checked_dotted_adjacent),
+            partial(rules.checked_cross_measures),
+            partial(rules.checked_quartet_transition),
+            partial(
+                rules.checked_endpoints,
+                allowed_fifth_endpoints=self.allowed_fifth_endpoints,
+                allowed_fourth_endpoints=self.allowed_fourth_endpoints,
+            ),
+        )
+        self.test_suites = [
+            list(full_to_full),
+            list(full_to_full),
+            list(full_to_full),
+            list(full_to_full),
+            list(full_to_full),
+        ]
+
+    def prune(self) -> list[theory.VariantStack]:
         starting_prospects_ids = {
             index_prospect.id for index_prospect in self.sequence_prospects[-1]
         }
@@ -69,7 +96,7 @@ class SequencePartial(Generic[GenericStack]):
             if failed_index == 5:
                 starting_prospects_ids.remove(failed_id)
                 if not starting_prospects_ids:
-                    raise CompositionError("Prescreening failed.")
+                    raise ImprobableError("Prescreening failed.")
                 return
 
             backtrack_ids = backtrack_attempts[failed_index][failed_id]
@@ -89,7 +116,7 @@ class SequencePartial(Generic[GenericStack]):
                 theory.BaseMeasureStack.obj_cache[viable_prospects_id]
                 for viable_prospects_id in viable_prospects_ids
             ]
-            current_tests = test_suites[first_index]
+            current_tests = self.test_suites[first_index]
             viable_prospects_ids = set()
             for second_prospect in viable_second_prospects:
                 second_prospect_id = second_prospect.id
@@ -146,9 +173,13 @@ class SequencePartial(Generic[GenericStack]):
         current_index: int,
         current_stack: theory.VariantStack,
         current_path: deque[theory.VariantStack],
-    ) -> Iterator[deque[theory.VariantStack]]:
+    ) -> Iterator[list[theory.VariantStack]]:
         if current_index == 0:
-            yield current_path
+            solution_id = [
+                [voice_measure.id for voice_measure in stack] for stack in current_path
+            ]
+            print(f"Found solution: {solution_id}")
+            yield list(current_path)
             return
 
         prospect_ids = self.backtrack_adjacencies[current_index][current_stack.id]
@@ -226,12 +257,69 @@ class SequencePartial(Generic[GenericStack]):
 
         return all(test() for test in test_suite)
 
+    def prescreen_prospects(self) -> list[theory.VariantStack]:
+        for transition_index in range(5):
+            if self.is_antecedent:
+                is_cadence = transition_index == 4
+            else:
+                is_cadence = transition_index == 3
+            if is_cadence:
+                self.test_suites[transition_index][-1:-1] = [
+                    partial(rules.checked_bass_suspension),
+                    partial(rules.checked_upper_suspension),
+                ]
 
-class BasseDansePartial(SequencePartial[theory.VariantStack]):
+            if transition_index == 4 and not self.is_antecedent:
+                self.test_suites[transition_index].append(
+                    partial(rules.checked_cadential_successor)
+                )
+            else:
+                if is_cadence:
+                    allowed_vectors = {0, -1}
+                else:
+                    allowed_vectors = {0, -1, 1, -2, 2, -3, 3, -4, 4}
+                self.test_suites[transition_index].append(
+                    partial(
+                        rules.checked_superius_transition,
+                        allowed_vectors=allowed_vectors,
+                    )
+                )
+
+            allowed_downbeat_unison = (
+                transition_index == 4 and not self.is_intermediate_sequence
+            )
+            self.test_suites[transition_index].extend(
+                [
+                    partial(
+                        rules.checked_duo_transition,
+                        allowed_downbeat_unison=allowed_downbeat_unison,
+                    ),
+                    partial(rules.checked_trio_transition),
+                ]
+            )
+        return self.prune()
+
+    def realize(self) -> Iterator[list[theory.VariantStack]]:
+        starting_points = self.prescreen_prospects()
+        print("Prescreen complete")
+        random.shuffle(starting_points)
+
+        self.start_time = time.time()
+        for starting_point in starting_points:
+            solution_iter = self.get_solution(
+                self.final_index, starting_point, deque([starting_point])
+            )
+            yield from solution_iter
+            print("Starting point failed. Choosing anew.")
+        print("Propagation exhausted. Backtracking to previous sequence.")
+
+
+class BasseDansePartial(SequencePartial):
     known_uniques = {1: 4, 2: 5}
 
-    def prescreen_prospects(self) -> list[theory.VariantStack]:
-        variant_to_full = (
+    def create_test_suite(self) -> None:
+        super().create_test_suite()
+        self.test_suites[0] = [
             partial(
                 rules.checked_solo_partial_transition,
                 flattened_pitch=self.flattened_pitch,
@@ -243,40 +331,17 @@ class BasseDansePartial(SequencePartial[theory.VariantStack]):
                 allowed_fifth_endpoints=self.allowed_fifth_endpoints,
                 allowed_fourth_endpoints=self.allowed_fourth_endpoints,
             ),
-        )
-        full_to_full = (
-            partial(
-                rules.checked_solo_transition,
-                flattened_pitch=self.flattened_pitch,
-            ),
-            partial(rules.are_measure_stacks_unique),
-            partial(rules.checked_dissonant_pass),
-            partial(rules.checked_broken_parallels),
-            partial(rules.checked_dotted_adjacent),
-            partial(rules.checked_cross_measures),
-            partial(rules.checked_quartet_transition),
-            partial(
-                rules.checked_endpoints,
-                allowed_fifth_endpoints=self.allowed_fifth_endpoints,
-                allowed_fourth_endpoints=self.allowed_fourth_endpoints,
-            ),
-        )
-        test_suites = [
-            list(variant_to_full),
-            list(full_to_full),
-            list(full_to_full),
-            list(full_to_full),
-            list(full_to_full),
         ]
 
+    def prescreen_prospects(self) -> list[theory.VariantStack]:
         for transition_index in range(5):
             if is_authentic_cadence := transition_index == 3:
-                test_suites[transition_index][-1:-1] = [
+                self.test_suites[transition_index][-1:-1] = [
                     partial(rules.checked_bass_suspension),
                     partial(rules.checked_upper_suspension),
                 ]
             if transition_index == 4:
-                test_suites[transition_index].append(
+                self.test_suites[transition_index].append(
                     partial(rules.checked_cadential_successor)
                 )
             else:
@@ -284,7 +349,7 @@ class BasseDansePartial(SequencePartial[theory.VariantStack]):
                     allowed_vectors = {0, -1}
                 else:
                     allowed_vectors = {0, -1, 1, -2, 2, -3, 3, -4, 4}
-                test_suites[transition_index].append(
+                self.test_suites[transition_index].append(
                     partial(
                         rules.checked_superius_transition,
                         allowed_vectors=allowed_vectors,
@@ -292,7 +357,7 @@ class BasseDansePartial(SequencePartial[theory.VariantStack]):
                 )
 
             allowed_downbeat_unison = transition_index == 0 or transition_index == 4
-            test_suites[transition_index].extend(
+            self.test_suites[transition_index].extend(
                 [
                     partial(
                         rules.checked_duo_transition,
@@ -301,141 +366,31 @@ class BasseDansePartial(SequencePartial[theory.VariantStack]):
                     partial(rules.checked_trio_transition),
                 ]
             )
-        return self.prune(test_suites)
-
-    def realize(self) -> list[theory.VariantStack]:
-        starting_points = self.prescreen_prospects()
-        print("Prescreen complete")
-        random.shuffle(starting_points)
-
-        self.start_time = time.time()
-        for starting_point in starting_points:
-            solution_iter = self.get_solution(
-                self.final_index, starting_point, deque([starting_point])
-            )
-            try:
-                raw_solution = next(solution_iter)
-            except StopIteration:
-                print("Starting point failed. Choosing anew.")
-            else:
-                print("Found solution")
-                return list(raw_solution)
-        raise CompositionError("Propagation exhausted.")
+        return self.prune()
 
 
-class BranleSimplePartial(SequencePartial[theory.FullMeasureStack]):
-    def __init__(
-        self,
-        sequence_prospects: list[list[theory.FullMeasureStack]],
-        chosen_modes: list[theory.ModalScale],
-        is_antecedent: bool = False,
-        is_intermediate_sequence: bool = False,
-    ) -> None:
-        super().__init__(sequence_prospects, chosen_modes)
-        self.is_antecedent = is_antecedent
-        self.is_intermediate_sequence = is_intermediate_sequence
+class BranleSimplePartial(SequencePartial):
+    pass
 
-    def prescreen_prospects(self) -> list[theory.VariantStack]:
-        full_to_full = (
-            partial(
-                rules.checked_solo_transition,
-                flattened_pitch=self.flattened_pitch,
-            ),
-            partial(rules.are_measure_stacks_unique),
-            partial(rules.checked_dissonant_pass),
-            partial(rules.checked_broken_parallels),
-            partial(rules.checked_dotted_adjacent),
-            partial(rules.checked_cross_measures),
-            partial(rules.checked_quartet_transition),
-            partial(
-                rules.checked_endpoints,
-                allowed_fifth_endpoints=self.allowed_fifth_endpoints,
-                allowed_fourth_endpoints=self.allowed_fourth_endpoints,
-            ),
-        )
-        test_suites = [
-            list(full_to_full),
-            list(full_to_full),
-            list(full_to_full),
-            list(full_to_full),
-            list(full_to_full),
-        ]
 
-        for transition_index in range(5):
-            if self.is_antecedent:
-                is_cadence = transition_index == 4
-            else:
-                is_cadence = transition_index == 3
-            if is_cadence:
-                test_suites[transition_index][-1:-1] = [
-                    partial(rules.checked_bass_suspension),
-                    partial(rules.checked_upper_suspension),
-                ]
-
-            if transition_index == 4 and not self.is_antecedent:
-                test_suites[transition_index].append(
-                    partial(rules.checked_cadential_successor)
-                )
-            else:
-                if is_cadence:
-                    allowed_vectors = {0, -1}
-                else:
-                    allowed_vectors = {0, -1, 1, -2, 2, -3, 3, -4, 4}
-                test_suites[transition_index].append(
-                    partial(
-                        rules.checked_superius_transition,
-                        allowed_vectors=allowed_vectors,
-                    )
-                )
-
-            allowed_downbeat_unison = (
-                transition_index == 4 and not self.is_intermediate_sequence
-            )
-            test_suites[transition_index].extend(
-                [
-                    partial(
-                        rules.checked_duo_transition,
-                        allowed_downbeat_unison=allowed_downbeat_unison,
-                    ),
-                    partial(rules.checked_trio_transition),
-                ]
-            )
-        return self.prune(test_suites)
-
-    def realize(self) -> list[theory.FullMeasureStack]:
-        starting_points = self.prescreen_prospects()
-        print("Prescreen complete")
-        random.shuffle(starting_points)
-
-        self.start_time = time.time()
-        for starting_point in starting_points:
-            solution_iter = self.get_solution(
-                self.final_index, starting_point, deque([starting_point])
-            )
-            try:
-                raw_solution = next(solution_iter)
-            except StopIteration:
-                print("Starting point failed. Choosing anew.")
-            else:
-                print("Found solution")
-                checked_solution = [
-                    current_stack
-                    for current_stack in raw_solution
-                    if isinstance(current_stack, theory.FullMeasureStack)
-                ]
-                return checked_solution
-        raise CompositionError("Propagation exhausted.")
+class BranleGaySemelPartial(SequencePartial):
+    pass
 
 
 class ScorePart:
-    def __init__(self, clef_name: str) -> None:
-        self.clef = clef_name
+    def __init__(self, clef: str, will_refrain: bool) -> None:
+        self.clef = clef
+        self.will_refrain = will_refrain
         self.sections: list[list[theory.SpecificNote | theory.RestNote]] = []
 
     def __iter__(self) -> Iterator[theory.SpecificNote | theory.RestNote]:
         for section in self.sections:
             for _ in range(2):
                 for sound_obj in section:
+                    yield sound_obj
+        if self.will_refrain:
+            for _ in range(2):
+                for sound_obj in self.sections[0]:
                     yield sound_obj
 
     def add_section(
@@ -444,9 +399,7 @@ class ScorePart:
         self.sections.append(list(sound_sequence))
 
 
-TwoDimensionStack = (
-    list[list[theory.FullMeasureStack]] | list[list[theory.VariantStack]]
-)
+TwoDimensionStack = list[list[theory.VariantStack]]
 
 
 class DanceScore:
@@ -455,16 +408,17 @@ class DanceScore:
         chosen_mode: theory.ModalScale,
         clef_group: list[str],
         score_sequences: TwoDimensionStack,
-        chosen_instruemnt: theory.MidiInstrument,
+        chosen_instrument: theory.MidiInstrument,
         tempo: int,
+        will_refrain: bool,
     ) -> None:
         self.scale = chosen_mode
-        print(f"Using {chosen_instruemnt}")
-        self.instrument = chosen_instruemnt
+        print(f"Using {chosen_instrument}")
+        self.instrument = chosen_instrument
         """You can have two parts with the same clef 
         (e.g., contratenor and tenor voices using the alto clef) 
         Therefore, a list is used instead of a dictionary"""
-        self.parts = [ScorePart(clef_name) for clef_name in clef_group]
+        self.parts = [ScorePart(clef, will_refrain) for clef in clef_group]
 
         for score_sequence in score_sequences:
             for score_part, voice_measures in zip(self.parts, zip(*score_sequence)):

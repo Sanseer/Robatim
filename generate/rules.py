@@ -123,11 +123,9 @@ def checked_solo_motion(
                     return False
                 previous_pitch = current_pitch
 
-        if (
-            second_voice_measure[0].duration == Fraction("1/4")
-            and second_voice_measure[1].duration == Fraction("1/4")
-            and not pure.checked_chromatic_relation(first_pitch, resolving_pitch)
-        ):
+        if second_voice_measure[0].duration == Fraction(
+            "1/4"
+        ) and not pure.checked_chromatic_relation(first_pitch, resolving_pitch):
             return False
         if (
             voice_distance
@@ -174,23 +172,22 @@ def checked_solo_motion(
                 return False
             if leap_direction == -1 and previous_direction == 1:
                 return False
-
-            if first_voice_measure[-2].duration == Fraction("1/4"):
-                if not pure.checked_chromatic_relation(previous_pitch, second_pitch):
-                    return False
+            if not pure.checked_chromatic_relation(previous_pitch, second_pitch):
+                return False
+            if (
+                first_voice_measure[-2].duration == Fraction("1/4")
+                and second_voice_measure[0].duration == Fraction("1/4")
+                and second_voice_measure[1].duration == Fraction("1/4")
+                and previous_direction == -1
+                and leap_direction == 1
+                and resolving_direction == -1
+            ):
                 # Do not use the same neighbor figure twice in a row
-                if (
-                    second_voice_measure[0].duration == Fraction("1/4")
-                    and second_voice_measure[1].duration == Fraction("1/4")
-                    and previous_direction == -1
-                    and leap_direction == 1
-                    and resolving_direction == -1
-                ):
-                    next_next_direction = theory.SpecificPitch.get_direction(
-                        resolving_pitch, second_voice_measure[2].specific_pitch
-                    )
-                    if next_next_direction == 1:
-                        return False
+                next_next_direction = theory.SpecificPitch.get_direction(
+                    resolving_pitch, second_voice_measure[2].specific_pitch
+                )
+                if next_next_direction == 1:
+                    return False
     if screen.is_agogic_combo(first_voice_measure, second_voice_measure):
         return False
     if first_pitch.generic_pitch == flattened_pitch:
@@ -198,6 +195,10 @@ def checked_solo_motion(
             return False
         if voice_distance > 3:
             return False
+    if pure.has_direct_relation(
+        first_voice_measure, second_voice_measure, flattened_pitch
+    ):
+        return False
     return pure.checked_chromatic_relation(first_pitch, second_pitch)
 
 
@@ -378,11 +379,9 @@ def checked_partial_solo_motion(
 
     if len(second_voice_measure) > 1:
         next_pitch = second_voice_measure[1].specific_pitch
-        if (
-            second_voice_measure[0].duration == Fraction("1/4")
-            and second_voice_measure[1].duration == Fraction("1/4")
-            and not pure.checked_chromatic_relation(first_pitch, next_pitch)
-        ):
+        if second_voice_measure[0].duration == Fraction(
+            "1/4"
+        ) and not pure.checked_chromatic_relation(first_pitch, next_pitch):
             return False
         if voice_distance:
             if second_pitch != next_pitch and not pure.checked_melodic_pyramid(
@@ -400,7 +399,9 @@ def checked_partial_solo_motion(
             return False
         if voice_distance > 3:
             return False
-    return True
+    return not pure.has_direct_relation(
+        first_voice_measure, second_voice_measure, flattened_pitch
+    )
 
 
 def get_partial_quartets(
@@ -408,8 +409,8 @@ def get_partial_quartets(
     second_measure_stack: theory.FullMeasureStack,
 ) -> Iterator[
     tuple[
-        theory.VariantVoiceMeasure,
-        theory.VariantVoiceMeasure,
+        theory.BaseVoiceMeasure,
+        theory.BaseVoiceMeasure,
         theory.FullVoiceMeasure,
         theory.FullVoiceMeasure,
     ]
@@ -1055,8 +1056,12 @@ def checked_melodic_activity(
         first_measure_stack, second_measure_stack, third_measure_stack
     ):
         voice_index += 1
+        if screen.is_agogic_combo(first_voice_measure, third_voice_measure):
+            return False
         if voice_index in inner_voice_indices:
             continue
+        if first_voice_measure == third_voice_measure:
+            return False
         note_section = itertools.chain(
             first_voice_measure, second_voice_measure, third_voice_measure
         )
@@ -1386,23 +1391,24 @@ def is_valid_outline(
         return bool(current_pitch_endpoints & allowed_fifth_endpoints)
 
     current_direction = theory.SpecificPitch.get_direction(first_pitch, last_pitch)
-    augmented_interval = theory.Interval.get("A4")
-    diminished_interval = theory.Interval.get("d5")
-
-    if current_direction == -1:
-        augmented_interval, diminished_interval = (
-            diminished_interval,
-            augmented_interval,
-        )
-    if first_pitch.has_interval_shift(last_pitch, (str(augmented_interval),)):
-        return False
-    if first_pitch.has_interval_shift(last_pitch, (str(diminished_interval),)):
-        if len(melodic_outline) != 5:
+    if current_direction == 1:
+        lower_pitch = first_pitch
+        upper_pitch = last_pitch
+    else:
+        lower_pitch = last_pitch
+        upper_pitch = first_pitch
+    if voice_distance == 3:
+        if lower_pitch.has_interval_shift(upper_pitch, ("A4",)):
             return False
-        return followup_is_stepewise
-
-    if voice_distance == 4:
+    elif voice_distance == 4:
+        if lower_pitch.has_interval_shift(upper_pitch, ("d5",)):
+            if len(melodic_outline) != 5:
+                return False
+            return followup_is_stepewise
         return bool(current_pitch_endpoints & allowed_fifth_endpoints)
+    elif voice_distance == 5:
+        if lower_pitch.has_interval_shift(upper_pitch, ("M6",)):
+            return False
     return True
 
 

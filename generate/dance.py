@@ -1,365 +1,15 @@
+from __future__ import annotations
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from functools import partial
 import random
-from typing import Iterator, Callable
+from typing import Any, Callable, Iterator, Literal
 
 from generate import export, limits, pure, rules, screen, source, theory
 
 idioms = source.idioms
 revert_duration = export.LilypondFactory.revert_duration
-lower_voice_names = ("bassus", "tenor", "contratenor")
-
-
-def print_prospect_counts(sequence_prospects: limits.TwoDimensionStack) -> None:
-    prospect_counts = [len(index_prospects) for index_prospects in sequence_prospects]
-    print(f"Allocated available measures: {prospect_counts}")
-
-
-def add_duplicates(
-    sequence_prospects: limits.TwoDimensionStack,
-    reference_sequence: list[theory.FullMeasureStack],
-    full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
-    chosen_modes: list[theory.ModalScale],
-) -> None:
-    first_voice_measures = defaultdict(list)
-    first_degrees = idioms["first_degrees"]
-
-    for voice_name in lower_voice_names:
-        allowed_first_motions = set(idioms["first_motions"][voice_name])
-        allowed_start_pitches = {
-            str(chosen_mode[first_degree])
-            for chosen_mode in chosen_modes
-            for first_degree in first_degrees[voice_name]
-        }
-
-        for voice_measure in full_voice_measures[voice_name]:
-            if len(voice_measure) == 1:
-                continue
-            first_specific_pitch = voice_measure[0].specific_pitch
-            if first_specific_pitch.generic_pitch not in allowed_start_pitches:
-                continue
-
-            second_specific_pitch = voice_measure[1].specific_pitch
-            interval_vector = theory.SpecificPitch.get_interval_vector(
-                first_specific_pitch, second_specific_pitch
-            )
-            if interval_vector not in allowed_first_motions:
-                continue
-            first_voice_measures[voice_name].append(voice_measure)
-
-    voice_measure_groups = [
-        first_voice_measures,
-        full_voice_measures,
-        full_voice_measures,
-    ]
-    for propagate_index, selected_voice_measures in enumerate(voice_measure_groups):
-        reference_superius_measure = reference_sequence[propagate_index][-1]
-        modified_measure_sequences = {
-            "bassus": selected_voice_measures["bassus"],
-            "tenor": selected_voice_measures["tenor"],
-            "contratenor": selected_voice_measures["contratenor"],
-            "superius": [reference_superius_measure],
-        }
-
-        voice_measure_stacker = VoiceMeasureStacker(
-            modified_measure_sequences,
-            result_min_count=7_000,
-            result_filter_threshold=0,
-        )
-        measure_stack_groups = next(iter(voice_measure_stacker))
-        sequence_prospects[propagate_index].extend(
-            measure_stack_groups["no_whole_notes"]
-        )
-
-
-def get_tempo(partial_constructor: type[limits.SequencePartial]) -> int:
-    dance_name = partial_constructor.__name__[:-7]
-    tempo_min, tempo_max = idioms["tempo_map"][dance_name]
-    return random.randint(tempo_min, tempo_max)
-
-
-half_cadence_cache: dict[str, list[theory.FullMeasureStack]] = {}
-
-
-def get_branle_simple(
-    clef_group: list[str],
-    voice_tessituras: dict[str, theory.Tessitura],
-    primary_mode: theory.ModalScale,
-    all_full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
-) -> limits.DanceScore:
-    sequence_prospects: list[list[theory.FullMeasureStack]] = [[] for _ in range(6)]
-    if is_antecedent := random.random() < 0.5:
-        chosen_modes = [primary_mode]
-    else:
-        secondary_mode = primary_mode.random_mode_shift()
-        chosen_modes = [primary_mode, secondary_mode]
-
-    top_clef = clef_group[-1]
-    max_ending_pitch = theory.SpecificPitch(
-        idioms["final_max_superius_pitch"][top_clef]
-    )
-    min_ending_pitch = theory.SpecificPitch("C0")
-    superius_ending_tessitura = theory.Tessitura(min_ending_pitch, max_ending_pitch)
-
-    set_final_prospects(
-        sequence_prospects,
-        primary_mode,
-        voice_tessituras,
-        "final_cadances",
-        superius_ending_tessitura,
-    )
-    modified_full_voice_measures = filter_voice_measures(
-        all_full_voice_measures, *chosen_modes
-    )
-    sequence_prospects[0] = get_first_measure_stacks(
-        modified_full_voice_measures, primary_mode, is_antecedent
-    )
-
-    voice_measure_stacker = VoiceMeasureStacker(
-        modified_full_voice_measures, allow_chanson_idiom=True
-    )
-    measure_stack_groups = next(iter(voice_measure_stacker))
-    fill_prospects(
-        sequence_prospects,
-        measure_stack_groups,
-        {
-            "no_whole_notes": [3],
-        },
-    )
-
-    voice_measure_stacker = VoiceMeasureStacker(modified_full_voice_measures)
-    measure_stack_groups = next(iter(voice_measure_stacker))
-
-    fill_prospects(
-        sequence_prospects,
-        measure_stack_groups,
-        {
-            "no_whole_notes": [1, 2],
-        },
-    )
-
-    print_prospect_counts(sequence_prospects)
-    dance_partial2 = limits.BranleSimplePartial(sequence_prospects, chosen_modes)
-    measure_sequence2 = dance_partial2.realize()
-
-    sequence_prospects = [[] for _ in range(6)]
-    if is_antecedent:
-        print("Half cadence!")
-        sequence1_modes = [primary_mode]
-        if str(primary_mode) in half_cadence_cache:
-            sequence_prospects[5] = half_cadence_cache[str(primary_mode)]
-        else:
-            sequence_prospects[5] = get_half_cadence(
-                modified_full_voice_measures, primary_mode, voice_tessituras
-            )
-        reference_stack = measure_sequence2[0]
-        filtered_prospects = []
-        reference_tonic_pitch = reference_stack[-1][0].specific_pitch
-        for index_prospect in sequence_prospects[5]:
-            current_superius_pitch = index_prospect[-1][0].specific_pitch
-            if current_superius_pitch != reference_tonic_pitch:
-                continue
-            filtered_prospects.append(index_prospect)
-        sequence_prospects[5] = filter_by_transition(
-            filtered_prospects, reference_stack, primary_mode
-        )
-        remaining_indices = [3, 4]
-    else:
-        print("Double cadence!")
-        sequence1_modes = [secondary_mode]
-        max_ending_pitch = theory.SpecificPitch(
-            idioms["intermediate_max_superius_pitch"][top_clef]
-        )
-        min_ending_pitch = measure_sequence2[-1][-1][-1].specific_pitch
-        superius_ending_tessitura = theory.Tessitura(min_ending_pitch, max_ending_pitch)
-        set_final_prospects(
-            sequence_prospects,
-            secondary_mode,
-            voice_tessituras,
-            "intermediate_cadances",
-            superius_ending_tessitura,
-            False,
-        )
-        modified_full_voice_measures = filter_voice_measures(
-            all_full_voice_measures,
-            secondary_mode,
-        )
-        voice_measure_stacker = VoiceMeasureStacker(modified_full_voice_measures)
-        measure_stack_groups = next(iter(voice_measure_stacker))
-
-        remaining_indices = [3]
-
-    fill_prospects(
-        sequence_prospects,
-        measure_stack_groups,
-        {
-            "no_whole_notes": remaining_indices,
-        },
-    )
-    add_duplicates(
-        sequence_prospects,
-        measure_sequence2,
-        modified_full_voice_measures,
-        chosen_modes,
-    )
-    print_prospect_counts(sequence_prospects)
-
-    dance_partial1 = limits.BranleSimplePartial(
-        sequence_prospects,
-        sequence1_modes,
-        is_antecedent=is_antecedent,
-        is_intermediate_sequence=True,
-    )
-    measure_sequence1 = dance_partial1.realize()
-
-    sequence_prospects = [[] for _ in range(6)]
-    min_ending_pitch = theory.SpecificPitch("C0")
-    max_ending_pitch = theory.SpecificPitch(
-        idioms["final_max_superius_pitch"][top_clef]
-    )
-    superius_ending_tessitura = theory.Tessitura(min_ending_pitch, max_ending_pitch)
-    if is_antecedent:
-        secondary_mode = primary_mode.random_mode_shift()
-    else:
-        secondary_mode = secondary_mode.random_mode_shift()
-    set_final_prospects(
-        sequence_prospects,
-        secondary_mode,
-        voice_tessituras,
-        "intermediate_cadances",
-        superius_ending_tessitura,
-    )
-    modified_full_voice_measures = filter_voice_measures(
-        all_full_voice_measures, secondary_mode
-    )
-    voice_measure_stacker = VoiceMeasureStacker(modified_full_voice_measures)
-    measure_stack_groups = next(iter(voice_measure_stacker))
-    fill_prospects(
-        sequence_prospects,
-        measure_stack_groups,
-        {"some_whole_notes": [0, 2], "no_whole_notes": [0, 1, 2, 3]},
-    )
-
-    print_prospect_counts(sequence_prospects)
-    dance_partial3 = limits.BranleSimplePartial(
-        sequence_prospects,
-        [secondary_mode],
-    )
-    measure_sequence3 = dance_partial3.realize()
-
-    score_sequences = [[*measure_sequence1, *measure_sequence2], measure_sequence3]
-    chosen_instruemnt = theory.MidiInstrument(*random.choice(idioms["instruments"]))
-    tempo = get_tempo(limits.BranleSimplePartial)
-
-    return limits.DanceScore(
-        primary_mode, clef_group, score_sequences, chosen_instruemnt, tempo
-    )
-
-
-def get_basse_danse(
-    clef_group: list[str],
-    voice_tessituras: dict[str, theory.Tessitura],
-    primary_mode: theory.ModalScale,
-    all_full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
-) -> limits.DanceScore:
-    half_measure_stacks = get_half_measure_stacks(primary_mode, voice_tessituras)
-
-    top_clef = clef_group[-1]
-    max_ending_pitch = theory.SpecificPitch(
-        idioms["final_max_superius_pitch"][top_clef]
-    )
-    min_ending_pitch = theory.SpecificPitch("C0")
-    secondary_mode = primary_mode.random_mode_shift()
-    modified_full_voice_measures = filter_voice_measures(
-        all_full_voice_measures, primary_mode, secondary_mode
-    )
-    superius_ending_tessitura = theory.Tessitura(min_ending_pitch, max_ending_pitch)
-
-    measure_sequence2 = get_dance_sequence(
-        modified_full_voice_measures,
-        half_measure_stacks,
-        primary_mode,
-        voice_tessituras,
-        "final_cadances",
-        superius_ending_tessitura,
-    )
-
-    max_ending_pitch = theory.SpecificPitch(
-        idioms["intermediate_max_superius_pitch"][top_clef]
-    )
-    min_ending_pitch = measure_sequence2[-1][-1][-1].specific_pitch
-    modified_full_voice_measures = filter_voice_measures(
-        all_full_voice_measures,
-        secondary_mode,
-    )
-    superius_ending_tessitura = theory.Tessitura(min_ending_pitch, max_ending_pitch)
-    measure_sequence1 = get_dance_sequence(
-        modified_full_voice_measures,
-        half_measure_stacks,
-        secondary_mode,
-        voice_tessituras,
-        "intermediate_cadances",
-        superius_ending_tessitura,
-    )
-    score_sequences = [[*measure_sequence1, *measure_sequence2]]
-    chosen_instruemnt = theory.MidiInstrument(*random.choice(idioms["instruments"]))
-    tempo = get_tempo(limits.BasseDansePartial)
-
-    return limits.DanceScore(
-        primary_mode, clef_group, score_sequences, chosen_instruemnt, tempo
-    )
-
-
-def get_dance_sequence(
-    full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
-    half_measure_stacks: list[theory.VariantStack],
-    chosen_mode: theory.ModalScale,
-    voice_tessituras: dict[str, theory.Tessitura],
-    cadence_id: str,
-    superius_ending_tessitura: theory.Tessitura,
-) -> list[theory.VariantStack]:
-    sequence_prospects: list[list[theory.VariantStack]] = [[] for _ in range(6)]
-    sequence_prospects[0] = half_measure_stacks
-
-    set_final_prospects(
-        sequence_prospects,
-        chosen_mode,
-        voice_tessituras,
-        cadence_id,
-        superius_ending_tessitura,
-    )
-
-    if cadence_id == "final_cadances":
-        voice_measure_stacker = VoiceMeasureStacker(
-            full_voice_measures, allow_chanson_idiom=True
-        )
-        measure_stack_groups = next(iter(voice_measure_stacker))
-        fill_prospects(
-            sequence_prospects,
-            measure_stack_groups,
-            {
-                "no_whole_notes": [3],
-            },
-        )
-        remaining_indices = [1, 2]
-    else:
-        remaining_indices = [1, 2, 3]
-
-    voice_measure_stacker = VoiceMeasureStacker(full_voice_measures)
-    measure_stack_groups = next(iter(voice_measure_stacker))
-    fill_prospects(
-        sequence_prospects,
-        measure_stack_groups,
-        {
-            "no_whole_notes": remaining_indices,
-        },
-    )
-
-    print_prospect_counts(sequence_prospects)
-    dance_partial = limits.BasseDansePartial(sequence_prospects, [chosen_mode])
-    return dance_partial.realize()
 
 
 def get_full_measure_sequences(
@@ -381,16 +31,15 @@ def get_full_measure_sequences(
         available_pitches = voice_tessitura.filter_pitches(
             chosen_mode.get_specific_iter()
         )
-
-        for starting_pitch in available_pitches:
-            for melody_pack in melody_packs:
-                for melody_contour in melody_pack.melody_contours:
-                    left_skip_count, right_skip_count = melody_pack.get_skip_counts(
-                        melody_contour
-                    )
-                    is_skip_continuous = melody_pack.check_skip_continuity(
-                        left_skip_count, right_skip_count, melody_contour
-                    )
+        for melody_pack in melody_packs:
+            for melody_contour in melody_pack.melody_contours:
+                left_skip_count, right_skip_count = melody_pack.get_skip_counts(
+                    melody_contour
+                )
+                is_skip_continuous = melody_pack.check_skip_continuity(
+                    left_skip_count, right_skip_count, melody_contour
+                )
+                for starting_pitch in available_pitches:
                     pitch_sequence = [
                         theory.SpecificNote(
                             starting_pitch, melody_pack.rhythm_durations[0]
@@ -405,11 +54,13 @@ def get_full_measure_sequences(
                         )
                         if current_pitch not in voice_tessitura:
                             break
-                        if vector in concerning_vectors:
-                            if previous_pitch.has_interval_shift(
+                        if (
+                            vector in concerning_vectors
+                            and previous_pitch.has_interval_shift(
                                 current_pitch, ("A4", "d5")
-                            ):
-                                break
+                            )
+                        ):
+                            break
                         pitch_sequence.append(
                             theory.SpecificNote(current_pitch, rhythm_duration)
                         )
@@ -430,25 +81,17 @@ def get_full_measure_sequences(
                         )
                         pitch_sequences[voice_name].append(voice_measure)
 
-        for available_pitch in available_pitches:
-            if available_pitch.letter == flattened_pitch_letter:
-                starting_pitch = available_pitch.clone()
-                starting_pitch.increment_value(-1)
-                if starting_pitch not in voice_tessitura:
-                    continue
-                is_first_pitch_flattened = True
-            else:
-                starting_pitch = available_pitch
-                is_first_pitch_flattened = False
+                for available_pitch in available_pitches:
+                    if available_pitch.letter == flattened_pitch_letter:
+                        starting_pitch = available_pitch.clone()
+                        starting_pitch.increment_value(-1)
+                        if starting_pitch not in voice_tessitura:
+                            continue
+                        is_first_pitch_flattened = True
+                    else:
+                        starting_pitch = available_pitch
+                        is_first_pitch_flattened = False
 
-            for melody_pack in melody_packs:
-                for melody_contour in melody_pack.melody_contours:
-                    left_skip_count, right_skip_count = melody_pack.get_skip_counts(
-                        melody_contour
-                    )
-                    is_skip_continuous = melody_pack.check_skip_continuity(
-                        left_skip_count, right_skip_count, melody_contour
-                    )
                     pitch_sequence = [
                         theory.SpecificNote(
                             starting_pitch, melody_pack.rhythm_durations[0]
@@ -475,11 +118,13 @@ def get_full_measure_sequences(
 
                         if current_pitch not in voice_tessitura:
                             break
-                        if vector in concerning_vectors:
-                            if previous_pitch.has_interval_shift(
+                        if (
+                            vector in concerning_vectors
+                            and previous_pitch.has_interval_shift(
                                 current_pitch, ("A4", "d5")
-                            ):
-                                break
+                            )
+                        ):
+                            break
                         pitch_sequence.append(
                             theory.SpecificNote(current_pitch, rhythm_duration)
                         )
@@ -500,41 +145,200 @@ def get_full_measure_sequences(
                                 is_skip_continuous,
                             )
                             pitch_sequences[voice_name].append(voice_measure)
-
     return pitch_sequences
 
 
-def filter_voice_measures(
-    all_full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
-    *chosen_modes: theory.ModalScale,
-) -> dict[str, list[theory.FullVoiceMeasure]]:
-    modified_full_voice_measures = defaultdict(list)
-    allowed_fifth_endpoints = {str(chosen_mode[0]) for chosen_mode in chosen_modes}
-    allowed_fourth_endpoints = {str(chosen_mode[4]) for chosen_mode in chosen_modes}
-    allowed_fourth_endpoints |= allowed_fifth_endpoints
+SequenceEnding = Literal[
+    "final_cadences",
+    "intermediate_cadences",
+    "mixed_cadences",
+    "forward_antecedent",
+    "backward_antecedent",
+]
 
-    for voice_name, voice_measures in all_full_voice_measures.items():
-        for voice_measure in voice_measures:
-            if len(voice_measure) == 2:
-                first_pitch = voice_measure[0].specific_pitch
-                second_pitch = voice_measure[1].specific_pitch
-                voice_distance = theory.SpecificPitch.get_interval_distance(
-                    first_pitch, second_pitch
+
+@dataclass
+class PartialConfig:
+    ending: SequenceEnding
+    mode_shift: int = 0
+    no_whole_notes: list[int] = field(default_factory=list)
+    some_whole_notes: list[int] = field(default_factory=list)
+    all_whole_notes: list[int] = field(default_factory=list)
+    duplicate: dict[str, Any] | None = None
+    is_section_start: bool = False
+
+
+def get_config_sections(dance_name: str) -> list[list[PartialConfig]]:
+    config_sections = []
+    for partial_spec in random.choice(idioms["form"][dance_name]):
+        partial_config = PartialConfig(**partial_spec)
+        if partial_config.is_section_start:
+            config_sections.append([partial_config])
+        else:
+            config_sections[-1].append(partial_config)
+    return config_sections
+
+
+@dataclass
+class GlobalSpec:
+    dance_name: str
+    clef_group: list[str]
+    voice_tessituras: dict[str, theory.Tessitura]
+    all_full_voice_measures: dict[str, list[theory.FullVoiceMeasure]]
+    dance_type: type[limits.SequencePartial] = field(init=False)
+    final_ending_tessitura: theory.Tessitura = field(init=False)
+    sequence_builders = {
+        "BasseDanse": limits.BasseDansePartial,
+        "BranleSimple": limits.BranleSimplePartial,
+        "BranleGaySemel": limits.BranleGaySemelPartial,
+    }
+
+    def __post_init__(self) -> None:
+        self.dance_type = self.sequence_builders[self.dance_name]
+        min_ending_pitch = theory.SpecificPitch("C0")
+        max_ending_pitch = theory.SpecificPitch(
+            idioms["final_max_superius_pitch"][self.clef_group[-1]]
+        )
+        self.final_ending_tessitura = theory.Tessitura(
+            min_ending_pitch, max_ending_pitch
+        )
+
+    @property
+    def top_clef(self) -> str:
+        return self.clef_group[-1]
+
+
+@dataclass
+class DuplicateMarker:
+    global_index: int = 0
+    local_indices: list[int] = field(default_factory=list)
+
+
+class SolutionSpec:
+    def __init__(
+        self,
+        primary_mode: theory.ModalScale,
+        config_sections: list[list[PartialConfig]],
+    ) -> None:
+        self.primary_mode = primary_mode
+        second_mode = primary_mode.random_mode_shift()
+        third_mode = second_mode.random_mode_shift()
+        all_modes = (primary_mode, second_mode, third_mode)
+
+        self.result: list[limits.TwoDimensionStack] = []
+        self.sections = []
+        null_marker = DuplicateMarker()
+        accumulated_modes: list[theory.ModalScale]
+
+        for section_index, config_section in enumerate(config_sections):
+            self.result.append([])
+            sequence_specs = []
+            accumulated_modes = []
+
+            for sequence_index, sequence_config in enumerate(config_section):
+                current_mode = all_modes[sequence_config.mode_shift]
+                current_modes = [current_mode]
+                for accumulated_mode in accumulated_modes:
+                    if accumulated_mode != current_mode:
+                        current_modes.append(accumulated_mode)
+                if current_mode not in accumulated_modes:
+                    accumulated_modes.append(current_mode)
+
+                sequence_rhythms = defaultdict(set)
+                for partial_index in sequence_config.no_whole_notes:
+                    sequence_rhythms[partial_index].add("no_whole_notes")
+                for partial_index in sequence_config.some_whole_notes:
+                    sequence_rhythms[partial_index].add("some_whole_notes")
+                for partial_index in sequence_config.all_whole_notes:
+                    sequence_rhythms[partial_index].add("all_whole_notes")
+
+                if sequence_config.duplicate is None:
+                    duplicate_marker = null_marker
+                else:
+                    duplicate_marker = DuplicateMarker(**sequence_config.duplicate)
+
+                self.result[-1].append([])
+                sequence_specs.append(
+                    SequenceSpec(
+                        section_index,
+                        sequence_index,
+                        current_modes,
+                        sequence_rhythms,
+                        sequence_config.ending,
+                        duplicate_marker,
+                    )
                 )
-                current_pitch_endpoints = {
-                    first_pitch.generic_pitch,
-                    second_pitch.generic_pitch,
-                }
+            self.sections.append(
+                SectionSpec(section_index, sequence_specs, accumulated_modes)
+            )
 
-                if voice_distance == 4:
-                    if not current_pitch_endpoints & allowed_fifth_endpoints:
-                        continue
-                elif voice_distance == 3:
-                    if not current_pitch_endpoints & allowed_fourth_endpoints:
-                        continue
-            modified_full_voice_measures[voice_name].append(voice_measure)
+    def __getitem__(self, index: int) -> SectionSpec:
+        return self.sections[index]
 
-    return modified_full_voice_measures
+    def get_superius_duplicate(
+        self, global_index: int, local_index: int
+    ) -> theory.BaseVoiceMeasure:
+        flattened_index = 0
+        for section_result in self.result:
+            for sequence_result in section_result:
+                if flattened_index == global_index:
+                    return sequence_result[local_index][-1]
+                flattened_index += 1
+        raise IndexError
+
+
+class SectionSpec:
+    def __init__(
+        self,
+        index: int,
+        display_order: list[SequenceSpec],
+        modes: list[theory.ModalScale],
+    ) -> None:
+        self.display_order = display_order
+        self.solve_order = display_order
+        self.modes = modes
+
+        if len(display_order) == 2:
+            first_spec, second_spec = display_order
+            solve_in_reverse = (
+                "antecedent" in first_spec.ending
+                or second_spec.ending == "final_cadences"
+                or ("cadences" in second_spec.ending and index == 0)
+            )
+            if solve_in_reverse:
+                self.solve_order = self.solve_order[::-1]
+
+    def __getitem__(self, index: int) -> SequenceSpec:
+        return self.display_order[index]
+
+    def __len__(self) -> int:
+        return len(self.display_order)
+
+
+class ImpossibleError(Exception):
+    def __str__(self) -> str:
+        return f"Solution not possible: {self.args[0]}"
+
+
+def filter_duplicates(
+    all_voice_measures: list[theory.FullVoiceMeasure],
+    reference_measure: theory.BaseVoiceMeasure,
+    partial_match: bool = False,
+) -> list[theory.FullVoiceMeasure]:
+    if partial_match:
+        reference_starting_pitch = reference_measure[0].specific_pitch
+        filtered_voice_measures = [
+            voice_measure
+            for voice_measure in all_voice_measures
+            if voice_measure[0].specific_pitch == reference_starting_pitch
+        ]
+    else:
+        filtered_voice_measures = [
+            voice_measure
+            for voice_measure in all_voice_measures
+            if voice_measure == reference_measure
+        ]
+    return filtered_voice_measures
 
 
 HalfDuoTest = tuple[
@@ -545,7 +349,25 @@ HalfDuoTest = tuple[
 ]
 
 
-def get_half_measure_stacks(
+def are_half_duos_valid(half_duo_tests: tuple[HalfDuoTest, ...]) -> bool:
+    for lower_pitch, upper_pitch, additional_tests, consonant_ids in half_duo_tests:
+        if not pure.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
+            return False
+        for additional_test in additional_tests:
+            if not additional_test(lower_pitch, upper_pitch):
+                return False
+    return True
+
+
+def is_half_trio_valid(
+    lowest_pitch: theory.SpecificPitch,
+    middle_pitch: theory.SpecificPitch,
+    highest_pitch: theory.SpecificPitch,
+) -> bool:
+    return pure.is_perfect_fourth_consonant(lowest_pitch, middle_pitch, highest_pitch)
+
+
+def get_basse_danse_start(
     chosen_mode: theory.ModalScale,
     voice_tessituras: dict[str, theory.Tessitura],
 ) -> list[theory.VariantStack]:
@@ -554,8 +376,7 @@ def get_half_measure_stacks(
         all_available_pitches[voice_name] = voice_tessitura.filter_pitches(
             chosen_mode.get_specific_iter()
         )
-
-    half_measure_stacks: list[theory.VariantStack] = []
+    first_stacks: list[theory.VariantStack] = []
     half_duos_to_check: tuple[HalfDuoTest, ...]
 
     for bassus_pitch in all_available_pitches["bassus"]:
@@ -631,23 +452,310 @@ def get_half_measure_stacks(
                         contratenor_measure,
                         superius_measure,
                     )
-                    half_measure_stacks.append(half_measure_stack)
+                    first_stacks.append(half_measure_stack)
+    return first_stacks
 
-    return half_measure_stacks
+
+def get_branle_simple_start(
+    full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
+    chosen_modes: list[theory.ModalScale],
+    section_start_is_antecedent: bool,
+    current_superius_duplicate: theory.BaseVoiceMeasure | None,
+) -> list[theory.VariantStack]:
+    first_sequences = defaultdict(list)
+    for voice_name, voice_measures in full_voice_measures.items():
+        if voice_name == "superius":
+            if current_superius_duplicate is not None:
+                for voice_measure in filter_duplicates(
+                    voice_measures,
+                    current_superius_duplicate,
+                ):
+                    if len(voice_measure) != 1:
+                        first_sequences[voice_name].append(voice_measure)
+                continue
+            if section_start_is_antecedent:
+                allowed_start_degrees = [0]
+            else:
+                allowed_start_degrees = idioms["first_degrees"][voice_name]
+        else:
+            allowed_start_degrees = idioms["first_degrees"][voice_name]
+
+        allowed_first_motions = set(idioms["first_motions"][voice_name])
+        allowed_start_pitches = {
+            str(chosen_mode[start_degree])
+            for chosen_mode in chosen_modes
+            for start_degree in allowed_start_degrees
+        }
+        for voice_measure in voice_measures:
+            if len(voice_measure) == 1:
+                continue
+            if voice_measure[0].duration == Fraction("3/4"):
+                continue
+            first_specific_pitch = voice_measure[0].specific_pitch
+            if first_specific_pitch.generic_pitch not in allowed_start_pitches:
+                continue
+
+            second_specific_pitch = voice_measure[1].specific_pitch
+            interval_vector = theory.SpecificPitch.get_interval_vector(
+                first_specific_pitch, second_specific_pitch
+            )
+            if interval_vector in allowed_first_motions:
+                first_sequences[voice_name].append(voice_measure)
+    voice_measure_stacker = VoiceMeasureStacker(first_sequences, {"no_whole_notes"})
+    return next(iter(voice_measure_stacker))
 
 
-def filter_by_transition(
-    index_prospects: list[theory.FullMeasureStack],
-    reference_stack: theory.FullMeasureStack,
+first_motions = {
+    "bassus": {-3, 3, -1, 1, 0},
+    "tenor": {-2, 2, -1, 1, 0},
+    "contratenor": {-2, 2, -1, 1, 0},
+    "superius": {-2, -1, 1, 0},
+}
+
+
+def get_branle_gay_start(
+    full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
+    chosen_modes: list[theory.ModalScale],
+    allowed_rhythms: set[str],
+    current_superius_duplicate: theory.BaseVoiceMeasure | None,
+) -> list[theory.VariantStack]:
+    first_sequences = defaultdict(list)
+    for voice_name, voice_measures in full_voice_measures.items():
+        if voice_name == "superius" and current_superius_duplicate is not None:
+            first_sequences[voice_name] = filter_duplicates(
+                voice_measures,
+                current_superius_duplicate,
+            )
+        else:
+            allowed_start_degrees = idioms["first_degrees"][voice_name]
+            allowed_start_pitches = {
+                str(chosen_mode[start_degree])
+                for chosen_mode in chosen_modes
+                for start_degree in allowed_start_degrees
+            }
+            for voice_measure in voice_measures:
+                if len(voice_measure) > 2 and voice_name != "superius":
+                    continue
+                if voice_measure[0].duration == Fraction("3/4"):
+                    continue
+
+                first_specific_pitch = voice_measure[0].specific_pitch
+                if first_specific_pitch.generic_pitch not in allowed_start_pitches:
+                    continue
+                if len(voice_measure) > 1:
+                    second_specific_pitch = voice_measure[1].specific_pitch
+                    interval_vector = theory.SpecificPitch.get_interval_vector(
+                        first_specific_pitch, second_specific_pitch
+                    )
+                    if interval_vector not in first_motions[voice_name]:
+                        continue
+                first_sequences[voice_name].append(voice_measure)
+    voice_measure_stacker = VoiceMeasureStacker(first_sequences, allowed_rhythms)
+    return next(iter(voice_measure_stacker))
+
+
+def get_antecedent_ending(
+    current_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
     chosen_mode: theory.ModalScale,
-) -> list[theory.FullMeasureStack]:
-    allowed_fifth_endpoints = {str(chosen_mode[0])}
-    allowed_fourth_endpoints = {str(chosen_mode[0]), str(chosen_mode[4])}
+    voice_tessituras: dict[str, theory.Tessitura],
+    is_backward: bool,
+    reference_stack: theory.VariantStack,
+) -> list[theory.VariantStack]:
+    last_sequences = defaultdict(list)
+    tonic_generic_pitch = chosen_mode[0]
+    flattened_pitch = chosen_mode.flattened_pitch
+    superius_tessitura = voice_tessituras["superius"]
+
+    interval_shifts = [theory.Interval.get("m2")]
+    if chosen_mode.scale_intervals[-1] == "m7":
+        interval_shifts.append(theory.Interval.get("M2"))
+    tonic_specific_pitches = superius_tessitura.find_equivalent_pitches(
+        tonic_generic_pitch
+    )
+
+    superius_measure_bound = theory.MeasureBound(
+        theory.RhythmBound(theory.half_duration, 2), theory.SkipBound(0)
+    )
+    voice_can_transition = partial(
+        rules.checked_solo_motion,
+        second_voice_measure=reference_stack[-1],
+        flattened_pitch=flattened_pitch,
+    )
+    for interval_shift in interval_shifts:
+        for tonic_specific_pitch in tonic_specific_pitches:
+            cadence_pitch = tonic_specific_pitch - interval_shift
+            if cadence_pitch not in superius_tessitura:
+                continue
+            measure_sequence = [
+                theory.SpecificNote(tonic_specific_pitch, theory.half_duration),
+                theory.SpecificNote(cadence_pitch, theory.half_duration),
+            ]
+            if is_backward:
+                measure_sequence = measure_sequence[::-1]
+            superius_measure = theory.FullVoiceMeasure.get(
+                measure_sequence,
+                superius_measure_bound,
+                superius_measure_bound,
+                True,
+                False,
+            )
+            if voice_can_transition(superius_measure):
+                last_sequences["superius"].append(superius_measure)
+
+    lower_voice_vectors = {
+        "bassus": {0, -1, -3, -4},
+        "tenor": {0, -1, 1},
+        "contratenor": {0, -1, 1},
+    }
+    for voice_index, (voice_name, allowed_vectors) in enumerate(
+        lower_voice_vectors.items()
+    ):
+        voice_can_transition = partial(
+            rules.checked_solo_motion,
+            second_voice_measure=reference_stack[voice_index],
+            flattened_pitch=flattened_pitch,
+        )
+        for voice_measure in current_voice_measures[voice_name]:
+            if len(voice_measure) > 2:
+                continue
+
+            first_pitch = voice_measure[0].specific_pitch
+            second_pitch = voice_measure[-1].specific_pitch
+            current_vector = theory.SpecificPitch.get_interval_vector(
+                first_pitch, second_pitch
+            )
+            if current_vector not in allowed_vectors:
+                continue
+            if voice_can_transition(voice_measure):
+                last_sequences[voice_name].append(voice_measure)
+    voice_measure_stacker = VoiceMeasureStacker(
+        last_sequences, {"no_whole_notes", "some_whole_notes"}
+    )
+    return next(iter(voice_measure_stacker))
+
+
+def get_penultimate_voice_measures(
+    chosen_mode: theory.ModalScale,
+    voice_formula: tuple[tuple[int, str], ...],
+    voice_tessitura: theory.Tessitura,
+) -> list[theory.FullVoiceMeasure]:
+    previous_scale_degree = starting_scale_degree = voice_formula[0][0]
+    starting_duration = revert_duration(voice_formula[0][1])
+    pitch_sequences = []
+
+    used_scale_degrees = [starting_scale_degree]
+    rhythm_durations = [starting_duration]
+    melody_contour = []
+
+    for current_scale_degree, duration_repr in voice_formula[1:]:
+        used_scale_degrees.append(current_scale_degree)
+        rhythm_durations.append(revert_duration(duration_repr))
+        current_vector = current_scale_degree - previous_scale_degree
+        melody_contour.append(current_vector)
+        previous_scale_degree = current_scale_degree
+
+    melody_pack = theory.MelodyPack(rhythm_durations, [melody_contour])
+    left_skip_count, right_skip_count = melody_pack.get_skip_counts(melody_contour)
+    is_skip_continuous = melody_pack.check_skip_continuity(
+        left_skip_count, right_skip_count, melody_contour
+    )
+
+    if (
+        -1 in used_scale_degrees
+        and chosen_mode.scale_intervals[-1][0] == "m"
+        and chosen_mode.type != "phrygian"
+    ):
+        """the phrygian cadence uses a descending minor second in the tenorizan
+        rather than the usual ascending minor second in the cantizan"""
+        starting_generic_pitch = chosen_mode.get_cadential_pitch(starting_scale_degree)
+        starting_specific_pitches = voice_tessitura.find_equivalent_pitches(
+            starting_generic_pitch
+        )
+        pitch_shifter = chosen_mode.cadential_shift
+    else:
+        starting_generic_pitch = chosen_mode[starting_scale_degree]
+        starting_specific_pitches = voice_tessitura.find_equivalent_pitches(
+            starting_generic_pitch
+        )
+        pitch_shifter = chosen_mode.scale_shift
+
+    for starting_specific_pitch in starting_specific_pitches:
+        pitch_sequence = [
+            theory.SpecificNote(starting_specific_pitch, starting_duration)
+        ]
+        previous_scale_degree = starting_scale_degree
+        previous_specific_pitch = starting_specific_pitch
+
+        for current_scale_degree, current_duration in zip(
+            used_scale_degrees[1:], rhythm_durations[1:]
+        ):
+            current_specific_pitch = pitch_shifter(
+                previous_specific_pitch, previous_scale_degree, current_scale_degree
+            )
+            if current_specific_pitch not in voice_tessitura:
+                break
+
+            pitch_sequence.append(
+                theory.SpecificNote(current_specific_pitch, current_duration)
+            )
+            previous_scale_degree = current_scale_degree
+            previous_specific_pitch = current_specific_pitch
+        else:
+            voice_measure = theory.FullVoiceMeasure.get(
+                pitch_sequence,
+                theory.MeasureBound(
+                    melody_pack.left_rhythm_bound, theory.SkipBound(left_skip_count)
+                ),
+                theory.MeasureBound(
+                    melody_pack.right_rhythm_bound,
+                    theory.SkipBound(right_skip_count),
+                ),
+                melody_pack.is_rhythm_continuous,
+                is_skip_continuous,
+            )
+            pitch_sequences.append(voice_measure)
+    return pitch_sequences
+
+
+ultimate_duration = Fraction("1")
+whole_note_bound = theory.MeasureBound(
+    theory.RhythmBound(ultimate_duration, 1), theory.SkipBound(0)
+)
+
+
+def get_ultimate_voice_measures(
+    chosen_mode: theory.ModalScale,
+    voice_formula: tuple[int, str],
+    voice_tessitura: theory.Tessitura,
+    modify_chordal_third: partial[theory.SpecificNote],
+) -> list[theory.FullVoiceMeasure]:
+    diatonic_generic_pitch = chosen_mode[voice_formula[0]]
+    starting_specific_pitches = voice_tessitura.find_equivalent_pitches(
+        diatonic_generic_pitch
+    )
+    pitch_sequences = []
+    for starting_specific_pitch in starting_specific_pitches:
+        sole_note = theory.SpecificNote(starting_specific_pitch, ultimate_duration)
+        corrected_voice_measure = theory.FullVoiceMeasure.get(
+            [modify_chordal_third(sole_note)],
+            whole_note_bound,
+            whole_note_bound,
+            True,
+            True,
+        )
+        pitch_sequences.append(corrected_voice_measure)
+    return pitch_sequences
+
+
+def filter_transition(
+    prospect_stacks: list[theory.VariantStack],
+    reference_stack: theory.VariantStack,
+    chosen_modes: list[theory.ModalScale],
+) -> list[theory.VariantStack]:
+    allowed_fifth_endpoints = {str(chosen_mode[0]) for chosen_mode in chosen_modes}
+    allowed_fourth_endpoints = {str(chosen_mode[4]) for chosen_mode in chosen_modes}
+    allowed_fourth_endpoints |= allowed_fifth_endpoints
     test_suite = (
-        partial(
-            rules.checked_solo_transition,
-            flattened_pitch=chosen_mode.flattened_pitch,
-        ),
         partial(rules.are_measure_stacks_unique),
         partial(rules.checked_dissonant_pass),
         partial(rules.checked_broken_parallels),
@@ -668,18 +776,482 @@ def filter_by_transition(
 
     filtered_prospects = []
     second_id = reference_stack.id
-    for index_prospect in index_prospects:
-        first_id = index_prospect.id
+    for prospect_stack in prospect_stacks:
+        first_id = prospect_stack.id
         if second_id in rules.absolute_failures[first_id]:
             continue
         for current_test in test_suite:
-            if not current_test(index_prospect, reference_stack):
+            if not current_test(prospect_stack, reference_stack):
                 break
         else:
-            filtered_prospects.append(index_prospect)
+            filtered_prospects.append(prospect_stack)
     if not filtered_prospects:
         raise limits.CompositionError("Transition failed.")
     return filtered_prospects
+
+
+def create_picardy_third(
+    has_minor_third: bool,
+    designated_letter: str,
+    original_note: theory.SpecificNote,
+) -> theory.SpecificNote:
+    if has_minor_third:
+        original_pitch = original_note.specific_pitch
+        if original_pitch.letter == designated_letter:
+            picardy_third = original_pitch.clone()
+            picardy_third.increment_value(1)
+            return theory.SpecificNote(picardy_third, original_note.duration)
+    return original_note
+
+
+@dataclass
+class SequenceSpec:
+    section_index: int
+    sequence_index: int
+    modes: list[theory.ModalScale]
+    rhythms: defaultdict[int, set[str]]
+    ending: SequenceEnding
+    duplicate: DuplicateMarker
+
+    def __post_init__(self) -> None:
+        if "cadences" in self.ending:
+            self.realize_prospects = self.solve_cadence
+        elif "antecedent" in self.ending:
+            self.realize_prospects = self.solve_antecedent
+        else:
+            raise ValueError
+        self.sequence_prospects: limits.TwoDimensionStack
+        self.unfilled_prospect_indices: set[int]
+        self.unfilled_duplicate_indices: set[int]
+
+    @property
+    def mode(self) -> theory.ModalScale:
+        return self.modes[0]
+
+    def setup_solution(
+        self, global_spec: GlobalSpec, solution_spec: SolutionSpec
+    ) -> SectionSpec:
+        self.sequence_prospects = [[] for _ in range(6)]
+        self.unfilled_prospect_indices = set(range(6))
+        self.unfilled_duplicate_indices = set(self.duplicate.local_indices)
+        section_spec = solution_spec[self.section_index]
+
+        section_start_is_antecedent = "antecedent" in section_spec[0].ending
+        if 0 in self.unfilled_duplicate_indices:
+            current_superius_duplicate = solution_spec.get_superius_duplicate(
+                self.duplicate.global_index, 0
+            )
+        else:
+            current_superius_duplicate = None
+
+        if global_spec.dance_name == "BasseDanse":
+            self.sequence_prospects[0] = get_basse_danse_start(
+                self.mode, global_spec.voice_tessituras
+            )
+            self.unfilled_prospect_indices.remove(0)
+        elif global_spec.dance_name == "BranleGaySemel":
+            if section_start_is_antecedent:
+                starting_modes = [section_spec.modes[0]]
+            else:
+                starting_modes = section_spec.modes[:]
+                if solution_spec.primary_mode not in starting_modes:
+                    starting_modes.append(solution_spec.primary_mode)
+            self.sequence_prospects[0] = get_branle_gay_start(
+                global_spec.all_full_voice_measures,
+                starting_modes,
+                self.rhythms[0],
+                current_superius_duplicate,
+            )
+            if current_superius_duplicate is not None:
+                self.unfilled_duplicate_indices.remove(0)
+            self.unfilled_prospect_indices.remove(0)
+        elif (
+            global_spec.dance_name == "BranleSimple"
+            and "some_whole_notes" not in self.rhythms[0]
+        ):
+            starting_modes = section_spec.modes[:]
+            if solution_spec.primary_mode not in starting_modes:
+                starting_modes.append(solution_spec.primary_mode)
+            self.sequence_prospects[0] = get_branle_simple_start(
+                global_spec.all_full_voice_measures,
+                starting_modes,
+                section_start_is_antecedent,
+                current_superius_duplicate,
+            )
+            if current_superius_duplicate is not None:
+                self.unfilled_duplicate_indices.remove(0)
+            self.unfilled_prospect_indices.remove(0)
+        return section_spec
+
+    def solve(
+        self, global_spec: GlobalSpec, solution_spec: SolutionSpec
+    ) -> Iterator[bool]:
+        print(f"Solving {self.ending} with {self.mode} {self.mode.type}")
+        section_spec = self.setup_solution(global_spec, solution_spec)
+        try:
+            self.realize_prospects(global_spec, solution_spec, section_spec)
+            self.print_prospect_counts()
+            dance_partial = global_spec.dance_type(
+                self.sequence_prospects,
+                self.modes,
+                "antecedent" in self.ending,
+                self.sequence_index != len(section_spec) - 1,
+            )
+            solution_iter = dance_partial.realize()
+            for measure_sequence in solution_iter:
+                section_result = solution_spec.result[self.section_index]
+                section_result[self.sequence_index] = measure_sequence
+                yield True
+        except limits.CompositionError as err:
+            print(f"{err} Backtracking to previous sequence.")
+            return
+
+    def print_prospect_counts(self) -> None:
+        prospect_counts = [
+            len(prospect_stacks) for prospect_stacks in self.sequence_prospects
+        ]
+        print(f"Allocated available measures: {prospect_counts}")
+
+    def filter_voice_measures(
+        self,
+        all_full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
+    ) -> dict[str, list[theory.FullVoiceMeasure]]:
+        modified_full_voice_measures = defaultdict(list)
+        allowed_fifth_endpoints = {str(mode[0]) for mode in self.modes}
+        allowed_fourth_endpoints = {str(mode[4]) for mode in self.modes}
+        allowed_fourth_endpoints |= allowed_fifth_endpoints
+
+        for voice_name, voice_measures in all_full_voice_measures.items():
+            for voice_measure in voice_measures:
+                if len(voice_measure) == 2:
+                    first_pitch = voice_measure[0].specific_pitch
+                    second_pitch = voice_measure[1].specific_pitch
+                    voice_distance = theory.SpecificPitch.get_interval_distance(
+                        first_pitch, second_pitch
+                    )
+                    current_pitch_endpoints = {
+                        first_pitch.generic_pitch,
+                        second_pitch.generic_pitch,
+                    }
+
+                    if voice_distance == 4:
+                        if not current_pitch_endpoints & allowed_fifth_endpoints:
+                            continue
+                    elif voice_distance == 3:
+                        if not current_pitch_endpoints & allowed_fourth_endpoints:
+                            continue
+                modified_full_voice_measures[voice_name].append(voice_measure)
+        return modified_full_voice_measures
+
+    def solve_antecedent(
+        self,
+        global_spec: GlobalSpec,
+        solution_spec: SolutionSpec,
+        section_spec: SectionSpec,
+    ) -> None:
+        allowed_voice_measures = self.filter_voice_measures(
+            global_spec.all_full_voice_measures
+        )
+        reference_stack = solution_spec.result[self.section_index][1][0]
+        self.sequence_prospects[5] = get_antecedent_ending(
+            allowed_voice_measures,
+            self.mode,
+            global_spec.voice_tessituras,
+            is_backward := "backward" in self.ending,
+            reference_stack,
+        )
+        if is_backward:
+            filtered_prospects = self.sequence_prospects[5]
+        else:
+            reference_tonic_pitch = reference_stack[-1][0].specific_pitch
+            filtered_prospects = []
+            for prospect_stack in self.sequence_prospects[5]:
+                current_superius_pitch = prospect_stack[-1][0].specific_pitch
+                if current_superius_pitch == reference_tonic_pitch:
+                    filtered_prospects.append(prospect_stack)
+
+        self.sequence_prospects[5] = filter_transition(
+            filtered_prospects, reference_stack, section_spec.modes
+        )
+        self.unfilled_prospect_indices.remove(5)
+        self.fill_remaining_prospects(
+            allowed_voice_measures,
+            solution_spec,
+        )
+
+    def solve_cadence(
+        self,
+        global_spec: GlobalSpec,
+        solution_spec: SolutionSpec,
+        section_spec: SectionSpec,
+    ) -> None:
+        if self.section_index == 0:
+            if self.sequence_index == len(section_spec) - 1:
+                final_ending_tessitura = global_spec.final_ending_tessitura
+            else:
+                reference_stack = solution_spec.result[self.section_index][1][-1]
+                min_ending_pitch = reference_stack[-1][-1].specific_pitch
+                max_ending_pitch = theory.SpecificPitch(
+                    idioms["intermediate_max_superius_pitch"][global_spec.top_clef]
+                )
+                final_ending_tessitura = theory.Tessitura(
+                    min_ending_pitch, max_ending_pitch
+                )
+        else:
+            min_ending_pitch = theory.SpecificPitch("C0")
+            max_ending_pitch = theory.SpecificPitch(
+                idioms["intermediate_max_superius_pitch"][global_spec.top_clef]
+            )
+            final_ending_tessitura = theory.Tessitura(
+                min_ending_pitch, max_ending_pitch
+            )
+
+        if 4 in self.unfilled_duplicate_indices:
+            current_superius_duplicate = solution_spec.get_superius_duplicate(
+                self.duplicate.global_index, 4
+            )
+            self.unfilled_duplicate_indices.remove(4)
+        else:
+            current_superius_duplicate = None
+        self.fill_cadential_prospects(
+            global_spec.voice_tessituras,
+            final_ending_tessitura,
+            current_superius_duplicate,
+        )
+        self.unfilled_prospect_indices -= {4, 5}
+
+        allowed_voice_measures = self.filter_voice_measures(
+            global_spec.all_full_voice_measures
+        )
+        self.fill_remaining_prospects(
+            allowed_voice_measures,
+            solution_spec,
+        )
+
+    def fill_cadential_prospects(
+        self,
+        voice_tessituras: dict[str, theory.Tessitura],
+        superius_ending_tessitura: theory.Tessitura,
+        penultimate_superius_duplicate: theory.BaseVoiceMeasure | None,
+    ) -> None:
+        cadence_type = self.ending
+        penultimate_sequences = defaultdict(list)
+        ultimate_sequences = defaultdict(list)
+        mediant_pitch_letter = self.mode[2].letter
+
+        modify_chordal_third = partial(
+            create_picardy_third,
+            self.mode.scale_intervals[2][0] == "m",
+            mediant_pitch_letter,
+        )
+        penultimate_rhythms = self.rhythms[4]
+        for voice_name, voice_formulas in idioms[cadence_type].items():
+            voice_tessitura = voice_tessituras[voice_name]
+            penultimate_formulas = set()
+            ultimate_formulas = set()
+            for voice_formula in voice_formulas:
+                *penultimate_formula, ultimate_formula = voice_formula
+                converted_formula = tuple(
+                    tuple(formula_part) for formula_part in penultimate_formula
+                )
+                penultimate_formulas.add(converted_formula)
+                ultimate_formulas.add(tuple(ultimate_formula))
+            if (
+                voice_name == "superius"
+                and cadence_type == "final_cadences"
+                and "some_whole_notes" in penultimate_rhythms
+                and "all_whole_notes" not in penultimate_rhythms
+            ):
+                penultimate_formulas.remove(((-1, "1"),))
+
+            for penultimate_formula in penultimate_formulas:
+                voice_measures = get_penultimate_voice_measures(
+                    self.mode, penultimate_formula, voice_tessitura
+                )
+                penultimate_sequences[voice_name].extend(voice_measures)
+            for ultimate_formula in ultimate_formulas:
+                voice_measures = get_ultimate_voice_measures(
+                    self.mode, ultimate_formula, voice_tessitura, modify_chordal_third
+                )
+                ultimate_sequences[voice_name].extend(voice_measures)
+        if penultimate_superius_duplicate is not None:
+            penultimate_sequences["superius"] = filter_duplicates(
+                penultimate_sequences["superius"],
+                penultimate_superius_duplicate,
+                partial_match=True,
+            )
+
+        voice_measure_stacker = VoiceMeasureStacker(
+            penultimate_sequences,
+            penultimate_rhythms,
+            are_cadential_duos_valid,
+            are_cadential_trios_valid,
+        )
+        leading_tone_letter = self.mode[-1].letter
+        for prospect_stack in next(iter(voice_measure_stacker)):
+            leading_tone_count = 0
+            for voice_measure in prospect_stack:
+                current_pitch_letter = voice_measure[-1].specific_pitch.letter
+                if current_pitch_letter == leading_tone_letter:
+                    leading_tone_count += 1
+                    if leading_tone_count > 1:
+                        break
+            else:
+                self.sequence_prospects[4].append(prospect_stack)
+
+        voice_measure_stacker = VoiceMeasureStacker(
+            ultimate_sequences, {"all_whole_notes"}
+        )
+        for prospect_stack in next(iter(voice_measure_stacker)):
+            superius_ending_pitch = prospect_stack[-1][-1].specific_pitch
+            if superius_ending_pitch not in superius_ending_tessitura:
+                continue
+
+            mediant_pitch_count = 0
+            for voice_measure in prospect_stack:
+                current_pitch_letter = voice_measure[-1].specific_pitch.letter
+                # accounts for the picardy third
+                if current_pitch_letter == mediant_pitch_letter:
+                    mediant_pitch_count += 1
+                    if mediant_pitch_count > 1:
+                        break
+            else:
+                self.sequence_prospects[5].append(prospect_stack)
+        if not self.sequence_prospects[5]:
+            if cadence_type == "final_cadences":
+                raise ImpossibleError(
+                    "Authentic cadence failed.", str(self.mode), self.mode.type
+                )
+            raise limits.ImprobableError("Cadence failed.")
+
+    def fill_remaining_prospects(
+        self,
+        allowed_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
+        solution_spec: SolutionSpec,
+    ) -> None:
+        for duplicate_index in self.unfilled_duplicate_indices:
+            allow_chanson_idiom = (
+                self.ending == "final_cadences" and duplicate_index == 3
+            )
+            current_superius_duplicate = solution_spec.get_superius_duplicate(
+                self.duplicate.global_index, duplicate_index
+            )
+            partial_match = duplicate_index == self.duplicate.local_indices[-1]
+
+            local_voice_measures = {
+                "bassus": allowed_voice_measures["bassus"],
+                "tenor": allowed_voice_measures["tenor"],
+                "contratenor": allowed_voice_measures["contratenor"],
+            }
+            local_voice_measures["superius"] = filter_duplicates(
+                allowed_voice_measures["superius"],
+                current_superius_duplicate,
+                partial_match,
+            )
+            voice_measure_stacker = VoiceMeasureStacker(
+                local_voice_measures,
+                self.rhythms[duplicate_index],
+                allow_chanson_idiom=allow_chanson_idiom,
+            )
+            self.sequence_prospects[duplicate_index] = next(iter(voice_measure_stacker))
+            self.unfilled_prospect_indices.remove(duplicate_index)
+        self.unfilled_duplicate_indices.clear()
+
+        if self.ending == "final_cadences" and 3 in self.unfilled_prospect_indices:
+            voice_measure_stacker = VoiceMeasureStacker(
+                allowed_voice_measures,
+                self.rhythms[3],
+                allow_chanson_idiom=True,
+            )
+            self.sequence_prospects[3] = next(iter(voice_measure_stacker))
+            self.unfilled_prospect_indices.remove(3)
+        for prospect_index in self.unfilled_prospect_indices:
+            voice_measure_stacker = VoiceMeasureStacker(
+                allowed_voice_measures,
+                self.rhythms[prospect_index],
+            )
+            self.sequence_prospects[prospect_index] = next(iter(voice_measure_stacker))
+        self.unfilled_prospect_indices.clear()
+
+
+@dataclass
+class DanceSolver:
+    global_spec: GlobalSpec
+    solution_spec: SolutionSpec
+    number_of_sections: int = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.number_of_sections = len(self.solution_spec.sections)
+
+    def get_tempo(self) -> int:
+        tempo_min, tempo_max = idioms["tempo_map"][self.global_spec.dance_name]
+        return random.randint(tempo_min, tempo_max)
+
+    def solve(self) -> limits.DanceScore:
+        try:
+            solution_score = next(self.advance_section(0))
+        except StopIteration:
+            raise limits.ImprobableError("Sample of prospects are insufficient.")
+        return solution_score
+
+    def advance_section(self, section_index: int) -> Iterator[limits.DanceScore]:
+        if section_index >= self.number_of_sections:
+            chosen_instrument = theory.MidiInstrument(
+                *random.choice(idioms["instruments"])
+            )
+            score_sequences = []
+            for section_result in self.solution_spec.result:
+                score_sequences.append(
+                    [
+                        measure_stack
+                        for sequence_result in section_result
+                        for measure_stack in sequence_result
+                    ]
+                )
+            if (
+                self.solution_spec[-1][-1].ending != "final_cadences"
+                and self.solution_spec[0][-1].ending == "final_cadences"
+            ):
+                if self.number_of_sections == 2 and len(self.solution_spec[-1]) > 1:
+                    will_refrain = True
+                elif self.number_of_sections > 2:
+                    will_refrain = True
+                else:
+                    will_refrain = False
+            else:
+                will_refrain = False
+
+            dance_score = limits.DanceScore(
+                self.solution_spec.primary_mode,
+                self.global_spec.clef_group,
+                score_sequences,
+                chosen_instrument,
+                self.get_tempo(),
+                will_refrain,
+            )
+            yield dance_score
+            return
+
+        section_solver = self.advance_sequence(
+            0, self.solution_spec[section_index].solve_order
+        )
+        try:
+            for _ in section_solver:
+                yield from self.advance_section(section_index + 1)
+        except limits.ImprobableError as err:
+            print(f"{err} Backtracking to previous section.")
+            return
+
+    def advance_sequence(
+        self, solve_index: int, sequence_specs: list[SequenceSpec]
+    ) -> Iterator[bool]:
+        if solve_index >= len(sequence_specs):
+            yield True
+            return
+        sequence_spec = sequence_specs[solve_index]
+        sequence_solver = sequence_spec.solve(self.global_spec, self.solution_spec)
+        for _ in sequence_solver:
+            yield from self.advance_sequence(solve_index + 1, sequence_specs)
 
 
 DuoMeasureTest = tuple[
@@ -689,8 +1261,11 @@ DuoMeasureTest = tuple[
     tuple[str, ...],
 ]
 
-regular_duo_successes: dict[int, set[int]] = defaultdict(set)
-regular_duo_failures: dict[int, set[int]] = defaultdict(set)
+
+bass_regular_duo_successes: dict[int, set[int]] = defaultdict(set)
+bass_regular_duo_failures: dict[int, set[int]] = defaultdict(set)
+upper_regular_duo_successes: dict[int, set[int]] = defaultdict(set)
+upper_regular_duo_failures: dict[int, set[int]] = defaultdict(set)
 
 
 def are_regular_duos_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
@@ -701,27 +1276,40 @@ def are_regular_duos_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> boo
         consonant_ids,
     ) in duo_measure_tests:
         lower_id, upper_id = lower_voice_measure.id, upper_voice_measure.id
-        if upper_id in regular_duo_successes[lower_id]:
-            continue
-        if upper_id in regular_duo_failures[lower_id]:
-            return False
-
-        if checked_regular_duo(
-            lower_voice_measure, upper_voice_measure, additional_tests, consonant_ids
-        ):
-            regular_duo_successes[lower_id].add(upper_id)
+        if consonant_ids == pure.lower_voice_consonances:
+            success_cache = bass_regular_duo_successes
+            failure_cache = bass_regular_duo_failures
+        elif consonant_ids == pure.upper_voice_consonances:
+            success_cache = upper_regular_duo_successes
+            failure_cache = upper_regular_duo_failures
         else:
-            regular_duo_failures[lower_id].add(upper_id)
+            raise ValueError
+
+        if upper_id in failure_cache[lower_id]:
             return False
+        if upper_id not in success_cache[lower_id]:
+            if checked_regular_duo(
+                lower_voice_measure, upper_voice_measure, consonant_ids
+            ):
+                success_cache[lower_id].add(upper_id)
+            else:
+                failure_cache[lower_id].add(upper_id)
+                return False
+
+        duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
+        for current_lower_note, current_upper_note in duo_iter:
+            for additional_test in additional_tests:
+                if not additional_test(
+                    current_lower_note.specific_pitch,
+                    current_upper_note.specific_pitch,
+                ):
+                    return False
     return True
 
 
 def checked_regular_duo(
     lower_voice_measure: theory.FullVoiceMeasure,
     upper_voice_measure: theory.FullVoiceMeasure,
-    additional_tests: tuple[
-        Callable[[theory.SpecificPitch, theory.SpecificPitch], bool], ...
-    ],
     consonant_ids: tuple[str, ...],
 ) -> bool:
     previous_lower_note = lower_voice_measure[0]
@@ -737,13 +1325,6 @@ def checked_regular_duo(
     elapsed_duration = Fraction("0")
     duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
     for current_lower_note, current_upper_note in duo_iter:
-        for additional_test in additional_tests:
-            if not additional_test(
-                current_lower_note.specific_pitch,
-                current_upper_note.specific_pitch,
-            ):
-                return False
-
         allowed_unison = (
             current_lower_note.specific_pitch == previous_lower_note.specific_pitch
             and current_upper_note.specific_pitch == previous_upper_note.specific_pitch
@@ -787,8 +1368,10 @@ def checked_regular_duo(
     return True
 
 
-idiom_duo_presences: dict[int, set[int]] = defaultdict(set)
-idiom_duo_absences: dict[int, set[int]] = defaultdict(set)
+bass_idiom_duo_presences: dict[int, set[int]] = defaultdict(set)
+bass_idiom_duo_absences: dict[int, set[int]] = defaultdict(set)
+upper_idiom_duo_presences: dict[int, set[int]] = defaultdict(set)
+upper_idiom_duo_absences: dict[int, set[int]] = defaultdict(set)
 
 
 def has_chanson_duo(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
@@ -799,17 +1382,25 @@ def has_chanson_duo(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
         consonant_ids,
     ) in duo_measure_tests:
         lower_id, upper_id = lower_voice_measure.id, upper_voice_measure.id
-        if upper_id in idiom_duo_presences[lower_id]:
-            return True
-        if upper_id in idiom_duo_absences[lower_id]:
-            continue
+        if consonant_ids == pure.lower_voice_consonances:
+            success_cache = bass_idiom_duo_presences
+            failure_cache = bass_idiom_duo_absences
+        elif consonant_ids == pure.upper_voice_consonances:
+            success_cache = upper_idiom_duo_presences
+            failure_cache = upper_idiom_duo_absences
+        else:
+            raise ValueError
 
+        if upper_id in success_cache[lower_id]:
+            return True
+        if upper_id in failure_cache[lower_id]:
+            continue
         if is_duo_idiom_present(
             lower_voice_measure, upper_voice_measure, consonant_ids
         ):
-            idiom_duo_presences[lower_id].add(upper_id)
+            success_cache[lower_id].add(upper_id)
             return True
-        idiom_duo_absences[lower_id].add(upper_id)
+        failure_cache[lower_id].add(upper_id)
     return False
 
 
@@ -1004,24 +1595,6 @@ def is_trio_idiom_present(
     return False
 
 
-def are_half_duos_valid(half_duo_tests: tuple[HalfDuoTest, ...]) -> bool:
-    for lower_pitch, upper_pitch, additional_tests, consonant_ids in half_duo_tests:
-        if not pure.is_duo_consonant(lower_pitch, upper_pitch, consonant_ids):
-            return False
-        for additional_test in additional_tests:
-            if not additional_test(lower_pitch, upper_pitch):
-                return False
-    return True
-
-
-def is_half_trio_valid(
-    lowest_pitch: theory.SpecificPitch,
-    middle_pitch: theory.SpecificPitch,
-    highest_pitch: theory.SpecificPitch,
-) -> bool:
-    return pure.is_perfect_fourth_consonant(lowest_pitch, middle_pitch, highest_pitch)
-
-
 def get_note_trio(
     lowest_voice_measure: theory.FullVoiceMeasure,
     middle_voice_measure: theory.FullVoiceMeasure,
@@ -1056,298 +1629,10 @@ def get_note_trio(
         remaining_measure_duration -= intersect_duration
 
 
-def get_first_measure_stacks(
-    full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
-    chosen_mode: theory.ModalScale,
-    is_antecedent: bool,
-) -> list[theory.FullMeasureStack]:
-    first_sequences = defaultdict(list)
-
-    first_degrees = idioms["first_degrees"]
-    if is_antecedent:
-        first_degrees["superius"] = [0]
-
-    for voice_name, voice_measures in full_voice_measures.items():
-        allowed_first_motions = set(idioms["first_motions"][voice_name])
-        allowed_start_pitches = {
-            str(chosen_mode[first_degree]) for first_degree in first_degrees[voice_name]
-        }
-        for voice_measure in voice_measures:
-            if len(voice_measure) == 1:
-                continue
-            first_specific_pitch = voice_measure[0].specific_pitch
-            if first_specific_pitch.generic_pitch not in allowed_start_pitches:
-                continue
-
-            second_specific_pitch = voice_measure[1].specific_pitch
-            interval_vector = theory.SpecificPitch.get_interval_vector(
-                first_specific_pitch, second_specific_pitch
-            )
-            if interval_vector not in allowed_first_motions:
-                continue
-            first_sequences[voice_name].append(voice_measure)
-
-    voice_measure_stacker = VoiceMeasureStacker(first_sequences)
-    measure_stack_groups = next(iter(voice_measure_stacker))
-
-    return measure_stack_groups["no_whole_notes"]
-
-
-def get_half_cadence(
-    full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
-    chosen_mode: theory.ModalScale,
-    voice_tessituras: dict[str, theory.Tessitura],
-) -> list[theory.FullMeasureStack]:
-    cadential_sequences = defaultdict(list)
-    tonic_generic_pitch = chosen_mode[0]
-    superius_tessitura = voice_tessituras["superius"]
-
-    interval_shifts = [theory.Interval.get("m2")]
-    if chosen_mode.scale_intervals[-1] == "m7":
-        interval_shifts.append(theory.Interval.get("M2"))
-    tonic_specific_pitches = superius_tessitura.find_equivalent_pitches(
-        tonic_generic_pitch
-    )
-
-    half_duration = Fraction("1/2")
-    superius_measure_bound = theory.MeasureBound(
-        theory.RhythmBound(half_duration, 2), theory.SkipBound(0)
-    )
-    for interval_shift in interval_shifts:
-        for tonic_specific_pitch in tonic_specific_pitches:
-            cadence_pitch = tonic_specific_pitch - interval_shift
-            if cadence_pitch in superius_tessitura:
-                superius_measure = theory.FullVoiceMeasure.get(
-                    [
-                        theory.SpecificNote(tonic_specific_pitch, half_duration),
-                        theory.SpecificNote(cadence_pitch, half_duration),
-                    ],
-                    superius_measure_bound,
-                    superius_measure_bound,
-                    True,
-                    False,
-                )
-                cadential_sequences["superius"].append(superius_measure)
-
-    for voice_name in lower_voice_names:
-        cadential_sequences[voice_name] = [
-            voice_measure
-            for voice_measure in full_voice_measures[voice_name]
-            if len(voice_measure) <= 2
-        ]
-
-    voice_measure_stacker = VoiceMeasureStacker(cadential_sequences)
-    measure_stack_groups = next(iter(voice_measure_stacker))
-    result_stacks = measure_stack_groups["no_whole_notes"]
-    result_stacks.extend(measure_stack_groups["some_whole_notes"])
-
-    half_cadence_cache[str(chosen_mode)] = result_stacks
-    return result_stacks
-
-
-def create_picardy_third(
-    has_minor_third: bool,
-    designated_letter: str,
-    original_note: theory.SpecificNote,
-) -> theory.SpecificNote:
-    if has_minor_third:
-        original_pitch = original_note.specific_pitch
-        if original_pitch.letter == designated_letter:
-            picardy_third = original_pitch.clone()
-            picardy_third.increment_value(1)
-            return theory.SpecificNote(picardy_third, original_note.duration)
-
-    return original_note
-
-
-class CadentialError(Exception):
-    def __str__(self) -> str:
-        return f"Authentic cadence failed: {self.args[0]}"
-
-
-def set_final_prospects(
-    sequence_prospects: limits.TwoDimensionStack,
-    chosen_mode: theory.ModalScale,
-    voice_tessituras: dict[str, theory.Tessitura],
-    cadence_id: str,
-    superius_ending_tessitura: theory.Tessitura,
-    include_whole_notes: bool = True,
-) -> None:
-    penultimate_sequences = defaultdict(list)
-    ultimate_sequences = defaultdict(list)
-
-    modify_chordal_third = partial(
-        create_picardy_third,
-        chosen_mode.scale_intervals[2][0] == "m",
-        chosen_mode[2].letter,
-    )
-
-    for voice_name, voice_formulae in idioms[cadence_id].items():
-        voice_tessitura = voice_tessituras[voice_name]
-        ultimate_formulas = set()
-        penultimate_formulas = set()
-        for voice_formula in voice_formulae:
-            *penultimate_formula, ultimate_formula = voice_formula
-            converted_formula = tuple(
-                tuple(formula_part) for formula_part in penultimate_formula
-            )
-            penultimate_formulas.add(converted_formula)
-            ultimate_formulas.add(tuple(ultimate_formula))
-
-        for penultimate_formula in penultimate_formulas:
-            voice_measures = get_penultimate_voice_measures(
-                chosen_mode, penultimate_formula, voice_tessitura
-            )
-            penultimate_sequences[voice_name].extend(voice_measures)
-        for ultimate_formula in ultimate_formulas:
-            voice_measures = get_ultimate_voice_measures(
-                chosen_mode, ultimate_formula, voice_tessitura, modify_chordal_third
-            )
-            ultimate_sequences[voice_name].extend(voice_measures)
-
-    voice_measure_stacker = VoiceMeasureStacker(
-        penultimate_sequences,
-        are_cadential_duos_valid,
-        are_cadential_trios_valid,
-    )
-    measure_stack_groups = next(iter(voice_measure_stacker))
-
-    sequence_prospects[-2].extend(measure_stack_groups["no_whole_notes"])
-    sequence_prospects[-2].extend(measure_stack_groups["some_whole_notes"])
-    if include_whole_notes:
-        sequence_prospects[-2].extend(measure_stack_groups["all_whole_notes"])
-
-    voice_measure_stacker = VoiceMeasureStacker(ultimate_sequences)
-    measure_stack_groups = next(iter(voice_measure_stacker))
-
-    for index_prospect in measure_stack_groups["all_whole_notes"]:
-        superius_ending_pitch = index_prospect[-1][-1].specific_pitch
-        if superius_ending_pitch not in superius_ending_tessitura:
-            continue
-        sequence_prospects[-1].append(index_prospect)
-    if not sequence_prospects[-1] and cadence_id == "final_cadances":
-        raise CadentialError(
-            "Not enough prospects.", str(chosen_mode), chosen_mode.type
-        )
-
-
-def get_penultimate_voice_measures(
-    chosen_mode: theory.ModalScale,
-    voice_formula: list[tuple[int, str]],
-    voice_tessitura: theory.Tessitura,
-) -> list[theory.FullVoiceMeasure]:
-    previous_scale_degree = starting_scale_degree = voice_formula[0][0]
-    starting_duration = revert_duration(voice_formula[0][1])
-    pitch_sequences = []
-
-    used_scale_degrees = [starting_scale_degree]
-    rhythm_durations = [starting_duration]
-    melody_contour = []
-
-    for current_scale_degree, duration_repr in voice_formula[1:]:
-        used_scale_degrees.append(current_scale_degree)
-        rhythm_durations.append(revert_duration(duration_repr))
-        current_vector = current_scale_degree - previous_scale_degree
-        melody_contour.append(current_vector)
-        previous_scale_degree = current_scale_degree
-
-    melody_pack = theory.MelodyPack(rhythm_durations, [melody_contour])
-    left_skip_count, right_skip_count = melody_pack.get_skip_counts(melody_contour)
-    is_skip_continuous = melody_pack.check_skip_continuity(
-        left_skip_count, right_skip_count, melody_contour
-    )
-
-    if (
-        -1 in used_scale_degrees
-        and chosen_mode.scale_intervals[-1][0] == "m"
-        and chosen_mode.type != "phrygian"
-    ):
-        """the phrygian cadence uses a descending minor second in the tenorizan
-        rather than the usual ascending minor second in the cantizan"""
-        starting_generic_pitch = chosen_mode.get_cadential_pitch(starting_scale_degree)
-        starting_specific_pitches = voice_tessitura.find_equivalent_pitches(
-            starting_generic_pitch
-        )
-        pitch_shifter = chosen_mode.cadential_shift
-    else:
-        starting_generic_pitch = chosen_mode[starting_scale_degree]
-        starting_specific_pitches = voice_tessitura.find_equivalent_pitches(
-            starting_generic_pitch
-        )
-        pitch_shifter = chosen_mode.scale_shift
-
-    for starting_specific_pitch in starting_specific_pitches:
-        pitch_sequence = [
-            theory.SpecificNote(starting_specific_pitch, starting_duration)
-        ]
-        previous_scale_degree = starting_scale_degree
-        previous_specific_pitch = starting_specific_pitch
-
-        for current_scale_degree, current_duration in zip(
-            used_scale_degrees[1:], rhythm_durations[1:]
-        ):
-            current_specific_pitch = pitch_shifter(
-                previous_specific_pitch, previous_scale_degree, current_scale_degree
-            )
-            if current_specific_pitch not in voice_tessitura:
-                break
-
-            pitch_sequence.append(
-                theory.SpecificNote(current_specific_pitch, current_duration)
-            )
-            previous_scale_degree = current_scale_degree
-            previous_specific_pitch = current_specific_pitch
-        else:
-            voice_measure = theory.FullVoiceMeasure.get(
-                pitch_sequence,
-                theory.MeasureBound(
-                    melody_pack.left_rhythm_bound, theory.SkipBound(left_skip_count)
-                ),
-                theory.MeasureBound(
-                    melody_pack.right_rhythm_bound,
-                    theory.SkipBound(right_skip_count),
-                ),
-                melody_pack.is_rhythm_continuous,
-                is_skip_continuous,
-            )
-            pitch_sequences.append(voice_measure)
-
-    return pitch_sequences
-
-
-ultimate_duration = Fraction("1")
-whole_note_bound = theory.RhythmBound(Fraction("1"), 1)
-no_skip_bound = theory.SkipBound(0)
-
-
-def get_ultimate_voice_measures(
-    chosen_mode: theory.ModalScale,
-    voice_formula: tuple[int, str],
-    voice_tessitura: theory.Tessitura,
-    modify_chordal_third: partial[theory.SpecificNote],
-) -> list[theory.FullVoiceMeasure]:
-    diatonic_generic_pitch = chosen_mode[voice_formula[0]]
-    starting_specific_pitches = voice_tessitura.find_equivalent_pitches(
-        diatonic_generic_pitch
-    )
-
-    pitch_sequences = []
-    for starting_specific_pitch in starting_specific_pitches:
-        sole_note = theory.SpecificNote(starting_specific_pitch, ultimate_duration)
-        corrected_voice_measure = theory.FullVoiceMeasure.get(
-            [modify_chordal_third(sole_note)],
-            theory.MeasureBound(whole_note_bound, no_skip_bound),
-            theory.MeasureBound(whole_note_bound, no_skip_bound),
-            True,
-            True,
-        )
-        pitch_sequences.append(corrected_voice_measure)
-
-    return pitch_sequences
-
-
-cadential_duo_successes: dict[int, set[int]] = defaultdict(set)
-cadential_duo_failures: dict[int, set[int]] = defaultdict(set)
+bass_cadential_duo_successes: dict[int, set[int]] = defaultdict(set)
+bass_cadential_duo_failures: dict[int, set[int]] = defaultdict(set)
+upper_cadential_duo_successes: dict[int, set[int]] = defaultdict(set)
+upper_cadential_duo_failures: dict[int, set[int]] = defaultdict(set)
 
 
 def are_cadential_duos_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> bool:
@@ -1358,27 +1643,40 @@ def are_cadential_duos_valid(duo_measure_tests: tuple[DuoMeasureTest, ...]) -> b
         consonant_ids,
     ) in duo_measure_tests:
         lower_id, upper_id = lower_voice_measure.id, upper_voice_measure.id
-        if upper_id in cadential_duo_successes[lower_id]:
-            continue
-        if upper_id in cadential_duo_failures[lower_id]:
-            return False
-
-        if checked_cadential_duo(
-            lower_voice_measure, upper_voice_measure, additional_tests, consonant_ids
-        ):
-            cadential_duo_successes[lower_id].add(upper_id)
+        if consonant_ids == pure.lower_voice_consonances:
+            success_cache = bass_cadential_duo_successes
+            failure_cache = bass_cadential_duo_failures
+        elif consonant_ids == pure.upper_voice_consonances:
+            success_cache = upper_cadential_duo_successes
+            failure_cache = upper_cadential_duo_failures
         else:
-            cadential_duo_failures[lower_id].add(upper_id)
+            raise ValueError
+
+        if upper_id in failure_cache[lower_id]:
             return False
+        if upper_id not in success_cache[lower_id]:
+            if checked_cadential_duo(
+                lower_voice_measure, upper_voice_measure, consonant_ids
+            ):
+                success_cache[lower_id].add(upper_id)
+            else:
+                failure_cache[lower_id].add(upper_id)
+                return False
+
+        duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
+        for current_lower_note, current_upper_note in duo_iter:
+            for additional_test in additional_tests:
+                if not additional_test(
+                    current_lower_note.specific_pitch,
+                    current_upper_note.specific_pitch,
+                ):
+                    return False
     return True
 
 
 def checked_cadential_duo(
     lower_voice_measure: theory.FullVoiceMeasure,
     upper_voice_measure: theory.FullVoiceMeasure,
-    additional_tests: tuple[
-        Callable[[theory.SpecificPitch, theory.SpecificPitch], bool], ...
-    ],
     consonant_ids: tuple[str, ...],
 ) -> bool:
     previous_lower_note = lower_voice_measure[0]
@@ -1429,13 +1727,6 @@ def checked_cadential_duo(
     elapsed_duration = Fraction("0")
     duo_iter = rules.get_note_duo(lower_voice_measure, upper_voice_measure)
     for current_lower_note, current_upper_note in duo_iter:
-        for additional_test in additional_tests:
-            if not additional_test(
-                current_lower_note.specific_pitch,
-                current_upper_note.specific_pitch,
-            ):
-                return False
-
         if elapsed_duration == Fraction("3/4"):
             attack_requires_consonance = not screen.is_dissonant_idiom(
                 lower_voice_measure, upper_voice_measure
@@ -1589,32 +1880,17 @@ def checked_cadential_trio(
     return True
 
 
-def fill_prospects(
-    sequence_prospects: limits.TwoDimensionStack,
-    measure_stack_groups: dict[str, list[theory.FullMeasureStack]],
-    stack_map: dict[str, list[int]],
-) -> None:
-    for group_key, prospect_indices in stack_map.items():
-        for measure_stack in measure_stack_groups[group_key]:
-            for prospect_index in prospect_indices:
-                sequence_prospects[prospect_index].append(measure_stack)
-
-
 quartet_tests: dict[str, bool] = {}
 
 
 def is_quartet_valid(
-    bassus_measure: theory.FullVoiceMeasure,
-    tenor_measure: theory.FullVoiceMeasure,
-    contratenor_measure: theory.FullVoiceMeasure,
-    superius_measure: theory.FullVoiceMeasure,
+    measure_quartet: tuple[
+        theory.FullVoiceMeasure,
+        theory.FullVoiceMeasure,
+        theory.FullVoiceMeasure,
+        theory.FullVoiceMeasure,
+    ]
 ) -> bool:
-    measure_quartet = (
-        bassus_measure,
-        tenor_measure,
-        contratenor_measure,
-        superius_measure,
-    )
     test_id = "+".join(str(voice_measure.id) for voice_measure in measure_quartet)
     if test_id in quartet_tests:
         return quartet_tests[test_id]
@@ -1639,11 +1915,12 @@ TrioValidator = Callable[[tuple[TrioMeasureTest, ...]], bool]
 @dataclass
 class VoiceMeasureStacker:
     pitch_sequences: dict[str, list[theory.FullVoiceMeasure]]
+    allowed_rhythms: set[str]
     are_duos_valid: DuoValidator = are_regular_duos_valid
     are_trios_valid: TrioValidator = are_regular_trios_valid
-    result_min_count: int = 7_000
-    result_filter_threshold: int = 4_000
     allow_chanson_idiom: bool = False
+    result_min_count = 5_000
+    some_whole_count = {1, 2, 3}
 
     def __post_init__(self) -> None:
         self.bassus_measures = self.pitch_sequences["bassus"]
@@ -1651,7 +1928,7 @@ class VoiceMeasureStacker:
         self.contratenor_measures = self.pitch_sequences["contratenor"]
         self.superius_measures = self.pitch_sequences["superius"]
 
-    def __iter__(self) -> Iterator[dict[str, list[theory.FullMeasureStack]]]:
+    def __iter__(self) -> Iterator[list[theory.VariantStack]]:
         random.shuffle(self.bassus_measures)
         sub_iters = []
         for bassus_measure in self.bassus_measures:
@@ -1660,59 +1937,44 @@ class VoiceMeasureStacker:
                     [bassus_measure],
                 )
             )
-
-        valid_result_count = 0
-        total_result_count = 0
-        measure_stack_groups = defaultdict(list)
+        result_stacks: list[theory.VariantStack] = []
+        result_count = 0
         sub_iter_count = len(sub_iters)
-        print(f"Generating stacks from {sub_iter_count} iterators.")
         sample_index = 0
 
         while sub_iters:
             if sample_index == sub_iter_count:
                 sample_index = 0
             try:
-                current_measure_stack = next(sub_iters[sample_index])
+                prospect_stack = next(sub_iters[sample_index])
             except StopIteration:
                 sub_iters.pop(sample_index)
                 sub_iter_count -= 1
                 continue
-            whole_note_count = self.count_whole_notes(current_measure_stack)
 
-            total_result_count += 1
-            if whole_note_count == 0:
-                measure_stack_groups["no_whole_notes"].append(current_measure_stack)
-                valid_result_count += 1
-                if valid_result_count == self.result_min_count:
-                    yield measure_stack_groups
-                    valid_result_count = 0
-                    total_result_count = 0
-                    measure_stack_groups.clear()
-            elif total_result_count < self.result_filter_threshold:
-                if whole_note_count == 4:
-                    measure_stack_groups["all_whole_notes"].append(
-                        current_measure_stack
-                    )
-                else:
-                    measure_stack_groups["some_whole_notes"].append(
-                        current_measure_stack
-                    )
+            result_stacks.append(prospect_stack)
             sample_index += 1
+            result_count += 1
+            if result_count == self.result_min_count:
+                yield result_stacks
+                result_count = 0
+                result_stacks = []
+        yield result_stacks
 
-        yield measure_stack_groups
-
-    @staticmethod
-    def count_whole_notes(measure_stack: theory.FullMeasureStack) -> int:
-        return sum(1 for voice_measure in measure_stack if len(voice_measure) == 1)
-
-    @staticmethod
     def shuffle_iter(
+        self,
         voice_measures: list[theory.FullVoiceMeasure],
     ) -> Iterator[theory.FullVoiceMeasure]:
         measure_indices = list(range(len(voice_measures)))
         random.shuffle(measure_indices)
         for measure_index in measure_indices:
-            yield voice_measures[measure_index]
+            voice_measure = voice_measures[measure_index]
+            if len(voice_measure) == 1:
+                if self.allowed_rhythms == {"no_whole_notes"}:
+                    continue
+            elif self.allowed_rhythms == {"all_whole_notes"}:
+                continue
+            yield voice_measure
 
     def get_measure_stacks(
         self,
@@ -1805,17 +2067,24 @@ class VoiceMeasureStacker:
                             )
                         ):
                             continue
-                        if not is_quartet_valid(
-                            bassus_measure,
-                            tenor_measure,
-                            contratenor_measure,
-                            superius_measure,
-                        ):
-                            continue
-                        possible_measure_stack = theory.FullMeasureStack.get(
+
+                        pseudo_stack = (
                             bassus_measure,
                             tenor_measure,
                             contratenor_measure,
                             superius_measure,
                         )
-                        yield possible_measure_stack
+                        whole_note_count = sum(
+                            1
+                            for voice_measure in pseudo_stack
+                            if len(voice_measure) == 1
+                        )
+                        if (
+                            whole_note_count not in self.some_whole_count
+                            and self.allowed_rhythms == {"some_whole_notes"}
+                        ):
+                            continue
+                        if not is_quartet_valid(pseudo_stack):
+                            continue
+                        prospect_stack = theory.FullMeasureStack.get(*pseudo_stack)
+                        yield prospect_stack
