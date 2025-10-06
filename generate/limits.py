@@ -42,12 +42,15 @@ class SequencePartial:
         self.dotted_counts = [0, 0, 0, 0]
         self.flattened_pitch = chosen_modes[0].flattened_pitch
         self.allowed_fifth_endpoints = {
-            str(chosen_mode[0]) for chosen_mode in chosen_modes
+            endpoint
+            for chosen_mode in chosen_modes
+            for endpoint in chosen_mode.fifth_endpoints
         }
         self.allowed_fourth_endpoints = {
-            str(chosen_mode[4]) for chosen_mode in chosen_modes
+            endpoint
+            for chosen_mode in chosen_modes
+            for endpoint in chosen_mode.fourth_endpoints
         }
-        self.allowed_fourth_endpoints |= self.allowed_fifth_endpoints
         self.start_time = time.time()
 
         self.backtrack_adjacencies: list[dict[int, set[int]]] = [

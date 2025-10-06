@@ -504,6 +504,9 @@ class ModalScale(GenericScale):
     ) -> None:
         super().__init__(symbol)
         self.type = self.__class__.__name__[:-5].lower()
+        self.fifth_endpoints = {str(self[0])}
+        self.fourth_endpoints = {str(self[scale_index]) for scale_index in (0, 3, 4)}
+        self.fourth_endpoints.add(str(self.flattened_pitch))
 
     @property
     def flattened_pitch(self) -> GenericPitch:

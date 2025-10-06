@@ -241,7 +241,9 @@ class LilypondFactory:
             sheet_file.write(output_string)
 
     @classmethod
-    def export_dance_score(cls, input_score: limits.DanceScore) -> None:
+    def export_dance_score(
+        cls, score_name: str, input_score: limits.DanceScore
+    ) -> None:
         with open("logs/custom.txt", "r") as sheet_file:
             output_string = sheet_file.read()
         tonic_designator = cls.convert_generic_pitch(input_score.scale[0])
@@ -278,6 +280,14 @@ class LilypondFactory:
         output_string = output_string.replace(
             "VOICE_PARTS", "\n".join(voice_parts_markup[::-1])
         )
+        header_text = (
+            '\\version "2.24.0"\n'
+            "\\header {\n"
+            f'{space_chr * 2}title = "{score_name}"\n'
+            f'{space_chr * 2}composer = "Sanseer"\n'
+            "}"
+        )
+        output_string = f"{header_text}\n\n{output_string}"
 
         with open("logs/output.txt", "w") as sheet_file:
             sheet_file.write(output_string)

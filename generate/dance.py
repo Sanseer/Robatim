@@ -202,10 +202,35 @@ class GlobalSpec:
         self.final_ending_tessitura = theory.Tessitura(
             min_ending_pitch, max_ending_pitch
         )
+        self.score_name = self.get_score_name()
 
     @property
     def top_clef(self) -> str:
         return self.clef_group[-1]
+
+    def get_score_name(self) -> str:
+        letter_sequences = []
+        for character in self.dance_name:
+            if character.isupper():
+                letter_sequences.append([character])
+            else:
+                letter_sequences[-1].append(character)
+        type_name = " ".join(
+            "".join(letter_sequence) for letter_sequence in letter_sequences
+        )
+
+        phonetic_collections = (idioms["vowels"], idioms["consonants"])
+        phonetic_index = random.random() < 0.5
+        word_fragments: list[str] = []
+        while len(song_name := "".join(word_fragments)) < 5:
+            phonetic_index = not phonetic_index
+            phonetic_options = random.choice(phonetic_collections[phonetic_index])
+            chosen_word_fragment = random.choice(phonetic_options)
+            if len(chosen_word_fragment) > 1:
+                phonetic_options.remove(chosen_word_fragment)
+            word_fragments.append(chosen_word_fragment)
+
+        return f"{type_name} ({song_name.capitalize()})"
 
 
 @dataclass
@@ -557,14 +582,13 @@ def get_branle_gay_start(
 def get_antecedent_ending(
     current_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
     chosen_mode: theory.ModalScale,
-    voice_tessituras: dict[str, theory.Tessitura],
+    superius_tessitura: theory.Tessitura,
     is_backward: bool,
     reference_stack: theory.VariantStack,
 ) -> list[theory.VariantStack]:
     last_sequences = defaultdict(list)
     tonic_generic_pitch = chosen_mode[0]
     flattened_pitch = chosen_mode.flattened_pitch
-    superius_tessitura = voice_tessituras["superius"]
 
     interval_shifts = [theory.Interval.get("m2")]
     if chosen_mode.scale_intervals[-1] == "m7":
@@ -752,9 +776,16 @@ def filter_transition(
     reference_stack: theory.VariantStack,
     chosen_modes: list[theory.ModalScale],
 ) -> list[theory.VariantStack]:
-    allowed_fifth_endpoints = {str(chosen_mode[0]) for chosen_mode in chosen_modes}
-    allowed_fourth_endpoints = {str(chosen_mode[4]) for chosen_mode in chosen_modes}
-    allowed_fourth_endpoints |= allowed_fifth_endpoints
+    allowed_fifth_endpoints = {
+        endpoint
+        for chosen_mode in chosen_modes
+        for endpoint in chosen_mode.fifth_endpoints
+    }
+    allowed_fourth_endpoints = {
+        endpoint
+        for chosen_mode in chosen_modes
+        for endpoint in chosen_mode.fourth_endpoints
+    }
     test_suite = (
         partial(rules.are_measure_stacks_unique),
         partial(rules.checked_dissonant_pass),
@@ -917,9 +948,12 @@ class SequenceSpec:
         all_full_voice_measures: dict[str, list[theory.FullVoiceMeasure]],
     ) -> dict[str, list[theory.FullVoiceMeasure]]:
         modified_full_voice_measures = defaultdict(list)
-        allowed_fifth_endpoints = {str(mode[0]) for mode in self.modes}
-        allowed_fourth_endpoints = {str(mode[4]) for mode in self.modes}
-        allowed_fourth_endpoints |= allowed_fifth_endpoints
+        allowed_fifth_endpoints = {
+            endpoint for mode in self.modes for endpoint in mode.fifth_endpoints
+        }
+        allowed_fourth_endpoints = {
+            endpoint for mode in self.modes for endpoint in mode.fourth_endpoints
+        }
 
         for voice_name, voice_measures in all_full_voice_measures.items():
             for voice_measure in voice_measures:
@@ -956,7 +990,7 @@ class SequenceSpec:
         self.sequence_prospects[5] = get_antecedent_ending(
             allowed_voice_measures,
             self.mode,
-            global_spec.voice_tessituras,
+            global_spec.voice_tessituras["superius"],
             is_backward := "backward" in self.ending,
             reference_stack,
         )

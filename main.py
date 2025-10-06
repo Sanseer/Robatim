@@ -59,5 +59,5 @@ if __name__ == "__main__":
             _, tonic_pitch_str, chosen_mode_str = err.args
             mode_group.remove([tonic_pitch_str, chosen_mode_str])
 
-    export.LilypondFactory.export_dance_score(dance_score)
+    export.LilypondFactory.export_dance_score(global_spec.score_name, dance_score)
     export.export_dance_midi(dance_score)
