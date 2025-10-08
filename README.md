@@ -1,6 +1,7 @@
 # Robatim
 
-Robatim is a deterministic music generator based on wave function collapse. [Video Demonstration](https://www.youtube.com/watch?v=oLbpJTWE6kg).
+Robatim is a deterministic music generator that uses recursive depth-first search and breadth-first search. [Video Demonstration](https://youtu.be/EYrInLi0P-Q). The style of music is based on Renaissance dance books I found on IMSLP (e.g., Terpsichore, Musarum Aoniarum and Danceries, Livre 2). I also consulted a secondary literature reference on the topic (Peter Schubert's Modal Counterpoint). 
+
 
 ## Requirements
 
@@ -14,7 +15,7 @@ Because this repository is a script rather than a package, it must be cloned/dow
 git clone https://github.com/Sanseer/Robatim
 ```
 
-Download [idioms_vgm.json](https://gist.github.com/Sanseer/4acfd518582d4cc286746adfcd0bc9ed) and put it in the main directory.
+Download [dance.json](https://gist.github.com/Sanseer/58f838bab2bedb8a311a86fe65a65c56) and put it in the main directory.
 
 ## Usage 
 
@@ -41,7 +42,4 @@ pre-commit run --all-files
 - [MidiUtil](https://github.com/MarkCWirt/MIDIUtil): Midi file creation in Python
 - [Lilypond](https://github.com/lilypond/lilypond): Music engraving from text input
 - [MidiEditor](https://github.com/markusschwenk/midieditor): for helping me understand how MIDI works
-- [Martin Donald](https://www.youtube.com/watch?v=2SuvO4Gi7uY): for the inspiration for the wave function collapse algorithm
-- [Trevor0402](https://www.doomworld.com/forum/topic/118828-trevor0402s-sc-55-soundfont/): Midi soundfont used in video demonstration
-- [VGMusic](https://www.vgmusic.com/): for the musical inspiration
 - Dave Smith et al.: for inventing MIDI  
